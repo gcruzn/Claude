@@ -102,6 +102,26 @@ public class MainActivity extends Activity {
         // --- Patrones
         LinearLayout list = card();
         list.addView(text("Patrones guardados", 16, GRAFITO, true));
+        LinearLayout imp = new LinearLayout(this);
+        imp.setOrientation(LinearLayout.HORIZONTAL);
+        Button paste = button("Pegar patrón", VERDE, v -> importFromClipboard());
+        Button file = button("Importar archivo", VERDE, v -> {
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            startActivityForResult(i, REQ_IMPORT);
+        });
+        LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        half.topMargin = dp(10);
+        half.rightMargin = dp(4);
+        paste.setLayoutParams(half);
+        LinearLayout.LayoutParams half2 = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        half2.topMargin = dp(10);
+        half2.leftMargin = dp(4);
+        file.setLayoutParams(half2);
+        imp.addView(paste);
+        imp.addView(file);
+        list.addView(imp);
         List<String> ids = store.ids();
         String active = store.getActive();
         if (ids.isEmpty()) {
@@ -146,6 +166,85 @@ public class MainActivity extends Activity {
         root.addView(text("Tips: graba y reproduce en la misma orientación (horizontal para el juego). "
                 + "Durante la grabación los toques NO llegan al juego: haz el patrón \"en seco\" sobre la capa azul. "
                 + "Si tocas la pantalla mientras se reproduce, se detiene.", 12, GRIS, false));
+    }
+
+    // ---------------------------------------------------------------- importar
+
+    private static final int REQ_IMPORT = 42;
+
+    private void importFromClipboard() {
+        android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm == null || !cm.hasPrimaryClip() || cm.getPrimaryClip().getItemCount() == 0) {
+            toast("El portapapeles está vacío");
+            return;
+        }
+        CharSequence cs = cm.getPrimaryClip().getItemAt(0).coerceToText(this);
+        importText(cs == null ? "" : cs.toString());
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != REQ_IMPORT || res != RESULT_OK || data == null || data.getData() == null) return;
+        try (java.io.InputStream in = getContentResolver().openInputStream(data.getData())) {
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = in.read(buf)) > 0) bos.write(buf, 0, r);
+            importText(bos.toString("UTF-8"));
+        } catch (Exception e) {
+            toast("No pude leer el archivo");
+        }
+    }
+
+    /** Acepta el JSON de un patrón (aunque venga con texto alrededor) y lo adapta a esta pantalla. */
+    private void importText(String text) {
+        int a = text.indexOf('{'), b = text.lastIndexOf('}');
+        if (a < 0 || b <= a) {
+            toast("No encontré un patrón en el texto");
+            return;
+        }
+        Pattern p;
+        try {
+            p = Pattern.fromJson(new org.json.JSONObject(text.substring(a, b + 1)));
+        } catch (Exception e) {
+            toast("El patrón no es válido");
+            return;
+        }
+        if (p.touches.isEmpty()) {
+            toast("El patrón no tiene toques");
+            return;
+        }
+        // Escalar si el patrón viene de una pantalla de otra resolución.
+        android.graphics.Point size = new android.graphics.Point();
+        getWindowManager().getDefaultDisplay().getRealSize(size);
+        int curLong = Math.max(size.x, size.y), curShort = Math.min(size.x, size.y);
+        if (p.screenW > 0 && p.screenH > 0) {
+            boolean landscape = p.screenW > p.screenH;
+            int newW = landscape ? curLong : curShort;
+            int newH = landscape ? curShort : curLong;
+            float sx = (float) newW / p.screenW, sy = (float) newH / p.screenH;
+            if (Math.abs(sx - 1f) > 0.001f || Math.abs(sy - 1f) > 0.001f) {
+                for (Pattern.Touch t : p.touches) {
+                    java.util.List<Pattern.Point> scaled = new java.util.ArrayList<>();
+                    for (Pattern.Point pt : t.pts) scaled.add(new Pattern.Point(pt.t, pt.x * sx, pt.y * sy));
+                    t.pts.clear();
+                    t.pts.addAll(scaled);
+                }
+            }
+            p.screenW = newW;
+            p.screenH = newH;
+        }
+        p.normalize();
+        store.saveNew(p);
+        if (TouchService.get() != null) TouchService.get().refresh();
+        toast("Importado: " + p.name);
+        render();
+    }
+
+    private void toast(String s) {
+        android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show();
     }
 
     private void rename(String id, Pattern pt) {
