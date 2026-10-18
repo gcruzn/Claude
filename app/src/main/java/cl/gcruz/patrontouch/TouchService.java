@@ -78,6 +78,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     private void cleanup() {
         if (player != null) player.stop(null);
+        hideGhost();
         removeRecordOverlay();
         hidePanel();
         instance = null;
@@ -231,6 +232,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     @Override
     public void onPlayerState(boolean playing, String status) {
+        if (playing) showGhost(); else hideGhost();
         if (playBtn != null) {
             playBtn.setText(playing ? "■ Parar" : "▶ Repetir");
             ((GradientDrawable) playBtn.getBackground()).setColor(
@@ -297,8 +299,73 @@ public class TouchService extends AccessibilityService implements Player.Listene
         p.screenH = size.y;
         store.saveNew(p);
         updateStatusIdle();
-        toast("Guardado: " + p.name + " (" + p.touches.size() + " toques, hasta "
-                + p.maxSimultaneous() + " a la vez)");
+        toast("Guardado: " + p.name + " · vista previa…");
+        // Vista previa: se reproduce una vez sola para que veas cómo se mueve el personaje.
+        new android.os.Handler(android.os.Looper.getMainLooper())
+                .postDelayed(() -> player.start(p, 1, 0), 600);
+    }
+
+    // ---------------------------------------------------------------- dedos virtuales
+
+    private GhostView ghostView;
+
+    /** Capa NO táctil que dibuja dónde está cada dedo virtual mientras se reproduce. */
+    private void showGhost() {
+        if (ghostView != null || wm == null) return;
+        ghostView = new GhostView(this, player);
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+        try { wm.addView(ghostView, lp); } catch (Exception e) { ghostView = null; }
+    }
+
+    private void hideGhost() {
+        if (ghostView != null && wm != null) {
+            try { wm.removeView(ghostView); } catch (Exception ignored) { }
+        }
+        ghostView = null;
+    }
+
+    private static class GhostView extends View {
+        private final Player player;
+        private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final int[] loc = new int[2];
+
+        GhostView(Context c, Player player) {
+            super(c);
+            this.player = player;
+            ring.setStyle(Paint.Style.STROKE);
+            ring.setStrokeWidth(5f);
+            ring.setColor(Color.argb(230, 226, 94, 107));
+            fill.setColor(Color.argb(90, 226, 94, 107));
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            super.onDraw(c);
+            Pattern p = player.pattern();
+            if (!player.isPlaying() || p == null) return;
+            getLocationOnScreen(loc);
+            long t = player.elapsedInRep();
+            for (Pattern.Touch touch : p.touches) {
+                if (t >= touch.down() && t <= touch.up()) {
+                    float[] xy = touch.at(t);
+                    c.drawCircle(xy[0] - loc[0], xy[1] - loc[1], 34f, fill);
+                    c.drawCircle(xy[0] - loc[0], xy[1] - loc[1], 34f, ring);
+                }
+            }
+            postInvalidateOnAnimation();
+        }
     }
 
     private void removeRecordOverlay() {

@@ -42,7 +42,14 @@ public class Player {
         this.listener = listener;
     }
 
+    private long repStartUptime;
+
     public boolean isPlaying() { return playing; }
+
+    public Pattern pattern() { return pattern; }
+
+    /** ms transcurridos desde que partió la repetición actual (para dibujar los dedos virtuales). */
+    public long elapsedInRep() { return android.os.SystemClock.uptimeMillis() - repStartUptime; }
 
     public void start(Pattern p, int repeats, long pauseMs) {
         stop(null);
@@ -72,6 +79,7 @@ public class Player {
         if (!playing || s != session) return;
         sliceStart = 0;
         pending = new HashMap<>();
+        repStartUptime = android.os.SystemClock.uptimeMillis();
         listener.onPlayerState(true, "Repetición " + (rep + 1) + (repeats > 0 ? "/" + repeats : " (∞)"));
         nextSlice(s);
     }
