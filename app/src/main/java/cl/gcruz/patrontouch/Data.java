@@ -210,8 +210,50 @@ public class Data {
             seeds.add("edgar1");
             changed = true;
         }
+        if (!seeds.contains("edgar2")) {
+            // Solo se reemplaza lo que sigue igual que en edgar1: lo editado por el usuario se respeta.
+            for (String[] v2 : EDGAR2) {
+                PatternDef p = pattern(v2[0]);
+                String v1 = null;
+                for (String[] x : EDGAR1) if (x[0].equals(v2[0])) v1 = x[2];
+                if (p != null && p.script.equals(v1)) {
+                    p.name = v2[1];
+                    p.script = v2[2];
+                }
+            }
+            seeds.add("edgar2");
+            changed = true;
+        }
         return changed;
     }
+
+    /**
+     * edgar2 (18-oct, tras grabar una partida real): de 46 patrones lanzados, 34 se cortaron a los
+     * ~1,4 s porque se tocó otra flecha encima. Un salto cortado antes de aterrizar (0,9 s) no pega
+     * nada. Todas las versiones duran ~1,5 s para que terminen antes del siguiente toque.
+     */
+    static final String[][] EDGAR2 = {
+            {"e_salto", "Edgar · Salto y golpes",
+                    "# Súper sobre el más cercano (hasta 6,67 tiles) y 2 ataques al aterrizar (~1,4 s)\n"
+                            + "súper auto\nesperar 0.6\ndisparar 2 toque"},
+            {"e_hiper", "Edgar · Hiper y salto",
+                    "# Solo si tu Edgar tiene hipercarga. Hiper antes del súper (~1,6 s)\n"
+                            + "hiper\nsúper auto\nesperar 0.6\ndisparar 2 toque"},
+            {"e_doble", "Edgar · Gadget y golpes",
+                    "# Let's Fly al más cercano y 2 ataques al aterrizar (~1,5 s); el súper queda en ▲\n"
+                            + "gadget\nesperar 0.8\ndisparar 2 toque"},
+            {"e_esquive", "Edgar · Esquive",
+                    "# En plena pelea: un ataque, súper auto para esquivar y otro ataque (~1,4 s)\n"
+                            + "disparar 1 toque\nsúper auto\nesperar 0.6\ndisparar 1 toque"},
+            {"e_alejarse", "Edgar · Pegar y alejarse",
+                    "# Un ataque y retroceder pegando (~1,3 s)\n"
+                            + "disparar 1 toque\nmover abajo 0.8 disparando\nparar"},
+            {"e_rodear", "Edgar · Rodear",
+                    "# Una vuelta corta golpeando (~1,6 s)\n" + Data.RODEAR_VUELTA + "parar"},
+            {"e_escape", "Edgar · Escape",
+                    "# Salto hacia atrás al alcance máximo y un tramo corriendo (~1,5 s)\n"
+                            + "súper apuntado abajo\nesperar 0.5\nmover abajo 0.6\nparar"},
+    };
 
     /**
      * Edgar (wiki Brawl Stars, oct-2026): golpe de 2 tiles que tarda 0,4 s, recarga 0,7 s
@@ -225,9 +267,8 @@ public class Data {
             + "mover derecha 0.2 disparando\nmover arriba-derecha 0.2 disparando\n"
             + "mover arriba 0.2 disparando\nmover arriba-izquierda 0.2 disparando\n";
 
-    private void seedEdgar() {
-        if (profile("edgar") == null) addProfile("edgar", "Edgar", "tap", 400, 1000, "move", "auto");
-        String[][] ps = {
+    /** Versión 1 (larga). Se conserva tal cual: edgar2 la usa para saber si el usuario editó algo. */
+    static final String[][] EDGAR1 = {
                 {"e_salto", "Edgar · Salto y golpes",
                         "# Súper sobre el enemigo más cercano (hasta 6,67 tiles) y golpes al aterrizar\n"
                                 + "súper auto\nesperar 0.6\ndisparar 6 toque"},
@@ -250,7 +291,10 @@ public class Data {
                         "# Saltar hacia atrás y correr con el impulso de velocidad (2,5 s)\n"
                                 + "súper apuntado abajo\nesperar 0.6\nmover abajo 2.5\nparar"},
         };
-        for (String[] p : ps) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);
+
+    private void seedEdgar() {
+        if (profile("edgar") == null) addProfile("edgar", "Edgar", "tap", 400, 1000, "move", "auto");
+        for (String[] p : EDGAR1) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);
         if (set("edgar") == null) {
             PadSet s = new PadSet();
             s.id = "edgar";
