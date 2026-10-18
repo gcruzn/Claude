@@ -175,3 +175,13 @@ auto-apuntado elige al más cercano, y «arriba/abajo» son de la pantalla, no h
 (base64 del .p12) y `SIDELOAD_PASSWORD`; la clave vive en `C:\Users\gonza\.patrontouch\`, fuera del repo
 público. Las versiones nuevas se instalan encima con `adb install -r` sin perder datos ni el permiso de
 Accesibilidad (probado 3.1.2 → 3.1.3). Si el CI falla, el error de Gradle queda como anotación pública del job.
+
+### v3.2.0: patrones cortos (~1,5 s) tras una partida real
+
+Partida grabada (Supervivencia solo, 2.º de 10, +10 trofeos; murió en el duelo final dentro del gas):
+de 46 patrones lanzados, 34 se cortaron a los ~1,4 s porque tocó otra flecha encima; 12 duraron menos
+de 1 s. Además el set activo era **General** (las duraciones de ~3,04 s calzan con «Completo»), no Edgar.
+Respuesta: lote `edgar2`, que acorta los 7 patrones de Edgar a ~1,4–1,6 s y solo reemplaza los que el
+usuario no editó (compara contra `EDGAR1`). ◀▶▲▼ del set Edgar = Pegar y alejarse · Gadget y golpes ·
+Salto y golpes · Escape. Probados en Terrenos: Salto (1,37 s) y Gadget (1,47 s) conectan sus golpes.
+Desde v3.1.4 el log dice qué patrón corre en cada flecha (`patrón «…» flecha=… modo=…`).
