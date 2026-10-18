@@ -76,8 +76,7 @@ class P:
             return self.aim("super", t, "up", 320)
         if kind == "back":
             return self.aim("super", t, "down", 320)
-        if kind == "self":
-            return self.aim("super", t, "up", 260, power=0.12)
+        # "self" y "auto": toque simple; el juego lo resuelve (auto-apuntado o junto a ti).
         return self.tap("super", t)
 
     def hyper_super(self, b, t):
