@@ -584,6 +584,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
         }
         activeIdx = idx;
         activeMode = mode;
+        android.util.Log.i(TAG, "patrón «" + name + "» flecha=" + (idx >= 0 ? DIRS[idx][0] : "—")
+                + " modo=" + (mode == MODE_LOOP ? "bucle" : mode == MODE_MOVE ? "mover" : "una vez")
+                + " perfil=" + prof.id + " reps=" + reps);
         player.start(p, reps, mode == MODE_LOOP ? 120 : 0);
     }
 
