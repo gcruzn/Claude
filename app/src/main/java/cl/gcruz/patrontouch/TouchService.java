@@ -222,7 +222,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
         center.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * (locked ? 0.3f : 0.5f));
         center.setOnTouchListener(centerTouch(center));
         g.addView(center, cell(1, 1, size));
-        releaseTarget = center;
+
+        // Zona invisible (esquina inferior izquierda): absorbe el toque mínimo que se inyecta al
+        // terminar un patrón para soltar los dedos virtuales, sin activar nada.
+        View sink = new View(this);
+        sink.setOnTouchListener((v, e) -> true);
+        g.addView(sink, cell(2, 0, size));
+        releaseTarget = sink;
 
         for (int i = 0; i < DIRS.length; i++) {
             TextView b = new TextView(this);
