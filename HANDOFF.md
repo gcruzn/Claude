@@ -166,8 +166,10 @@ la calibración por defecto, los patrones de Edgar no podían funcionar.
 `edgar1`): ▲ Salto y golpes · ▼ Escape · ◀ Pegar y alejarse · ▶ Doble salto. También están Esquive, Rodear e
 Hiper y salto (este último solo sirve con hipercarga).
 
-Probados en el juego (grabación revisada): Salto y golpes, Pegar y alejarse, Doble salto, Rodear (v2,
-tramos de 0,2 s). Sin probar todavía: Escape (súper apuntado ahora con arrastre ×1,8) y Esquive.
+Los siete se probaron en Terrenos de práctica revisando la grabación: Salto y golpes, Pegar y alejarse,
+Doble salto, Rodear (v2, tramos de 0,2 s), Esquive y Escape (súper apuntado con arrastre ×1,8: salta al
+alcance máximo). Hiper y salto no se pudo probar (no hay hipercarga). Límite de fondo: son ciegos; el
+auto-apuntado elige al más cercano, y «arriba/abajo» son de la pantalla, no hacia el enemigo.
 
 **Firma:** el CI firma con la clave debug del runner, que cambia en cada build → cada versión obliga a
 desinstalar y a reactivar el servicio en Accesibilidad. Hay soporte para una clave fija vía secretos
