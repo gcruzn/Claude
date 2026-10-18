@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Patrón Touch</string>
+    <string name="service_label">Patrón Touch</string>
+    <string name="service_description">Graba patrones de toques multi-touch (varios dedos a la vez) y los reproduce en loop. Usa el permiso de accesibilidad para inyectar los gestos. Bajar volumen detiene la reproducción.</string>
+</resources>
