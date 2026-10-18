@@ -339,7 +339,8 @@ public class Script {
                         String d = s.dir != null ? s.dir
                                 : !"auto".equals(prof.superMode) && !"move".equals(prof.superMode) ? prof.superMode
                                 : curDir != null ? curDir : "up";
-                        if (btn != null) p.touches.add(drag(t, btn, offset(btn, d, cal.aimRadius())));
+                        // El súper apuntado va al alcance máximo: con el arrastre corto del ataque el salto quedaba corto.
+                        if (btn != null) p.touches.add(drag(t, btn, offset(btn, d, cal.aimRadius() * 1.8f)));
                         t += 400;
                     } else {
                         if (btn != null) p.touches.add(press(t, btn, 70));

@@ -220,14 +220,19 @@ public class Data {
      * más cercano. Mientras está en el aire los toques no sirven: después de cada salto se espera.
      * Ataque y súper con toque se auto-apuntan, que es lo único que una macro ciega puede hacer.
      */
+    private static final String RODEAR_VUELTA = "mover izquierda 0.2 disparando\nmover abajo-izquierda 0.2 disparando\n"
+            + "mover abajo 0.2 disparando\nmover abajo-derecha 0.2 disparando\n"
+            + "mover derecha 0.2 disparando\nmover arriba-derecha 0.2 disparando\n"
+            + "mover arriba 0.2 disparando\nmover arriba-izquierda 0.2 disparando\n";
+
     private void seedEdgar() {
         if (profile("edgar") == null) addProfile("edgar", "Edgar", "tap", 400, 1000, "move", "auto");
         String[][] ps = {
                 {"e_salto", "Edgar · Salto y golpes",
                         "# Súper sobre el enemigo más cercano (hasta 6,67 tiles) y golpes al aterrizar\n"
-                                + "súper auto\nesperar 0.6\ndisparar 3 toque\nmover arriba 1.2 disparando\nparar"},
+                                + "súper auto\nesperar 0.6\ndisparar 6 toque"},
                 {"e_hiper", "Edgar · Hiper y salto",
-                        "# Hiper primero: así el súper activa la recarga rápida (0,47 s)\n"
+                        "# Solo si tu Edgar tiene hipercarga. Hiper primero: así el súper activa la recarga rápida (0,47 s)\n"
                                 + "hiper\nsúper auto\nesperar 0.6\ndisparar 6 toque\nmover arriba 1 disparando\nparar"},
                 {"e_doble", "Edgar · Doble salto",
                         "# Let's Fly al más cercano, golpes, y súper para seguirlo si escapa\n"
@@ -239,11 +244,8 @@ public class Data {
                         "# Golpear retrocediendo: estira el alcance contra otros cuerpo a cuerpo\n"
                                 + "disparar 2 toque\nmover abajo 1.2 disparando\nmover arriba 0.4\ndisparar 2 toque\nparar"},
                 {"e_rodear", "Edgar · Rodear",
-                        "# Dar la vuelta golpeando a un brawler lento\n"
-                                + "mover izquierda 0.4 disparando\nmover abajo-izquierda 0.4 disparando\n"
-                                + "mover abajo 0.4 disparando\nmover abajo-derecha 0.4 disparando\n"
-                                + "mover derecha 0.4 disparando\nmover arriba-derecha 0.4 disparando\n"
-                                + "mover arriba 0.4 disparando\nmover arriba-izquierda 0.4 disparando\nparar"},
+                        "# Dos vueltas cortas golpeando a un brawler lento (vueltas de 0,2 s por tramo: más largas se alejan)\n"
+                                + RODEAR_VUELTA + RODEAR_VUELTA + "parar"},
                 {"e_escape", "Edgar · Escape",
                         "# Saltar hacia atrás y correr con el impulso de velocidad (2,5 s)\n"
                                 + "súper apuntado abajo\nesperar 0.6\nmover abajo 2.5\nparar"},
@@ -254,7 +256,7 @@ public class Data {
             s.id = "edgar";
             s.name = "Edgar";
             s.profileId = "edgar";
-            String[][] map = {{"up", "e_salto"}, {"down", "e_escape"}, {"left", "e_alejarse"}, {"right", "e_hiper"}};
+            String[][] map = {{"up", "e_salto"}, {"down", "e_escape"}, {"left", "e_alejarse"}, {"right", "e_doble"}};
             for (String[] m : map) {
                 Arrow ar = new Arrow();
                 ar.patternId = m[1];
