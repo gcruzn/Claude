@@ -1,0 +1,140 @@
+# Handoff — Patrón Touch (app Android de patrones multi-touch)
+
+> Contexto para continuar este proyecto en Claude Code. Estado al **18-oct-2026**, versión **3.0.1**.
+> El usuario es Gonzalo Cruz: habla español de Chile, deja los términos técnicos en inglés y prefiere
+> respuestas concisas, decisiones tomadas sin menús de opciones e interfaces de tema claro.
+
+## Qué es
+
+App Android propia (sin root) que inyecta toques multi-touch con un **AccessibilityService**
+(`dispatchGesture`) para ejecutar patrones en **Brawl Stars**: mover el joystick y, al mismo tiempo,
+disparar, súper, gadget e hipercarga. La usa en un **Samsung** en horizontal (pantalla 2340×1080).
+
+- **Repositorio:** `gcruzn/Claude`, rama **`patron-touch`** (no tocar `main`). El repo es **público**.
+- **APK listo para instalar:** `apk/PatronTouch.apk` en la rama. Lo commitea el CI.
+  Descarga directa: `https://github.com/gcruzn/Claude/raw/patron-touch/apk/PatronTouch.apk`
+- **Package:** `cl.gcruz.patrontouch`, minSdk 26, target/compile 34, Java 17, **sin AndroidX** (solo framework).
+
+## Cómo se compila (importante)
+
+El entorno de trabajo no tenía acceso a Google Maven ni al Android SDK, así que **compila GitHub Actions**
+(`.github/workflows/build.yml`):
+
+1. Hacer push a `patron-touch`.
+2. El CI ejecuta `gradle assembleRelease` (Gradle 8.7, AGP 8.5.2), firma con la clave debug y **commitea
+   `apk/PatronTouch.apk` con `[skip ci]`**.
+3. Después de cada build exitoso hay que hacer `git pull` para traer ese commit antes del siguiente push.
+4. **Subir `versionCode`/`versionName` en `app/build.gradle` en cada entrega.**
+
+- **Ver errores de compilación:** `gh run view <id> -R gcruzn/claude --log-failed | grep error:`
+- **Si el entorno tiene Android SDK,** `./gradlew assembleRelease` local sirve igual (no hay wrapper
+  commiteado: usar `gradle` 8.7).
+
+## Arquitectura (`app/src/main/java/cl/gcruz/patrontouch/`)
+
+| Archivo | Rol |
+|---|---|
+| `TouchService.java` | AccessibilityService. **Cruceta** flotante (▲▼◀▶, centro, ✕), menú central, candado, calibración en el juego, overlay de "dedos virtuales", teclas de volumen. |
+| `Player.java` | Reproduce un `Pattern` con `dispatchGesture`: agrupa toques en bloques que no se solapan y hace **un solo gesto por bloque** (no encadena con `continueStroke`, que se cortaba). Remuestrea los trazos con un micro-zigzag para respetar los tiempos (Android recorre los strokes a velocidad constante). Al detener inyecta un toque mínimo para **soltar dedos**. |
+| `Pattern.java` | Modelo de bajo nivel: toques (dedos) con puntos `(t, x, y)` en píxeles de pantalla. |
+| `Script.java` | **Lenguaje de instrucciones**: parser texto → pasos, formateador pasos → texto y compilador pasos → `Pattern` según el perfil y la calibración. Sin dependencias de Android (se puede testear con stubs). |
+| `Data.java` | Datos del usuario en SharedPreferences (`config` / clave `data`, JSON): **patrones** (texto), **perfiles de disparo**, **sets** (perfil + patrón y repeticiones por flecha), set activo y perfil global. Siembra valores por defecto. |
+| `Calibration.java` | Posición de joystick, ataque, súper, gadget e hipercarga (se calibra tocando cada control en el juego; gadget e hiper son opcionales). Escala por resolución. |
+| `MainActivity.java` | App: servicio, set activo (perfil y patrón ×N por flecha), lista de patrones, perfiles (editor en diálogo), ajustes de la cruceta (candado, opacidad, tamaño, vibración, volumen+) y calibración. |
+| `PatternEditorActivity.java` | Editor dual: **Pasos** (botones) ⇄ **Texto**, con validación por línea, **▶ Probar** (abre el juego y ejecuta tras 3-2-1) y **Copiar texto**. |
+| `Ui.java` | Helpers de UI y paleta (coral `#E25E6B`, azul `#406AB4`, verde `#73C96A`, grafito `#454A51`, gris `#969798`). |
+| `Library.java`, `PatternStore.java` | **Legado** (v2.x: biblioteca por brawler/modo y patrones grabados en JSON). Hoy no se usan desde la UI; se pueden borrar. `assets/biblioteca.json`, `patrones/*.json` y `tools/gen_biblioteca.py` también son legado. |
+
+### Lenguaje de instrucciones (una por línea; acepta tildes, flechas y sinónimos)
+
+```
+mover arriba [segundos] [disparando]   # el joystick queda apretado; "arriba" = hacia el enemigo
+parar                                  # suelta el joystick
+disparar [N] [toque|mantener|apuntado] [dirección]
+súper [auto|apuntado] [dirección]
+gadget
+hiper
+esperar segundos
+# comentario
+```
+
+- **Direcciones:** arriba, abajo, izquierda, derecha y sus diagonales (`arriba-izquierda`…), o `↑ ↓ ← → ↖ ↗ ↙ ↘`.
+- **Movimiento continuo:** el movimiento sigue mientras corren las demás instrucciones, hasta un `parar` u otro `mover`.
+- **Tiempo:** avanza con `esperar`, con los `disparar` (según el intervalo del perfil) y con `mover … N`.
+- **Controles sin calibrar:** si gadget o hiper no están calibrados, esos toques se omiten pero el tiempo corre igual.
+
+### Perfiles de disparo (`Data.Profile`)
+
+| Campo | Valores |
+|---|---|
+| `attack` | `tap` · `hold` · `aim` |
+| `interval` | ms entre disparos |
+| `hold` | ms que se mantiene apretado |
+| `aimDir` | `move` (hacia donde te mueves) o una dirección |
+| `superMode` | `auto` (toque) · `move` · una dirección |
+
+**Por defecto:** Rápido 0,3 s · Normal 0,55 s · Lento 0,8 s · Mantener 1,2 s · Apuntado · Lanzador al frente.
+
+### Interacción de la cruceta
+
+- **Flecha:**
+  - toque = patrón del set con sus **N repeticiones**;
+  - **doble toque** = bucle infinito (coral);
+  - **mantener ~0,45 s (vibra) y soltar** = solo moverse (verde).
+- **Una a la vez:** tocar la misma flecha detiene; tocar otra cancela la actual y arranca la nueva.
+- **Centro:**
+  - toque = menú (cambiar de set, candado, calibrar);
+  - **mantener 3 s** = candado;
+  - arrastrar = mover la cruceta (si no está bloqueada).
+- **Persistencia:** la posición se guarda en `padX`/`padY`.
+- **✕:** cierra la cruceta; manteniéndola, calibra. **Con candado queda desactivada.**
+- **Volumen −** detiene; **volumen +** repite la última acción.
+
+## Limitaciones de Android (no son bugs)
+
+- **Toques reales:** cualquier toque real en pantalla **cancela** los gestos inyectados. Por eso
+  "mantener" funciona como mantener y soltar, y el toque del dedo sobre la cruceta usa
+  `stopByUserTouch()`, que detiene sin inyectar nada.
+- **Grabar mientras se juega:** no se puede sin root (la capa de grabación intercepta los toques).
+  La v1 grababa "en seco"; se descartó y hoy los patrones se crean con instrucciones.
+- **Patrones ciegos:** saben dónde están los botones, no dónde está el enemigo. Rinden bien con brawlers
+  de distancia y auto-apuntado, y mal con cuerpo a cuerpo (Edgar).
+
+## Bugs resueltos (para no repetirlos)
+
+1. **Joystick pegado:** encadenar gestos con `continueStroke` se cortaba y dejaba el dedo virtual abajo.
+   Se resolvió con un gesto por bloque y soltando los dedos al detener.
+2. **Menú del centro que se abría solo (v3.0):** el toque de liberación caía en el centro de la cruceta.
+   Ahora va a una **vista "sink" invisible** en la celda (2,0) del grid, que lo absorbe.
+3. **Servicio "activo" que no inyectaba nada:** Samsung lo suspendió en segundo plano.
+   Se solucionó reiniciando el teléfono y poniendo Batería en "Sin restricciones".
+
+## Instalación en el teléfono (ya hecha; por si se repite)
+
+- **Play Protect bloquea la instalación:** desactivar momentáneamente "Analizar apps con Play Protect".
+- **"Configuración restringida" en Accesibilidad:** Ajustes › Apps › Patrón Touch › ⋮ › Permitir ajustes restringidos.
+- **Para que Samsung no suspenda el servicio:** Batería › Sin restricciones y sacar la app de "Apps en reposo".
+- **Conflictos:** el usuario tenía **otros auto clickers activos en Accesibilidad**, que pueden cortar los gestos.
+
+## Estado y pendientes
+
+- **v3.0.1 instalada y funcionando:** cruceta, sets, perfiles, editor y candado.
+- **Edgar:** el patrón "Asalto total" (hiper → súper auto → golpes → gadget → súper → golpes) **no le funcionó**,
+  y el usuario no dijo en qué falló. Se propuso "Edgar · Pegado" (`gadget, hiper, súper auto, esperar 0.6, disparar 8 toque`),
+  basado en un video de un Edgar de Prestigio 3. Falta su feedback.
+- **Siguiente paso sugerido:** que grabe una partida propia con *Mostrar toques* (Opciones de desarrollador) y la suba.
+  Analizar los cuadros con ffmpeg y OpenCV, detectar los círculos de toque y convertirlos en instrucciones.
+  Ya se hizo una vez: joystick ≈ (555, 800), ataque ≈ (1664, 794), súper ≈ (1508, 956) en 2340×1080.
+- **Ideas conversadas no implementadas:**
+  - diagonales en la cruceta;
+  - importar o exportar sets completos como texto;
+  - eliminar el código legado (`Library`, `PatternStore`, la biblioteca y `tools/`).
+- **Riesgo explicado al usuario:** Supercell prohíbe macros y hay riesgo de ban. Se le sugirió probar en una
+  cuenta secundaria o en el entrenamiento. **No implementar evasión de detección** (por ejemplo, aleatorizar
+  tiempos para parecer humano).
+
+## Probar el parser sin Android
+
+`Script.java` no depende de Android. Se puede compilar con stubs mínimos de `Pattern`, `Calibration` y
+`Data.Profile` y ejecutar con `javac`/`java` para validar textos de patrones y ver los toques resultantes
+(tiempos y coordenadas).
