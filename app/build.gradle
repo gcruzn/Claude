@@ -10,15 +10,30 @@ android {
         applicationId 'cl.gcruz.patrontouch'
         minSdk 26
         targetSdk 34
-        versionCode 9
-        versionName '3.0.1'
+        versionCode 10
+        versionName '3.1.0'
+    }
+
+    // Clave fija desde el secreto SIDELOAD_KEYSTORE del CI (el workflow la deja en
+    // app/sideload.p12). Sin ella se firma con la clave debug del runner, que cambia en cada
+    // build y obliga a desinstalar (se pierden patrones, sets y calibración).
+    def sideload = file('sideload.p12')
+    signingConfigs {
+        if (sideload.exists()) {
+            sideload {
+                storeFile sideload
+                storeType 'pkcs12'
+                storePassword System.getenv('SIDELOAD_PASSWORD') ?: ''
+                keyAlias 'patrontouch'
+                keyPassword System.getenv('SIDELOAD_PASSWORD') ?: ''
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
-            // Firmado con la clave debug para poder instalarlo directo (sideload personal)
-            signingConfig signingConfigs.debug
+            signingConfig sideload.exists() ? signingConfigs.sideload : signingConfigs.debug
         }
     }
 

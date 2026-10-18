@@ -65,6 +65,8 @@ public class Data {
     public final List<Profile> profiles = new ArrayList<>();
     public final List<PadSet> sets = new ArrayList<>();
     public String activeSet = "", globalProfile = "normal";
+    /** Lotes de patrones de fábrica ya agregados (para no volver a sembrar lo que el usuario borró). */
+    public final List<String> seeds = new ArrayList<>();
 
     private final SharedPreferences prefs;
 
@@ -87,9 +89,11 @@ public class Data {
             d.patterns.clear();
             d.profiles.clear();
             d.sets.clear();
+            d.seeds.clear();
             d.seed();
             d.save();
         }
+        if (d.applySeeds()) d.save();
         return d;
     }
 
@@ -195,6 +199,71 @@ public class Data {
         globalProfile = "normal";
     }
 
+    /**
+     * Lotes que se agregan una sola vez a los datos existentes, sin pisar nada del usuario:
+     * solo entra lo que falta por id, y el lote queda anotado aunque después se borre.
+     */
+    boolean applySeeds() {
+        boolean changed = false;
+        if (!seeds.contains("edgar1")) {
+            seedEdgar();
+            seeds.add("edgar1");
+            changed = true;
+        }
+        return changed;
+    }
+
+    /**
+     * Edgar (wiki Brawl Stars, oct-2026): golpe de 2 tiles que tarda 0,4 s, recarga 0,7 s
+     * (0,47 s con hipercarga); súper de 6,67 tiles con ~0,86 s en el aire, se carga solo en ~30 s;
+     * la hipercarga solo potencia si se activa ANTES del súper; Let's Fly se engancha al brawler
+     * más cercano. Mientras está en el aire los toques no sirven: después de cada salto se espera.
+     * Ataque y súper con toque se auto-apuntan, que es lo único que una macro ciega puede hacer.
+     */
+    private void seedEdgar() {
+        if (profile("edgar") == null) addProfile("edgar", "Edgar", "tap", 400, 1000, "move", "auto");
+        String[][] ps = {
+                {"e_salto", "Edgar · Salto y golpes",
+                        "# Súper sobre el enemigo más cercano (hasta 6,67 tiles) y golpes al aterrizar\n"
+                                + "súper auto\nesperar 0.6\ndisparar 3 toque\nmover arriba 1.2 disparando\nparar"},
+                {"e_hiper", "Edgar · Hiper y salto",
+                        "# Hiper primero: así el súper activa la recarga rápida (0,47 s)\n"
+                                + "hiper\nsúper auto\nesperar 0.6\ndisparar 6 toque\nmover arriba 1 disparando\nparar"},
+                {"e_doble", "Edgar · Doble salto",
+                        "# Let's Fly al más cercano, golpes, y súper para seguirlo si escapa\n"
+                                + "gadget\nesperar 1\ndisparar 2 toque\nsúper auto\nesperar 0.6\ndisparar 4 toque"},
+                {"e_esquive", "Edgar · Esquive",
+                        "# En plena pelea: súper auto para esquivar golpes y seguir pegando\n"
+                                + "disparar 3 toque\nsúper auto\nesperar 0.6\ndisparar 3 toque"},
+                {"e_alejarse", "Edgar · Pegar y alejarse",
+                        "# Golpear retrocediendo: estira el alcance contra otros cuerpo a cuerpo\n"
+                                + "disparar 2 toque\nmover abajo 1.2 disparando\nmover arriba 0.4\ndisparar 2 toque\nparar"},
+                {"e_rodear", "Edgar · Rodear",
+                        "# Dar la vuelta golpeando a un brawler lento\n"
+                                + "mover izquierda 0.4 disparando\nmover abajo-izquierda 0.4 disparando\n"
+                                + "mover abajo 0.4 disparando\nmover abajo-derecha 0.4 disparando\n"
+                                + "mover derecha 0.4 disparando\nmover arriba-derecha 0.4 disparando\n"
+                                + "mover arriba 0.4 disparando\nmover arriba-izquierda 0.4 disparando\nparar"},
+                {"e_escape", "Edgar · Escape",
+                        "# Saltar hacia atrás y correr con el impulso de velocidad (2,5 s)\n"
+                                + "súper apuntado abajo\nesperar 0.6\nmover abajo 2.5\nparar"},
+        };
+        for (String[] p : ps) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);
+        if (set("edgar") == null) {
+            PadSet s = new PadSet();
+            s.id = "edgar";
+            s.name = "Edgar";
+            s.profileId = "edgar";
+            String[][] map = {{"up", "e_salto"}, {"down", "e_escape"}, {"left", "e_alejarse"}, {"right", "e_hiper"}};
+            for (String[] m : map) {
+                Arrow ar = new Arrow();
+                ar.patternId = m[1];
+                s.arrows.put(m[0], ar);
+            }
+            sets.add(s);
+        }
+    }
+
     // ---------------------------------------------------------------- JSON
 
     private JSONObject toJson() throws Exception {
@@ -223,12 +292,15 @@ public class Data {
             ss.put(new JSONObject().put("id", s.id).put("name", s.name).put("profile", s.profileId).put("arrows", ar));
         }
         o.put("sets", ss);
+        o.put("seeds", new JSONArray(seeds));
         return o;
     }
 
     private void fromJson(JSONObject o) throws Exception {
         activeSet = o.optString("activeSet", "");
         globalProfile = o.optString("globalProfile", "normal");
+        JSONArray sd = o.optJSONArray("seeds");
+        if (sd != null) for (int i = 0; i < sd.length(); i++) seeds.add(sd.getString(i));
         JSONArray ps = o.getJSONArray("patterns");
         for (int i = 0; i < ps.length(); i++) {
             JSONObject p = ps.getJSONObject(i);

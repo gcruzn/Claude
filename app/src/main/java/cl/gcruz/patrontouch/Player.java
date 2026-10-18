@@ -155,6 +155,7 @@ public class Player {
         boolean ok = service.dispatchGesture(b.build(), new AccessibilityService.GestureResultCallback() {
             @Override
             public void onCancelled(GestureDescription g) {
+                android.util.Log.w("PatronTouch", "gesto " + id + " cancelado (" + (s == session && id == gestureSeq ? "vigente" : "reemplazado") + ")");
                 // Solo cuenta si es el gesto vigente (uno nuevo nuestro también "cancela" el anterior).
                 if (s == session && id == gestureSeq) {
                     handler.post(() -> stop("Interrumpido (un toque u otra app de accesibilidad cortó el gesto)"));

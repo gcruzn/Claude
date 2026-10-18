@@ -70,6 +70,135 @@ public class TouchService extends AccessibilityService implements Player.Listene
         Point s = screenSize();
         cal = new Calibration(this, s.x, s.y);
         showPanel();
+        registerDebug();
+    }
+
+    // ---------------------------------------------------------------- pruebas por ADB
+
+    /**
+     * Comandos de prueba desde el PC, sin tocar la pantalla (un toque real cancelaría el gesto):
+     *   adb shell am broadcast -a cl.gcruz.patrontouch.DEBUG --es cmd run --es id e_salto [--es profile edgar] [--ei reps 1]
+     *   ... --es cmd run --es script "súper auto\nesperar 0.6"     (patrón suelto, \n separa líneas)
+     *   ... --es cmd stop | dump | calib --es joy 555,800 --es attack 1664,794 ...
+     * La salida va a logcat con la etiqueta PatronTouch. Solo el shell puede enviarlos: el receptor
+     * exige android.permission.DUMP, que ninguna app instalada tiene.
+     */
+    static final String DEBUG_ACTION = "cl.gcruz.patrontouch.DEBUG";
+    static final String TAG = "PatronTouch";
+    private android.content.BroadcastReceiver debugReceiver;
+
+    private void registerDebug() {
+        debugReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, android.content.Intent i) {
+                try {
+                    debug(i);
+                } catch (Exception e) {
+                    android.util.Log.e(TAG, "debug: " + e);
+                }
+            }
+        };
+        android.content.IntentFilter f = new android.content.IntentFilter(DEBUG_ACTION);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(debugReceiver, f, android.Manifest.permission.DUMP, main, Context.RECEIVER_EXPORTED);
+        } else {
+            registerReceiver(debugReceiver, f, android.Manifest.permission.DUMP, main);
+        }
+    }
+
+    private void debug(android.content.Intent i) {
+        String cmd = i.getStringExtra("cmd");
+        if (cmd == null) cmd = "dump";
+        switch (cmd) {
+            case "stop":
+                player.stop("Detenido por ADB");
+                break;
+            case "calib": {
+                for (int k = 0; k < Calibration.KEYS.length; k++) {
+                    String v = i.getStringExtra(Calibration.KEYS[k]);
+                    if (v == null) continue;
+                    if (v.equals("none")) {
+                        cal.pos[k] = null;
+                    } else {
+                        String[] xy = v.split(",");
+                        cal.pos[k] = new float[]{Float.parseFloat(xy[0]), Float.parseFloat(xy[1])};
+                    }
+                }
+                Point s = screenSize();
+                cal.screenW = Math.max(s.x, s.y);
+                cal.screenH = Math.min(s.x, s.y);
+                cal.save();
+                logCalibration();
+                break;
+            }
+            case "run": {
+                String id = i.getStringExtra("id");
+                String script = i.getStringExtra("script");
+                String name = "ADB";
+                if (id != null) {
+                    Data.PatternDef def = data.pattern(id);
+                    if (def == null) {
+                        android.util.Log.w(TAG, "run: no existe el patrón " + id);
+                        return;
+                    }
+                    script = def.script;
+                    name = def.name;
+                }
+                if (script == null) return;
+                script = script.replace("\\n", "\n");
+                String pid = i.getStringExtra("profile");
+                Data.Profile prof = pid != null ? data.profile(pid) : null;
+                if (prof == null) prof = data.profileFor(data.active());
+                int reps = i.getIntExtra("reps", 1);
+                logCompiled(name, script, prof);
+                runScript(name, script, prof, Math.max(0, reps), -1, reps == 0 ? MODE_LOOP : MODE_ONCE);
+                break;
+            }
+            default: {
+                logCalibration();
+                android.util.Log.i(TAG, "set activo=" + data.activeSet + " perfil global=" + data.globalProfile
+                        + " lotes=" + data.seeds);
+                for (Data.Profile p : data.profiles) android.util.Log.i(TAG, "perfil " + p.id + ": " + p.summary());
+                for (Data.PadSet s : data.sets) {
+                    StringBuilder b = new StringBuilder("set " + s.id + " (" + s.name + ", perfil " + data.profileFor(s).id + "):");
+                    for (java.util.Map.Entry<String, Data.Arrow> e : s.arrows.entrySet())
+                        b.append(' ').append(e.getKey()).append('=').append(e.getValue().patternId).append('×').append(e.getValue().reps);
+                    android.util.Log.i(TAG, b.toString());
+                }
+                for (Data.PatternDef p : data.patterns) {
+                    Script.Result r = Script.parse(p.script);
+                    android.util.Log.i(TAG, "patrón " + p.id + " «" + p.name + "»: "
+                            + (r.ok() ? r.steps.size() + " pasos OK" : "ERROR línea " + r.errorLine + ": " + r.error));
+                }
+            }
+        }
+    }
+
+    private void logCalibration() {
+        StringBuilder b = new StringBuilder("calibración " + cal.screenW + "x" + cal.screenH
+                + (cal.calibrated ? "" : " (por defecto)") + ":");
+        for (int k = 0; k < Calibration.KEYS.length; k++) {
+            float[] p = cal.pos[k];
+            b.append(' ').append(Calibration.KEYS[k]).append('=')
+                    .append(p == null ? "—" : Math.round(p[0]) + "," + Math.round(p[1]));
+        }
+        android.util.Log.i(TAG, b.toString());
+    }
+
+    /** Escribe en logcat cada toque que va a inyectar el patrón (inicio, fin, de dónde a dónde). */
+    private void logCompiled(String name, String script, Data.Profile prof) {
+        Script.Result r = Script.parse(script);
+        if (!r.ok()) {
+            android.util.Log.w(TAG, name + ": ERROR línea " + r.errorLine + ": " + r.error);
+            return;
+        }
+        Pattern p = Script.compile(name, r.steps, prof, cal);
+        android.util.Log.i(TAG, name + " (perfil " + prof.id + "): " + p.touches.size() + " toques, " + p.duration + " ms");
+        for (Pattern.Touch t : p.touches) {
+            Pattern.Point a = t.pts.get(0), z = t.pts.get(t.pts.size() - 1);
+            android.util.Log.i(TAG, "  " + a.t + "–" + z.t + " ms  " + Math.round(a.x) + "," + Math.round(a.y)
+                    + " → " + Math.round(z.x) + "," + Math.round(z.y));
+        }
     }
 
     @Override
@@ -93,6 +222,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     private void cleanup() {
+        if (debugReceiver != null) try { unregisterReceiver(debugReceiver); } catch (Exception ignored) { }
+        debugReceiver = null;
         if (player != null) player.stop(null);
         hideGhost();
         removeCalibration();
@@ -553,6 +684,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     @Override
     public void onPlayerState(boolean playing, String status) {
+        android.util.Log.i(TAG, (playing ? "▶ " : "■ ") + status);
         if (playing) showGhost(); else hideGhost();
         paintIdle();
         if (playing && activeIdx >= 0 && dirButtons[activeIdx] != null) {
