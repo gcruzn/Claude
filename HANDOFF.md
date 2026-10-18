@@ -1,6 +1,7 @@
 # Handoff — Patrón Touch (app Android de patrones multi-touch)
 
-> Contexto para continuar este proyecto en Claude Code. Estado al **18-oct-2026**, versión **3.0.1**.
+> Contexto para continuar este proyecto en Claude Code. Estado al **18-oct-2026**, versión **3.1.1**
+> (ver «Sesión del 18-oct: Edgar y pruebas por ADB» al final).
 > El usuario es Gonzalo Cruz: habla español de Chile, deja los términos técnicos en inglés y prefiere
 > respuestas concisas, decisiones tomadas sin menús de opciones e interfaces de tema claro.
 
@@ -138,3 +139,38 @@ esperar segundos
 `Script.java` no depende de Android. Se puede compilar con stubs mínimos de `Pattern`, `Calibration` y
 `Data.Profile` y ejecutar con `javac`/`java` para validar textos de patrones y ver los toques resultantes
 (tiempos y coordenadas).
+
+## Sesión del 18-oct: Edgar y pruebas por ADB (v3.1.0 → v3.1.1)
+
+**Conexión al celular:** `C:\Program Files\ASUS\GlideX\adb.exe` (no hay adb en el PATH). Teléfono SM-S948B.
+
+**Comandos de prueba** (receptor en `TouchService`, protegido con `android.permission.DUMP`: solo el shell):
+
+```
+adb shell am broadcast -a cl.gcruz.patrontouch.DEBUG --es cmd dump                 # calibración, sets, valida patrones
+adb shell am broadcast -a cl.gcruz.patrontouch.DEBUG --es cmd run --es id e_salto --es profile edgar
+adb shell am broadcast -a cl.gcruz.patrontouch.DEBUG --es cmd run --es script "'súper auto\nesperar 0.6'"
+adb shell am broadcast -a cl.gcruz.patrontouch.DEBUG --es cmd calib --es joy 571,801 --es attack 1966,676 --es super 1664,796 --es gadget 1854,954 --es hyper none
+adb logcat -s PatronTouch:*
+```
+
+Flujo de prueba: Edgar › Probar › **Terrenos de práctica** (muñecos quietos), `screenrecord` + `run`, y hoja
+de contacto de cuadros con OpenCV (`cv2` está en el Python del PC; no hay ffmpeg).
+
+**Calibración real de Gonzalo** (2340×1080, distinta de los valores por defecto): joystick 571,801 · ataque
+1966,676 · súper 1664,796 · gadget 1854,954 · sin hipercarga (su Edgar no la tiene). El botón morado en
+1508,950 no es un control de Edgar. **El valor por defecto de «ataque» caía sobre su botón de súper**: con
+la calibración por defecto, los patrones de Edgar no podían funcionar.
+
+**Set «Edgar»** (perfil «Edgar»: toque cada 0,4 s; se agrega una sola vez a los datos existentes, lote
+`edgar1`): ▲ Salto y golpes · ▼ Escape · ◀ Pegar y alejarse · ▶ Doble salto. También están Esquive, Rodear e
+Hiper y salto (este último solo sirve con hipercarga).
+
+Probados en el juego (grabación revisada): Salto y golpes, Pegar y alejarse, Doble salto, Rodear (v2,
+tramos de 0,2 s). Sin probar todavía: Escape (súper apuntado ahora con arrastre ×1,8) y Esquive.
+
+**Firma:** el CI firma con la clave debug del runner, que cambia en cada build → cada versión obliga a
+desinstalar y a reactivar el servicio en Accesibilidad. Hay soporte para una clave fija vía secretos
+`SIDELOAD_KEYSTORE` (base64 del .p12) y `SIDELOAD_PASSWORD`; la clave está generada en
+`C:\Users\gonza\.patrontouch\` (fuera del repo, que es público). Falta que Gonzalo cargue los dos secretos en
+GitHub › Settings › Secrets and variables › Actions.
