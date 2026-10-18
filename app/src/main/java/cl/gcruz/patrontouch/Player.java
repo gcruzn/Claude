@@ -82,11 +82,24 @@ public class Player {
     }
 
     public void stop(String reason) {
+        stop(reason, true);
+    }
+
+    /**
+     * Detiene sin inyectar el toque de liberación. Se usa cuando el propio dedo del usuario ya
+     * está en la pantalla (Android cancela los gestos inyectados ante cualquier toque real) y un
+     * toque inyectado podría cancelar el toque real sobre el panel.
+     */
+    public void stopByUserTouch() {
+        stop(null, false);
+    }
+
+    private void stop(String reason, boolean release) {
         boolean was = playing;
         playing = false;
         session++;
         handler.removeCallbacksAndMessages(null);
-        if (was) releaseFingers();
+        if (was && release) releaseFingers();
         if (was || reason != null) listener.onPlayerState(false, reason == null ? "Detenido" : reason);
     }
 

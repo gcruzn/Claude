@@ -76,9 +76,10 @@ public class MainActivity extends Activity {
                     startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
         } else {
             card.addView(text("● Servicio activo", 16, VERDE, true));
-            card.addView(text("En el juego toca ↑ ↓ ← →: se mueve hacia allá disparando y usa gadget, hipercarga y súper. "
-                    + "Se ejecuta una vez. ◎ calibra · – minimiza · ✕ cierra · ⠿ arrastra.", 13, GRAFITO, false));
-            card.addView(button(svc.isPanelVisible() ? "Ocultar panel" : "Mostrar panel", GRAFITO, v -> {
+            card.addView(text("Cruceta en el juego:\n• Toque: patrón completo una vez (gadget, se mueve disparando, hipercarga + súper)\n"
+                    + "• Doble toque: patrón completo en bucle\n• Mantener (vibra) y soltar: solo se mueve en esa dirección\n"
+                    + "• Tocar la misma flecha la detiene; otra flecha la reemplaza\n• • del centro: arrastrar · ✕: cerrar · mantener ✕: calibrar", 13, GRAFITO, false));
+            card.addView(button(svc.isPanelVisible() ? "Ocultar cruceta" : "Mostrar cruceta", GRAFITO, v -> {
                 if (svc.isPanelVisible()) svc.hidePanel(); else svc.showPanel();
                 render();
             }));
@@ -92,17 +93,29 @@ public class MainActivity extends Activity {
         boolean calibrated = svc != null && svc.calibration().calibrated;
         calCard.addView(text(calibrated
                 ? "✓ Calibrados. Si cambias la disposición de tus controles, vuelve a calibrar."
-                : "Sin calibrar. Abre Brawl Stars en una partida o en el entrenamiento, toca ◎ en el panel "
-                + "y luego toca cada botón cuando la app lo pida (joystick, ataque, súper, gadget e hipercarga).",
+                : "Sin calibrar. Toca el botón, abre Brawl Stars en el entrenamiento y toca cada control cuando "
+                + "la app lo pida (joystick, ataque, súper, gadget e hipercarga). También: mantén presionada la ✕ de la cruceta.",
                 13, calibrated ? VERDE : GRAFITO, false));
+        if (svc != null) calCard.addView(button("Calibrar en el juego", AZUL, v -> {
+            TouchService.get().calibrateSoon();
+            moveTaskToBack(true);
+        }));
         root.addView(calCard);
         space(12);
 
         // --- Ajustes
         LinearLayout set = card();
-        set.addView(text("Atajos", 16, GRAFITO, true));
+        set.addView(text("Cruceta", 16, GRAFITO, true));
+        set.addView(slider("Opacidad", "padAlpha", 45, 15, 90, "%"));
+        set.addView(slider("Tamaño", "padSize", 58, 40, 90, " dp"));
+        Switch vib = new Switch(this);
+        vib.setText("Vibrar al activar bucle o solo-movimiento");
+        vib.setTextColor(GRAFITO);
+        vib.setChecked(prefs.getBoolean("vibrate", true));
+        vib.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("vibrate", on).apply());
+        set.addView(vib);
         Switch vol = new Switch(this);
-        vol.setText("Volumen + repite el último patrón (solo con el panel abierto)");
+        vol.setText("Volumen + repite la última acción (solo con la cruceta abierta)");
         vol.setTextColor(GRAFITO);
         vol.setChecked(prefs.getBoolean("volShortcut", true));
         vol.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("volShortcut", on).apply());
@@ -111,7 +124,7 @@ public class MainActivity extends Activity {
         root.addView(set);
         space(12);
 
-        root.addView(text("Tip: mantén presionada una flecha para ver qué hace. Volumen − detiene.", 12, GRIS, false));
+        root.addView(text("Volumen − detiene cualquier patrón. Tocar la pantalla del juego también lo corta.", 12, GRIS, false));
     }
 
     // ---------------------------------------------------------------- importar
@@ -250,6 +263,33 @@ public class MainActivity extends Activity {
         t.setPadding(dp(8), dp(6), dp(8), dp(6));
         t.setOnClickListener(l);
         return t;
+    }
+
+    private LinearLayout slider(String label, String key, int def, int min, int max, String unit) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        TextView t = text(label + ": " + prefs.getInt(key, def) + unit, 14, GRAFITO, false);
+        android.widget.SeekBar sb = new android.widget.SeekBar(this);
+        sb.setMax(max - min);
+        sb.setProgress(prefs.getInt(key, def) - min);
+        sb.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar s, int p, boolean user) {
+                t.setText(label + ": " + (p + min) + unit);
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar s) { }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar s) {
+                prefs.edit().putInt(key, s.getProgress() + min).apply();
+                if (TouchService.get() != null) TouchService.get().rebuildPanel();
+            }
+        });
+        box.addView(t);
+        box.addView(sb);
+        return box;
     }
 
     private void space(int h) {

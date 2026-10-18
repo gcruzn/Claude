@@ -138,19 +138,29 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     public Calibration calibration() { return cal; }
 
-    // ---------------------------------------------------------------- panel
+    // ---------------------------------------------------------------- panel (cruceta)
 
-    /** Patrones completos por dirección: se mueve hacia allá disparando + gadget, hipercarga y súper. */
+    /** dir, flecha, fila, columna en la cuadrícula 3×3. */
     private static final String[][] DIRS = {
-            {"up", "↑", "Avanzar: gadget, avanza disparando, hipercarga + súper al enemigo más cercano"},
-            {"down", "↓", "Retroceder: gadget, se retira disparando a quien lo sigue, hipercarga + súper"},
-            {"left", "←", "Izquierda: gadget, esquiva hacia la izquierda disparando, hipercarga + súper"},
-            {"right", "→", "Derecha: gadget, esquiva hacia la derecha disparando, hipercarga + súper"},
+            {"up", "▲", "0", "1"},
+            {"left", "◀", "1", "0"},
+            {"right", "▶", "1", "2"},
+            {"down", "▼", "2", "1"},
     };
+    private static final int MODE_ONCE = 1, MODE_LOOP = 2, MODE_MOVE = 3;
+    private static final long DOUBLE_TAP_MS = 260, LONG_PRESS_MS = 450;
 
-    private static Library.LibPattern directional(String dir, String label) {
+    private final TextView[] dirButtons = new TextView[DIRS.length];
+    private View releaseTarget;
+    private int activeIdx = -1, activeMode = 0;
+    private Runnable pendingTap, longCue;
+    private int pendingIdx = -1;
+    private boolean touchDouble, touchLong, touchStopOnly;
+
+    /** Patrón completo: gadget, se mueve disparando, hipercarga + súper (auto-apuntado). */
+    private static Library.LibPattern directional(String dir) {
         Library.LibPattern lp = new Library.LibPattern();
-        lp.name = label;
+        lp.name = dir;
         try {
             lp.moves = new org.json.JSONArray().put(new org.json.JSONObject().put("dir", dir).put("ms", 1700));
             org.json.JSONArray acts = new org.json.JSONArray();
@@ -166,46 +176,89 @@ public class TouchService extends AccessibilityService implements Player.Listene
         return lp;
     }
 
+    /** Solo movimiento, sin disparar (se repite en bucle hasta detenerlo). */
+    private static Library.LibPattern moveOnly(String dir) {
+        Library.LibPattern lp = new Library.LibPattern();
+        lp.name = dir;
+        try {
+            lp.moves = new org.json.JSONArray().put(new org.json.JSONObject().put("dir", dir).put("ms", 20000));
+            lp.acts = new org.json.JSONArray();
+        } catch (Exception ignored) {
+        }
+        return lp;
+    }
+
+    private int idleColor() {
+        int a = Math.round(255 * prefs.getInt("padAlpha", 45) / 100f);
+        return Color.argb(a, 64, 106, 180);
+    }
+
+    private int activeColor(int mode) {
+        int a = Math.max(150, Math.round(255 * prefs.getInt("padAlpha", 45) / 100f));
+        if (mode == MODE_LOOP) return Color.argb(a, 226, 94, 107);   // coral = bucle
+        if (mode == MODE_MOVE) return Color.argb(a, 115, 201, 106);  // verde = solo moverse
+        return Color.argb(a, 69, 74, 81);                            // grafito = una vez
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     public void showPanel() {
         if (wm == null || panel != null) return;
         removeBubble();
+        int size = dp(prefs.getInt("padSize", 58));
 
         panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.HORIZONTAL);
-        panel.setGravity(Gravity.CENTER_VERTICAL);
-        int pad = dp(3);
-        panel.setPadding(pad, pad, pad, pad);
-        panel.setBackground(round(Color.argb(170, 255, 255, 255), 16, Color.argb(50, 0, 0, 0)));
+        GridLayout g = new GridLayout(this);
+        g.setColumnCount(3);
+        g.setRowCount(3);
+        panel.addView(g);
 
-        TextView handle = mini("⠿", Color.TRANSPARENT, GRAFITO);
-        panel.addView(handle);
-        for (String[] d : DIRS) {
-            TextView b = mini(d[1], Color.argb(220, 64, 106, 180), Color.WHITE);
-            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-            Library.LibPattern lp = directional(d[0], d[1]);
-            b.setOnClickListener(v -> runDirection(b, lp));
-            b.setOnLongClickListener(v -> {
-                toast(d[2]);
-                return true;
-            });
-            panel.addView(b);
+        // Centro: punto para arrastrar la cruceta.
+        TextView handle = new TextView(this);
+        handle.setText("•");
+        handle.setGravity(Gravity.CENTER);
+        handle.setTextColor(Color.argb(Math.round(255 * prefs.getInt("padAlpha", 45) / 100f) + 40, 69, 74, 81));
+        handle.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * 0.5f);
+        handle.setOnTouchListener(dragListener(null));
+        g.addView(handle, cell(1, 1, size));
+        releaseTarget = handle;
+
+        for (int i = 0; i < DIRS.length; i++) {
+            TextView b = new TextView(this);
+            b.setText(DIRS[i][1]);
+            b.setGravity(Gravity.CENTER);
+            b.setTextColor(Color.WHITE);
+            b.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * 0.38f);
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(idleColor());
+            bg.setCornerRadius(size * 0.28f);
+            b.setBackground(bg);
+            b.setOnTouchListener(dirTouch(i));
+            dirButtons[i] = b;
+            g.addView(b, cell(Integer.parseInt(DIRS[i][2]), Integer.parseInt(DIRS[i][3]), size));
         }
-        TextView calChip = mini("◎", Color.argb(200, 238, 241, 246), GRAFITO);
-        TextView minChip = mini("–", Color.argb(200, 238, 241, 246), GRAFITO);
-        TextView closeChip = mini("✕", Color.argb(200, 251, 231, 233), CORAL);
-        panel.addView(calChip);
-        panel.addView(minChip);
-        panel.addView(closeChip);
 
-        calChip.setOnClickListener(v -> startCalibration());
-        minChip.setOnClickListener(v -> minimize());
-        closeChip.setOnClickListener(v -> {
+        // ✕ en la esquina superior derecha (más pequeño). Mantener = calibrar.
+        TextView close = new TextView(this);
+        close.setText("✕");
+        close.setGravity(Gravity.CENTER);
+        close.setTextColor(Color.WHITE);
+        close.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * 0.26f);
+        GradientDrawable cbg = new GradientDrawable();
+        cbg.setShape(GradientDrawable.OVAL);
+        cbg.setColor(Color.argb(Math.round(255 * prefs.getInt("padAlpha", 45) / 100f), 226, 94, 107));
+        close.setBackground(cbg);
+        close.setOnClickListener(v -> {
             player.stop(null);
             hidePanel();
-            toast("Panel cerrado. Ábrelo de nuevo desde la app Patrón Touch.");
+            toast("Cruceta cerrada. Ábrela de nuevo desde la app Patrón Touch.");
         });
-        handle.setOnTouchListener(dragListener(null));
+        close.setOnLongClickListener(v -> {
+            startCalibration();
+            return true;
+        });
+        GridLayout.LayoutParams clp = cell(0, 2, (int) (size * 0.6f));
+        clp.setGravity(Gravity.CENTER);
+        g.addView(close, clp);
 
         if (panelParams == null) {
             panelParams = overlayParams(false);
@@ -216,25 +269,128 @@ public class TouchService extends AccessibilityService implements Player.Listene
             panelParams.y = dp(8);
         }
         wm.addView(panel, panelParams);
-        if (!cal.calibrated) toast("Primero toca ◎ para calibrar tus controles (con el juego abierto)");
+        if (!cal.calibrated) toast("Calibra tus controles: mantén presionada la ✕ con el juego abierto");
     }
 
-    private void runDirection(TextView btn, Library.LibPattern lp) {
-        if (player.isPlaying()) {
-            player.stop(null);
+    /** Vuelve a dibujar la cruceta (al cambiar tamaño u opacidad en la app). */
+    public void rebuildPanel() {
+        if (panel == null) return;
+        player.stop(null);
+        try { wm.removeView(panel); } catch (Exception ignored) { }
+        panel = null;
+        showPanel();
+    }
+
+    private GridLayout.LayoutParams cell(int row, int col, int size) {
+        GridLayout.LayoutParams lp = new GridLayout.LayoutParams(GridLayout.spec(row), GridLayout.spec(col));
+        lp.width = size;
+        lp.height = size;
+        int m = dp(3);
+        lp.setMargins(m, m, m, m);
+        return lp;
+    }
+
+    /** Toque = una vez · doble toque = bucle · mantener y soltar = solo moverse. */
+    private View.OnTouchListener dirTouch(int i) {
+        return (v, e) -> {
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN: {
+                    touchDouble = pendingTap != null && pendingIdx == i;
+                    if (pendingTap != null) {
+                        main.removeCallbacks(pendingTap);
+                        pendingTap = null;
+                    }
+                    boolean wasPlaying = player.isPlaying();
+                    touchStopOnly = wasPlaying && activeIdx == i && !touchDouble;
+                    if (wasPlaying) player.stopByUserTouch();
+                    touchLong = false;
+                    ((GradientDrawable) dirButtons[i].getBackground()).setColor(activeColor(MODE_ONCE));
+                    longCue = () -> {
+                        touchLong = true;
+                        vibrate(35);
+                        ((GradientDrawable) dirButtons[i].getBackground()).setColor(activeColor(MODE_MOVE));
+                    };
+                    main.postDelayed(longCue, LONG_PRESS_MS);
+                    return true;
+                }
+                case MotionEvent.ACTION_UP: {
+                    main.removeCallbacks(longCue);
+                    if (touchDouble) {
+                        vibrate(20);
+                        start(i, MODE_LOOP);
+                    } else if (touchLong) {
+                        start(i, MODE_MOVE);
+                    } else if (touchStopOnly) {
+                        paintIdle();
+                    } else {
+                        pendingIdx = i;
+                        pendingTap = () -> {
+                            pendingTap = null;
+                            start(i, MODE_ONCE);
+                        };
+                        main.postDelayed(pendingTap, DOUBLE_TAP_MS);
+                    }
+                    return true;
+                }
+                case MotionEvent.ACTION_CANCEL:
+                    main.removeCallbacks(longCue);
+                    paintIdle();
+                    return true;
+            }
+            return false;
+        };
+    }
+
+    private void start(int i, int mode) {
+        if (player.isPlaying()) player.stop(null);
+        String dir = DIRS[i][0];
+        Library.LibPattern lp = mode == MODE_MOVE ? moveOnly(dir) : directional(dir);
+        Pattern p = Library.compile(lp, cal, false);
+        if (p.touches.isEmpty()) {
+            paintIdle();
             return;
         }
-        Pattern p = Library.compile(lp, cal, false);
-        if (p.touches.isEmpty()) return;
-        lastName = lp.name;
-        runningBtn = btn;
+        activeIdx = i;
+        activeMode = mode;
+        lastName = DIRS[i][1];
         lastRun = () -> {
             if (player.isPlaying()) player.stop(null);
-            Pattern q = Library.compile(lp, cal, false);
-            lastName = lp.name;
-            player.start(q, 1, 0);
+            start(i, mode);
         };
-        player.start(p, 1, 0);
+        player.start(p, mode == MODE_ONCE ? 1 : 0, mode == MODE_LOOP ? 120 : 0);
+    }
+
+    private void paintIdle() {
+        for (TextView b : dirButtons) {
+            if (b != null) ((GradientDrawable) b.getBackground()).setColor(idleColor());
+        }
+    }
+
+    private void vibrate(long ms) {
+        if (!prefs.getBoolean("vibrate", true)) return;
+        try {
+            android.os.Vibrator vib = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE);
+            if (vib != null) vib.vibrate(android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** Calibración pedida desde la app: espera a que abras el juego en horizontal. */
+    public void calibrateSoon() {
+        toast("Abre Brawl Stars: la calibración empieza en unos segundos");
+        final int[] tries = {0};
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                Point s = screenSize();
+                if (s.x > s.y) {
+                    startCalibration();
+                } else if (++tries[0] < 20) {
+                    main.postDelayed(this, 1000);
+                }
+            }
+        };
+        main.postDelayed(r, 5000);
     }
 
     public void hidePanel() {
@@ -244,26 +400,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
         removeBubble();
     }
 
-    private void minimize() {
-        if (panel != null) try { wm.removeView(panel); } catch (Exception ignored) { }
-        panel = null;
-        runningBtn = null;
-        bubble = mini("PT", Color.argb(200, 64, 106, 180), Color.WHITE);
-        bubble.setTypeface(Typeface.DEFAULT_BOLD);
-        bubble.setGravity(Gravity.CENTER);
-        bubble.setMinWidth(dp(36));
-        bubble.setMinHeight(dp(36));
-        ((GradientDrawable) bubble.getBackground()).setCornerRadius(dp(18));
-        bubble.setOnTouchListener(dragListener(() -> showPanel()));
-        wm.addView(bubble, panelParams);
-    }
-
     private void removeBubble() {
         if (bubble != null && wm != null) try { wm.removeView(bubble); } catch (Exception ignored) { }
         bubble = null;
     }
 
-    /** Arrastra la ventana del panel/burbuja; si fue un toque corto sin moverse, ejecuta onTap. */
+    /** Arrastra la ventana del panel; si fue un toque corto sin moverse, ejecuta onTap. */
     private View.OnTouchListener dragListener(Runnable onTap) {
         return new View.OnTouchListener() {
             float sx, sy;
@@ -297,26 +439,14 @@ public class TouchService extends AccessibilityService implements Player.Listene
         };
     }
 
-    /** Botón pequeño y compacto para el panel. */
-    private TextView mini(String text, int bg, int fg) {
-        TextView tv = chip(text, bg, fg);
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        tv.setGravity(Gravity.CENTER);
-        tv.setMinWidth(dp(34));
-        tv.setPadding(dp(8), dp(4), dp(8), dp(4));
-        return tv;
-    }
-
     // ---------------------------------------------------------------- reproducción
 
     @Override
     public float[] releasePoint() {
-        View w = panel != null ? panel : bubble;
-        if (w != null) {
+        if (panel != null && releaseTarget != null) {
             int[] loc = new int[2];
-            View target = panel != null && panel.getChildCount() > 0 ? panel.getChildAt(0) : w;
-            target.getLocationOnScreen(loc);
-            return new float[]{loc[0] + target.getWidth() / 2f, loc[1] + target.getHeight() / 2f};
+            releaseTarget.getLocationOnScreen(loc);
+            return new float[]{loc[0] + releaseTarget.getWidth() / 2f, loc[1] + releaseTarget.getHeight() / 2f};
         }
         return new float[]{screenSize().x / 2f, 1f};
     }
@@ -324,14 +454,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
     @Override
     public void onPlayerState(boolean playing, String status) {
         if (playing) showGhost(); else hideGhost();
-        if (playing && runningBtn != null) {
-            ((GradientDrawable) runningBtn.getBackground()).setColor(GRAFITO);
+        paintIdle();
+        if (playing && activeIdx >= 0 && dirButtons[activeIdx] != null) {
+            ((GradientDrawable) dirButtons[activeIdx].getBackground()).setColor(activeColor(activeMode));
         }
         if (!playing) {
-            if (runningBtn != null) {
-                ((GradientDrawable) runningBtn.getBackground()).setColor(Color.argb(220, 64, 106, 180));
-                runningBtn = null;
-            }
+            activeIdx = -1;
             if (status != null && !status.startsWith("Listo") && !status.equals("Detenido")) toast(status);
         }
     }
