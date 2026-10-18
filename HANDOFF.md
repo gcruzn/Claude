@@ -1,6 +1,6 @@
 # Handoff — Patrón Touch (app Android de patrones multi-touch)
 
-> Contexto para continuar este proyecto en Claude Code. Estado al **18-oct-2026**, versión **3.1.1**
+> Contexto para continuar este proyecto en Claude Code. Estado al **18-oct-2026**, versión **3.1.3**
 > (ver «Sesión del 18-oct: Edgar y pruebas por ADB» al final).
 > El usuario es Gonzalo Cruz: habla español de Chile, deja los términos técnicos en inglés y prefiere
 > respuestas concisas, decisiones tomadas sin menús de opciones e interfaces de tema claro.
@@ -171,8 +171,7 @@ Doble salto, Rodear (v2, tramos de 0,2 s), Esquive y Escape (súper apuntado con
 alcance máximo). Hiper y salto no se pudo probar (no hay hipercarga). Límite de fondo: son ciegos; el
 auto-apuntado elige al más cercano, y «arriba/abajo» son de la pantalla, no hacia el enemigo.
 
-**Firma:** el CI firma con la clave debug del runner, que cambia en cada build → cada versión obliga a
-desinstalar y a reactivar el servicio en Accesibilidad. Hay soporte para una clave fija vía secretos
-`SIDELOAD_KEYSTORE` (base64 del .p12) y `SIDELOAD_PASSWORD`; la clave está generada en
-`C:\Users\gonza\.patrontouch\` (fuera del repo, que es público). Falta que Gonzalo cargue los dos secretos en
-GitHub › Settings › Secrets and variables › Actions.
+**Firma (resuelto desde v3.1.2):** el CI firma con la clave fija de los secretos `SIDELOAD_KEYSTORE`
+(base64 del .p12) y `SIDELOAD_PASSWORD`; la clave vive en `C:\Users\gonza\.patrontouch\`, fuera del repo
+público. Las versiones nuevas se instalan encima con `adb install -r` sin perder datos ni el permiso de
+Accesibilidad (probado 3.1.2 → 3.1.3). Si el CI falla, el error de Gradle queda como anotación pública del job.
