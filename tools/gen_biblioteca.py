@@ -14,7 +14,7 @@ import json
 import os
 import sys
 
-VERSION = 1
+VERSION = 2
 UPDATED = "2026-10-18"
 
 MODES = [
@@ -105,24 +105,45 @@ def kite(b):
 def full_combo(b):
     e = CADENCE[b["reload"]]
     order = b.get("combo", "gadget-super")
-    p = P("Combo completo", f"{b['gadget_desc']} → hipercarga + súper → ataques. Úsalo con súper e hipercarga listos.")
+    use_gadget = b.get("gadget_in_combo", True)
+    if not use_gadget:
+        desc = "Hipercarga + súper → ataques. Úsalo con súper e hipercarga listos."
+    elif order == "super-gadget":
+        desc = f"Hipercarga + {b['gadget_desc']} → ataques. Úsalo con súper e hipercarga listos."
+    elif order == "attacks-gadget-super":
+        desc = f"{b['gadget_desc']} → hipercarga + súper. Úsalo con súper e hipercarga listos."
+    else:
+        desc = f"Gadget → hipercarga + súper → ataques. Úsalo con súper e hipercarga listos."
+    p = P("Combo completo", desc)
+
+    def gadget(t):
+        if use_gadget:
+            p.tap("gadget", t)
+
     if b["style"] in ("assassin", "tank"):
+        # Se acerca, entra con súper y castiga.
         p.move("up", 900).move("up", 900).move("down", 500)
         if order == "gadget-super":
-            p.tap("gadget", 300)
+            gadget(300)
             p.hyper_super(b, 650)
         else:
             p.hyper_super(b, 300)
-            p.tap("gadget", 900)
-        p.attacks(1100, 2300, e)
+            gadget(950)
+        p.attacks(1150, 2300, e)
+    elif order == "attacks-gadget-super":
+        # Primero golpes (cargan el gadget), luego gadget y súper.
+        p.move("left", 600).move("right", 600).move("down", 500)
+        p.attacks(50, 900, e)
+        gadget(1000)
+        p.hyper_super(b, 1200)
     else:
         p.move("left", 600).move("right", 600).move("down", 500)
         if order == "gadget-super":
-            p.tap("gadget", 100)
+            gadget(100)
             p.hyper_super(b, 450)
         else:
             p.hyper_super(b, 100)
-            p.tap("gadget", 700)
+            gadget(700)
         p.attacks(900, 1700, e)
     return p
 
