@@ -230,6 +230,18 @@ public class TouchService extends AccessibilityService implements Player.Listene
         player.start(p, store.getRepeats(), store.getPauseMs());
     }
 
+    /** Toque mínimo sobre el ícono ⠿ del panel (inofensivo); sin panel, el borde superior. */
+    @Override
+    public float[] releasePoint() {
+        if (panel != null && panel.getChildCount() > 0) {
+            int[] loc = new int[2];
+            View handle = panel.getChildAt(0);
+            handle.getLocationOnScreen(loc);
+            return new float[]{loc[0] + handle.getWidth() / 2f, loc[1] + handle.getHeight() / 2f};
+        }
+        return new float[]{screenSize().x / 2f, 1f};
+    }
+
     @Override
     public void onPlayerState(boolean playing, String status) {
         if (playing) showGhost(); else hideGhost();
