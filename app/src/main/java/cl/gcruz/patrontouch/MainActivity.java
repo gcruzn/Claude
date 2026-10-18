@@ -3,12 +3,14 @@ package cl.gcruz.patrontouch;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
-import android.text.InputType;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
@@ -16,11 +18,12 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import java.util.List;
 
-/** Pantalla principal: activar el servicio, configurar repeticiones y administrar patrones. */
+/** Pantalla principal: activar el servicio, biblioteca, calibración, ajustes y patrones propios. */
 public class MainActivity extends Activity {
 
     private static final int CORAL = Color.parseColor("#E25E6B");
@@ -28,14 +31,17 @@ public class MainActivity extends Activity {
     private static final int VERDE = Color.parseColor("#73C96A");
     private static final int GRAFITO = Color.parseColor("#454A51");
     private static final int GRIS = Color.parseColor("#969798");
+    private static final int REQ_IMPORT = 42;
 
     private PatternStore store;
+    private SharedPreferences prefs;
     private LinearLayout root;
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         store = new PatternStore(this);
+        prefs = getSharedPreferences("config", MODE_PRIVATE);
         ScrollView sv = new ScrollView(this);
         sv.setBackgroundColor(Color.parseColor("#F6F7F9"));
         root = new LinearLayout(this);
@@ -57,51 +63,93 @@ public class MainActivity extends Activity {
         TouchService svc = TouchService.get();
 
         root.addView(text("Patrón Touch", 24, GRAFITO, true));
-        root.addView(text("Graba toques con varios dedos a la vez y repítelos en loop.", 14, GRIS, false));
+        root.addView(text("Patrones de ataque por brawler y modo, listos para usar en el juego.", 14, GRIS, false));
         space(14);
 
-        // --- Estado del servicio
+        // --- Servicio
         LinearLayout card = card();
         if (svc == null) {
             card.addView(text("● Servicio desactivado", 16, CORAL, true));
-            card.addView(text("1. Toca el botón y activa \"Patrón Touch\" en Accesibilidad.\n"
-                    + "2. Si Android dice \"Configuración restringida\": ve a Ajustes › Apps › Patrón Touch › "
-                    + "menú ⋮ › \"Permitir configuración restringida\" y vuelve a intentar.", 13, GRAFITO, false));
+            card.addView(text("Activa \"Patrón Touch\" en Accesibilidad. Si Android dice \"Configuración restringida\": "
+                    + "Ajustes › Apps › Patrón Touch › ⋮ › Permitir ajustes restringidos.", 13, GRAFITO, false));
             card.addView(button("Abrir Accesibilidad", AZUL, v ->
                     startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
         } else {
             card.addView(text("● Servicio activo", 16, VERDE, true));
-            card.addView(text("Usa el panel flotante encima del juego: ⏺ Grabar, ▶ Repetir, ■ Parar. "
-                    + "Arrástralo desde ⠿ a una esquina donde no estorbe. Bajar volumen también detiene.",
-                    13, GRAFITO, false));
-            card.addView(button(svc.isPanelVisible() ? "Ocultar panel flotante" : "Mostrar panel flotante",
-                    GRAFITO, v -> {
-                        if (svc.isPanelVisible()) svc.hidePanel(); else svc.showPanel();
-                        render();
-                    }));
+            card.addView(text("En el juego usa el panel: elige brawler ▾ y modo ▾, y toca un patrón para ejecutarlo una vez. "
+                    + "⇄ invierte izquierda/derecha · ◎ calibra · – minimiza · ✕ cierra.", 13, GRAFITO, false));
+            card.addView(button(svc.isPanelVisible() ? "Ocultar panel" : "Mostrar panel", GRAFITO, v -> {
+                if (svc.isPanelVisible()) svc.hidePanel(); else svc.showPanel();
+                render();
+            }));
         }
         root.addView(card);
         space(12);
 
-        // --- Configuración
-        LinearLayout cfg = card();
-        cfg.addView(text("Repetición", 16, GRAFITO, true));
-        EditText reps = number(String.valueOf(store.getRepeats()));
-        EditText pause = number(String.valueOf(store.getPauseMs()));
-        cfg.addView(row("Veces (0 = infinito)", reps));
-        cfg.addView(row("Pausa entre vueltas (ms)", pause));
-        cfg.addView(button("Guardar", AZUL, v -> {
-            store.setRepeats(parse(reps.getText().toString()));
-            store.setPauseMs(parse(pause.getText().toString()));
-            if (TouchService.get() != null) TouchService.get().refresh();
-            render();
-        }));
-        root.addView(cfg);
+        // --- Calibración
+        LinearLayout calCard = card();
+        calCard.addView(text("Controles", 16, GRAFITO, true));
+        boolean calibrated = svc != null && svc.calibration().calibrated;
+        calCard.addView(text(calibrated
+                ? "✓ Calibrados. Si cambias la disposición de tus controles, vuelve a calibrar."
+                : "Sin calibrar. Abre Brawl Stars en una partida o en el entrenamiento, toca ◎ en el panel "
+                + "y luego toca cada botón cuando la app lo pida (joystick, ataque, súper, gadget e hipercarga).",
+                13, calibrated ? VERDE : GRAFITO, false));
+        root.addView(calCard);
         space(12);
 
-        // --- Patrones
+        // --- Biblioteca
+        LinearLayout libCard = card();
+        libCard.addView(text("Biblioteca de patrones", 16, GRAFITO, true));
+        Library lib = svc != null ? svc.library() : Library.load(this);
+        int total = 0;
+        for (Library.Brawler br : lib.brawlers) total += br.patterns.size();
+        libCard.addView(text("Versión " + lib.version + (lib.updated.isEmpty() ? "" : " · " + lib.updated)
+                + " · " + lib.brawlers.size() + " brawlers · " + total + " patrones", 13, GRAFITO, false));
+        StringBuilder names = new StringBuilder();
+        for (Library.Brawler br : lib.brawlers) names.append(names.length() == 0 ? "" : ", ").append(br.name);
+        libCard.addView(text(names.toString(), 12, GRIS, false));
+        libCard.addView(button("Buscar actualizaciones", AZUL, v -> {
+            if (TouchService.get() != null) {
+                TouchService.get().checkForUpdates(true);
+                new Handler(Looper.getMainLooper()).postDelayed(this::render, 2500);
+            } else {
+                new Thread(() -> {
+                    String msg;
+                    try {
+                        Library l = Library.download(this);
+                        msg = "Biblioteca actualizada (v" + l.version + ")";
+                    } catch (Exception e) {
+                        msg = "No pude actualizar: revisa tu conexión";
+                    }
+                    String m = msg;
+                    runOnUiThread(() -> {
+                        toast(m);
+                        render();
+                    });
+                }).start();
+            }
+        }));
+        root.addView(libCard);
+        space(12);
+
+        // --- Ajustes
+        LinearLayout set = card();
+        set.addView(text("Atajos", 16, GRAFITO, true));
+        Switch vol = new Switch(this);
+        vol.setText("Volumen + repite el último patrón (solo con el panel abierto)");
+        vol.setTextColor(GRAFITO);
+        vol.setChecked(prefs.getBoolean("volShortcut", true));
+        vol.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("volShortcut", on).apply());
+        set.addView(vol);
+        set.addView(text("Volumen − siempre detiene un patrón en curso.", 12, GRIS, false));
+        root.addView(set);
+        space(12);
+
+        // --- Patrones propios
         LinearLayout list = card();
-        list.addView(text("Patrones guardados", 16, GRAFITO, true));
+        list.addView(text("Mis patrones", 16, GRAFITO, true));
+        list.addView(text("Patrones que te paso por chat. Aparecen en el panel en ★ Mis patrones.", 12, GRIS, false));
         LinearLayout imp = new LinearLayout(this);
         imp.setOrientation(LinearLayout.HORIZONTAL);
         Button paste = button("Pegar patrón", VERDE, v -> importFromClipboard());
@@ -122,33 +170,18 @@ public class MainActivity extends Activity {
         imp.addView(paste);
         imp.addView(file);
         list.addView(imp);
-        List<String> ids = store.ids();
-        String active = store.getActive();
-        if (ids.isEmpty()) {
-            list.addView(text("Aún no hay patrones. Abre el juego y toca ⏺ Grabar en el panel.", 13, GRIS, false));
-        }
-        for (String id : ids) {
+        for (String id : store.ids()) {
             Pattern pt = store.load(id);
             if (pt == null) continue;
-            boolean isActive = id.equals(active);
             LinearLayout r = new LinearLayout(this);
             r.setOrientation(LinearLayout.HORIZONTAL);
             r.setGravity(Gravity.CENTER_VERTICAL);
             r.setPadding(0, dp(8), 0, dp(8));
-
             LinearLayout info = new LinearLayout(this);
             info.setOrientation(LinearLayout.VERTICAL);
-            info.addView(text((isActive ? "★ " : "") + pt.name, 15, isActive ? AZUL : GRAFITO, true));
-            info.addView(text(String.format("%.1f s · %d toques · hasta %d dedos a la vez · %s",
-                    pt.duration / 1000f, pt.touches.size(), pt.maxSimultaneous(),
-                    pt.screenW > pt.screenH ? "horizontal" : "vertical"), 12, GRIS, false));
+            info.addView(text(pt.name, 15, GRAFITO, true));
+            info.addView(text(String.format("%.1f s · %d toques", pt.duration / 1000f, pt.touches.size()), 12, GRIS, false));
             r.addView(info, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-
-            if (!isActive) r.addView(small("Usar", AZUL, v -> {
-                store.setActive(id);
-                if (TouchService.get() != null) TouchService.get().refresh();
-                render();
-            }));
             r.addView(small("Renombrar", GRAFITO, v -> rename(id, pt)));
             r.addView(small("Borrar", CORAL, v -> new AlertDialog.Builder(this)
                     .setMessage("¿Borrar \"" + pt.name + "\"?")
@@ -163,14 +196,10 @@ public class MainActivity extends Activity {
         root.addView(list);
         space(12);
 
-        root.addView(text("Tips: graba y reproduce en la misma orientación (horizontal para el juego). "
-                + "Durante la grabación los toques NO llegan al juego: haz el patrón \"en seco\" sobre la capa azul. "
-                + "Si tocas la pantalla mientras se reproduce, se detiene.", 12, GRIS, false));
+        root.addView(text("Tip: mantén presionado un patrón en el panel para ver qué hace.", 12, GRIS, false));
     }
 
     // ---------------------------------------------------------------- importar
-
-    private static final int REQ_IMPORT = 42;
 
     private void importFromClipboard() {
         android.content.ClipboardManager cm =
@@ -198,7 +227,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Acepta el JSON de un patrón (aunque venga con texto alrededor) y lo adapta a esta pantalla. */
     private void importText(String text) {
         int a = text.indexOf('{'), b = text.lastIndexOf('}');
         if (a < 0 || b <= a) {
@@ -216,7 +244,6 @@ public class MainActivity extends Activity {
             toast("El patrón no tiene toques");
             return;
         }
-        // Escalar si el patrón viene de una pantalla de otra resolución.
         android.graphics.Point size = new android.graphics.Point();
         getWindowManager().getDefaultDisplay().getRealSize(size);
         int curLong = Math.max(size.x, size.y), curShort = Math.min(size.x, size.y);
@@ -243,10 +270,6 @@ public class MainActivity extends Activity {
         render();
     }
 
-    private void toast(String s) {
-        android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show();
-    }
-
     private void rename(String id, Pattern pt) {
         EditText et = new EditText(this);
         et.setText(pt.name);
@@ -263,8 +286,8 @@ public class MainActivity extends Activity {
 
     // ---------------------------------------------------------------- helpers de UI
 
-    private int parse(String s) {
-        try { return Integer.parseInt(s.trim()); } catch (Exception e) { return 0; }
+    private void toast(String s) {
+        android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show();
     }
 
     private LinearLayout card() {
@@ -312,24 +335,6 @@ public class MainActivity extends Activity {
         t.setPadding(dp(8), dp(6), dp(8), dp(6));
         t.setOnClickListener(l);
         return t;
-    }
-
-    private EditText number(String v) {
-        EditText e = new EditText(this);
-        e.setInputType(InputType.TYPE_CLASS_NUMBER);
-        e.setText(v);
-        e.setEms(5);
-        return e;
-    }
-
-    private LinearLayout row(String label, View field) {
-        LinearLayout r = new LinearLayout(this);
-        r.setOrientation(LinearLayout.HORIZONTAL);
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.addView(text(label, 14, GRAFITO, false),
-                new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        r.addView(field);
-        return r;
     }
 
     private void space(int h) {
