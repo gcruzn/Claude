@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
         TouchService svc = TouchService.get();
 
         root.addView(text("Patrón Touch", 24, GRAFITO, true));
-        root.addView(text("Patrones de ataque por brawler y modo, listos para usar en el juego.", 14, GRIS, false));
+        root.addView(text("Cuatro patrones completos (↑ ↓ ← →) para cualquier brawler.", 14, GRIS, false));
         space(14);
 
         // --- Servicio
@@ -76,8 +76,8 @@ public class MainActivity extends Activity {
                     startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
         } else {
             card.addView(text("● Servicio activo", 16, VERDE, true));
-            card.addView(text("En el juego usa el panel: elige brawler ▾ y modo ▾, y toca un patrón para ejecutarlo una vez. "
-                    + "⇄ invierte izquierda/derecha · ◎ calibra · – minimiza · ✕ cierra.", 13, GRAFITO, false));
+            card.addView(text("En el juego toca ↑ ↓ ← →: se mueve hacia allá disparando y usa gadget, hipercarga y súper. "
+                    + "Se ejecuta una vez. ◎ calibra · – minimiza · ✕ cierra · ⠿ arrastra.", 13, GRAFITO, false));
             card.addView(button(svc.isPanelVisible() ? "Ocultar panel" : "Mostrar panel", GRAFITO, v -> {
                 if (svc.isPanelVisible()) svc.hidePanel(); else svc.showPanel();
                 render();
@@ -98,41 +98,6 @@ public class MainActivity extends Activity {
         root.addView(calCard);
         space(12);
 
-        // --- Biblioteca
-        LinearLayout libCard = card();
-        libCard.addView(text("Biblioteca de patrones", 16, GRAFITO, true));
-        Library lib = svc != null ? svc.library() : Library.load(this);
-        int total = 0;
-        for (Library.Brawler br : lib.brawlers) total += br.patterns.size();
-        libCard.addView(text("Versión " + lib.version + (lib.updated.isEmpty() ? "" : " · " + lib.updated)
-                + " · " + lib.brawlers.size() + " brawlers · " + total + " patrones", 13, GRAFITO, false));
-        StringBuilder names = new StringBuilder();
-        for (Library.Brawler br : lib.brawlers) names.append(names.length() == 0 ? "" : ", ").append(br.name);
-        libCard.addView(text(names.toString(), 12, GRIS, false));
-        libCard.addView(button("Buscar actualizaciones", AZUL, v -> {
-            if (TouchService.get() != null) {
-                TouchService.get().checkForUpdates(true);
-                new Handler(Looper.getMainLooper()).postDelayed(this::render, 2500);
-            } else {
-                new Thread(() -> {
-                    String msg;
-                    try {
-                        Library l = Library.download(this);
-                        msg = "Biblioteca actualizada (v" + l.version + ")";
-                    } catch (Exception e) {
-                        msg = "No pude actualizar: revisa tu conexión";
-                    }
-                    String m = msg;
-                    runOnUiThread(() -> {
-                        toast(m);
-                        render();
-                    });
-                }).start();
-            }
-        }));
-        root.addView(libCard);
-        space(12);
-
         // --- Ajustes
         LinearLayout set = card();
         set.addView(text("Atajos", 16, GRAFITO, true));
@@ -146,57 +111,7 @@ public class MainActivity extends Activity {
         root.addView(set);
         space(12);
 
-        // --- Patrones propios
-        LinearLayout list = card();
-        list.addView(text("Mis patrones", 16, GRAFITO, true));
-        list.addView(text("Patrones que te paso por chat. Aparecen en el panel en ★ Mis patrones.", 12, GRIS, false));
-        LinearLayout imp = new LinearLayout(this);
-        imp.setOrientation(LinearLayout.HORIZONTAL);
-        Button paste = button("Pegar patrón", VERDE, v -> importFromClipboard());
-        Button file = button("Importar archivo", VERDE, v -> {
-            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-            i.addCategory(Intent.CATEGORY_OPENABLE);
-            i.setType("*/*");
-            startActivityForResult(i, REQ_IMPORT);
-        });
-        LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, dp(46), 1f);
-        half.topMargin = dp(10);
-        half.rightMargin = dp(4);
-        paste.setLayoutParams(half);
-        LinearLayout.LayoutParams half2 = new LinearLayout.LayoutParams(0, dp(46), 1f);
-        half2.topMargin = dp(10);
-        half2.leftMargin = dp(4);
-        file.setLayoutParams(half2);
-        imp.addView(paste);
-        imp.addView(file);
-        list.addView(imp);
-        for (String id : store.ids()) {
-            Pattern pt = store.load(id);
-            if (pt == null) continue;
-            LinearLayout r = new LinearLayout(this);
-            r.setOrientation(LinearLayout.HORIZONTAL);
-            r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(0, dp(8), 0, dp(8));
-            LinearLayout info = new LinearLayout(this);
-            info.setOrientation(LinearLayout.VERTICAL);
-            info.addView(text(pt.name, 15, GRAFITO, true));
-            info.addView(text(String.format("%.1f s · %d toques", pt.duration / 1000f, pt.touches.size()), 12, GRIS, false));
-            r.addView(info, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            r.addView(small("Renombrar", GRAFITO, v -> rename(id, pt)));
-            r.addView(small("Borrar", CORAL, v -> new AlertDialog.Builder(this)
-                    .setMessage("¿Borrar \"" + pt.name + "\"?")
-                    .setPositiveButton("Borrar", (d, w) -> {
-                        store.delete(id);
-                        if (TouchService.get() != null) TouchService.get().refresh();
-                        render();
-                    })
-                    .setNegativeButton("Cancelar", null).show()));
-            list.addView(r);
-        }
-        root.addView(list);
-        space(12);
-
-        root.addView(text("Tip: mantén presionado un patrón en el panel para ver qué hace.", 12, GRIS, false));
+        root.addView(text("Tip: mantén presionada una flecha para ver qué hace. Volumen − detiene.", 12, GRIS, false));
     }
 
     // ---------------------------------------------------------------- importar

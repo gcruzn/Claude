@@ -46,7 +46,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private static final int VERDE = Color.parseColor("#73C96A");
     private static final int GRAFITO = Color.parseColor("#454A51");
     private static final int GRIS = Color.parseColor("#969798");
-    private static final String CUSTOM_ID = "_custom";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private WindowManager wm;
@@ -59,9 +58,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private WindowManager.LayoutParams panelParams;
     private LinearLayout panel;
     private TextView bubble;
-    private TextView statusTv, brawlerChip, modeChip, mirrorChip;
-    private GridLayout grid;
-    private View pickerWindow;
 
     private Runnable lastRun;
     private String lastName;
@@ -78,7 +74,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
         Point s = screenSize();
         cal = new Calibration(this, s.x, s.y);
         showPanel();
-        checkForUpdates(false);
     }
 
     @Override
@@ -105,7 +100,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (player != null) player.stop(null);
         hideGhost();
         removeCalibration();
-        closePicker();
         hidePanel();
         instance = null;
     }
@@ -133,7 +127,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
     public boolean isPanelVisible() { return panel != null || bubble != null; }
 
     public void refresh() {
-        if (panel != null) rebuildPatterns();
     }
 
     public void reloadLibrary(Library l) {
@@ -147,58 +140,64 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     // ---------------------------------------------------------------- panel
 
+    /** Patrones completos por dirección: se mueve hacia allá disparando + gadget, hipercarga y súper. */
+    private static final String[][] DIRS = {
+            {"up", "↑", "Avanzar: gadget, avanza disparando, hipercarga + súper al enemigo más cercano"},
+            {"down", "↓", "Retroceder: gadget, se retira disparando a quien lo sigue, hipercarga + súper"},
+            {"left", "←", "Izquierda: gadget, esquiva hacia la izquierda disparando, hipercarga + súper"},
+            {"right", "→", "Derecha: gadget, esquiva hacia la derecha disparando, hipercarga + súper"},
+    };
+
+    private static Library.LibPattern directional(String dir, String label) {
+        Library.LibPattern lp = new Library.LibPattern();
+        lp.name = label;
+        try {
+            lp.moves = new org.json.JSONArray().put(new org.json.JSONObject().put("dir", dir).put("ms", 1700));
+            org.json.JSONArray acts = new org.json.JSONArray();
+            acts.put(new org.json.JSONObject().put("t", 50).put("btn", "gadget"));
+            for (int t = 250; t < 1700; t += 450) {
+                acts.put(new org.json.JSONObject().put("t", t).put("btn", "attack"));
+            }
+            acts.put(new org.json.JSONObject().put("t", 800).put("btn", "hyper"));
+            acts.put(new org.json.JSONObject().put("t", 1050).put("btn", "super"));
+            lp.acts = acts;
+        } catch (Exception ignored) {
+        }
+        return lp;
+    }
+
     @SuppressLint("ClickableViewAccessibility")
     public void showPanel() {
         if (wm == null || panel != null) return;
         removeBubble();
 
         panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(6);
+        panel.setOrientation(LinearLayout.HORIZONTAL);
+        panel.setGravity(Gravity.CENTER_VERTICAL);
+        int pad = dp(3);
         panel.setPadding(pad, pad, pad, pad);
-        panel.setBackground(round(Color.argb(240, 255, 255, 255), 18, Color.argb(70, 0, 0, 0)));
-        panel.setElevation(dp(4));
+        panel.setBackground(round(Color.argb(170, 255, 255, 255), 16, Color.argb(50, 0, 0, 0)));
 
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView handle = mini("⠿", Color.TRANSPARENT, GRAFITO);
+        panel.addView(handle);
+        for (String[] d : DIRS) {
+            TextView b = mini(d[1], Color.argb(220, 64, 106, 180), Color.WHITE);
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+            Library.LibPattern lp = directional(d[0], d[1]);
+            b.setOnClickListener(v -> runDirection(b, lp));
+            b.setOnLongClickListener(v -> {
+                toast(d[2]);
+                return true;
+            });
+            panel.addView(b);
+        }
+        TextView calChip = mini("◎", Color.argb(200, 238, 241, 246), GRAFITO);
+        TextView minChip = mini("–", Color.argb(200, 238, 241, 246), GRAFITO);
+        TextView closeChip = mini("✕", Color.argb(200, 251, 231, 233), CORAL);
+        panel.addView(calChip);
+        panel.addView(minChip);
+        panel.addView(closeChip);
 
-        TextView handle = chip("⠿", Color.TRANSPARENT, GRAFITO);
-        brawlerChip = chip("", AZUL, Color.WHITE);
-        modeChip = chip("", Color.parseColor("#EEF1F6"), GRAFITO);
-        mirrorChip = chip("⇄", Color.parseColor("#EEF1F6"), GRAFITO);
-        TextView calChip = chip("◎", Color.parseColor("#EEF1F6"), GRAFITO);
-        TextView minChip = chip("–", Color.parseColor("#EEF1F6"), GRAFITO);
-        TextView closeChip = chip("✕", Color.parseColor("#FBE7E9"), CORAL);
-
-        header.addView(handle);
-        header.addView(brawlerChip);
-        header.addView(modeChip);
-        header.addView(mirrorChip);
-        header.addView(calChip);
-        header.addView(minChip);
-        header.addView(closeChip);
-
-        statusTv = new TextView(this);
-        statusTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        statusTv.setTextColor(GRIS);
-        statusTv.setPadding(dp(8), dp(2), dp(8), dp(2));
-        statusTv.setMaxWidth(dp(420));
-
-        grid = new GridLayout(this);
-        grid.setColumnCount(3);
-
-        panel.addView(header);
-        panel.addView(statusTv);
-        panel.addView(grid);
-
-        brawlerChip.setOnClickListener(v -> pickBrawler());
-        modeChip.setOnClickListener(v -> pickMode());
-        mirrorChip.setOnClickListener(v -> {
-            prefs.edit().putBoolean("mirror", !prefs.getBoolean("mirror", false)).apply();
-            updateHeader();
-            toast(prefs.getBoolean("mirror", false) ? "Espejo activado: izquierda ⇄ derecha" : "Espejo desactivado");
-        });
         calChip.setOnClickListener(v -> startCalibration());
         minChip.setOnClickListener(v -> minimize());
         closeChip.setOnClickListener(v -> {
@@ -214,11 +213,28 @@ public class TouchService extends AccessibilityService implements Player.Listene
             panelParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
             panelParams.gravity = Gravity.TOP | Gravity.START;
             panelParams.x = dp(12);
-            panelParams.y = dp(60);
+            panelParams.y = dp(8);
         }
-        updateHeader();
-        rebuildPatterns();
         wm.addView(panel, panelParams);
+        if (!cal.calibrated) toast("Primero toca ◎ para calibrar tus controles (con el juego abierto)");
+    }
+
+    private void runDirection(TextView btn, Library.LibPattern lp) {
+        if (player.isPlaying()) {
+            player.stop(null);
+            return;
+        }
+        Pattern p = Library.compile(lp, cal, false);
+        if (p.touches.isEmpty()) return;
+        lastName = lp.name;
+        runningBtn = btn;
+        lastRun = () -> {
+            if (player.isPlaying()) player.stop(null);
+            Pattern q = Library.compile(lp, cal, false);
+            lastName = lp.name;
+            player.start(q, 1, 0);
+        };
+        player.start(p, 1, 0);
     }
 
     public void hidePanel() {
@@ -232,12 +248,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (panel != null) try { wm.removeView(panel); } catch (Exception ignored) { }
         panel = null;
         runningBtn = null;
-        bubble = chip("PT", AZUL, Color.WHITE);
+        bubble = mini("PT", Color.argb(200, 64, 106, 180), Color.WHITE);
         bubble.setTypeface(Typeface.DEFAULT_BOLD);
         bubble.setGravity(Gravity.CENTER);
-        bubble.setMinWidth(dp(44));
-        bubble.setMinHeight(dp(44));
-        ((GradientDrawable) bubble.getBackground()).setCornerRadius(dp(22));
+        bubble.setMinWidth(dp(36));
+        bubble.setMinHeight(dp(36));
+        ((GradientDrawable) bubble.getBackground()).setCornerRadius(dp(18));
         bubble.setOnTouchListener(dragListener(() -> showPanel()));
         wm.addView(bubble, panelParams);
     }
@@ -281,189 +297,14 @@ public class TouchService extends AccessibilityService implements Player.Listene
         };
     }
 
-    private void updateHeader() {
-        if (panel == null) return;
-        String bid = prefs.getString("brawler", null);
-        if (CUSTOM_ID.equals(bid)) {
-            brawlerChip.setText("Mis patrones ▾");
-        } else {
-            Library.Brawler b = lib.brawler(bid);
-            brawlerChip.setText((b == null ? "Brawler" : b.name) + " ▾");
-        }
-        Library.Mode m = lib.mode(prefs.getString("mode", null));
-        modeChip.setText((m == null ? "Modo" : m.name) + " ▾");
-        modeChip.setVisibility(CUSTOM_ID.equals(bid) ? View.GONE : View.VISIBLE);
-        boolean mir = prefs.getBoolean("mirror", false);
-        ((GradientDrawable) mirrorChip.getBackground()).setColor(mir ? VERDE : Color.parseColor("#EEF1F6"));
-        mirrorChip.setTextColor(mir ? Color.WHITE : GRAFITO);
-    }
-
-    /** Botones de patrones para el brawler y modo elegidos. */
-    private void rebuildPatterns() {
-        if (grid == null) return;
-        grid.removeAllViews();
-        runningBtn = null;
-        String bid = prefs.getString("brawler", null);
-
-        if (CUSTOM_ID.equals(bid)) {
-            List<String> ids = store.ids();
-            for (String id : ids) {
-                Pattern p = store.load(id);
-                if (p == null) continue;
-                addPatternButton(p.name, "Patrón propio · " + String.format("%.1f s", p.duration / 1000f),
-                        () -> p);
-            }
-            setStatus(ids.isEmpty() ? "No tienes patrones propios. Pégalos desde la app." : "Tus patrones importados");
-            return;
-        }
-
-        Library.Brawler b = lib.brawler(bid);
-        Library.Mode m = lib.mode(prefs.getString("mode", null));
-        if (b == null) {
-            setStatus("Biblioteca vacía: actualízala desde la app");
-            return;
-        }
-        String modeId = m == null ? "all" : m.id;
-        int n = 0;
-        for (Library.LibPattern lp : b.patterns) {
-            if (!lp.appliesTo(modeId)) continue;
-            addPatternButton(lp.name, lp.desc, () -> Library.compile(lp, cal, prefs.getBoolean("mirror", false)));
-            n++;
-        }
-        String tip = b.tip == null || b.tip.isEmpty() ? "" : " · " + b.tip;
-        setStatus(cal.calibrated ? n + " patrones" + tip
-                : "⚠ Toca ◎ para calibrar tus controles (con el juego abierto)");
-    }
-
-    private interface PatternSupplier {
-        Pattern get();
-    }
-
-    private void addPatternButton(String name, String desc, PatternSupplier supplier) {
-        TextView btn = chip(name, Color.parseColor("#F6F7F9"), GRAFITO);
-        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        ((GradientDrawable) btn.getBackground()).setStroke(dp(1), Color.parseColor("#DADDE2"));
-        GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-        lp.setMargins(dp(3), dp(3), dp(3), dp(3));
-        btn.setLayoutParams(lp);
-        Runnable run = () -> {
-            if (player.isPlaying()) {
-                player.stop(null);
-                return;
-            }
-            Pattern p = supplier.get();
-            if (p == null || p.touches.isEmpty()) {
-                toast("Este patrón no tiene acciones con tus controles calibrados");
-                return;
-            }
-            lastRun = this.lastRunFor(name, supplier);
-            lastName = name;
-            runningBtn = btn;
-            player.start(p, 1, 0);
-        };
-        btn.setOnClickListener(v -> run.run());
-        btn.setOnLongClickListener(v -> {
-            toast(name + ": " + (desc == null || desc.isEmpty() ? "sin descripción" : desc));
-            return true;
-        });
-        grid.addView(btn);
-    }
-
-    private Runnable lastRunFor(String name, PatternSupplier supplier) {
-        return () -> {
-            if (player.isPlaying()) player.stop(null);
-            Pattern p = supplier.get();
-            if (p != null && !p.touches.isEmpty()) {
-                lastName = name;
-                player.start(p, 1, 0);
-            }
-        };
-    }
-
-    private void setStatus(String s) {
-        if (statusTv != null) statusTv.setText(s);
-    }
-
-    // ---------------------------------------------------------------- selectores
-
-    private void pickBrawler() {
-        List<String> labels = new ArrayList<>();
-        List<String> ids = new ArrayList<>();
-        for (Library.Brawler b : lib.brawlers) {
-            labels.add(b.name + (b.role.isEmpty() ? "" : "  ·  " + b.role));
-            ids.add(b.id);
-        }
-        labels.add("★ Mis patrones");
-        ids.add(CUSTOM_ID);
-        showPicker("Elige brawler", labels, i -> {
-            prefs.edit().putString("brawler", ids.get(i)).apply();
-            updateHeader();
-            rebuildPatterns();
-        });
-    }
-
-    private void pickMode() {
-        List<String> labels = new ArrayList<>();
-        for (Library.Mode m : lib.modes) labels.add(m.name);
-        showPicker("Elige modo de juego", labels, i -> {
-            prefs.edit().putString("mode", lib.modes.get(i).id).apply();
-            updateHeader();
-            rebuildPatterns();
-        });
-    }
-
-    private interface Pick {
-        void on(int index);
-    }
-
-    private void showPicker(String title, List<String> items, Pick pick) {
-        closePicker();
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(10), dp(10), dp(10), dp(10));
-        box.setBackground(round(Color.WHITE, 16, Color.argb(60, 0, 0, 0)));
-        box.setElevation(dp(8));
-        TextView t = new TextView(this);
-        t.setText(title);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setTextColor(GRAFITO);
-        t.setPadding(dp(8), dp(4), dp(8), dp(8));
-        box.addView(t);
-
-        ScrollView sv = new ScrollView(this);
-        LinearLayout list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-        for (int i = 0; i < items.size(); i++) {
-            final int idx = i;
-            TextView row = new TextView(this);
-            row.setText(items.get(i));
-            row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-            row.setTextColor(GRAFITO);
-            row.setPadding(dp(12), dp(10), dp(12), dp(10));
-            row.setOnClickListener(v -> {
-                closePicker();
-                pick.on(idx);
-            });
-            list.addView(row);
-        }
-        sv.addView(list);
-        box.addView(sv, new LinearLayout.LayoutParams(dp(300), Math.min(dp(260), dp(44) * items.size())));
-        TextView cancel = chip("Cancelar", Color.parseColor("#EEF1F6"), GRAFITO);
-        cancel.setOnClickListener(v -> closePicker());
-        box.addView(cancel);
-
-        WindowManager.LayoutParams lp = overlayParams(false);
-        lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp.gravity = Gravity.CENTER;
-        pickerWindow = box;
-        wm.addView(box, lp);
-    }
-
-    private void closePicker() {
-        if (pickerWindow != null && wm != null) try { wm.removeView(pickerWindow); } catch (Exception ignored) { }
-        pickerWindow = null;
+    /** Botón pequeño y compacto para el panel. */
+    private TextView mini(String text, int bg, int fg) {
+        TextView tv = chip(text, bg, fg);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        tv.setGravity(Gravity.CENTER);
+        tv.setMinWidth(dp(34));
+        tv.setPadding(dp(8), dp(4), dp(8), dp(4));
+        return tv;
     }
 
     // ---------------------------------------------------------------- reproducción
@@ -473,8 +314,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         View w = panel != null ? panel : bubble;
         if (w != null) {
             int[] loc = new int[2];
-            View target = panel != null && panel.getChildCount() > 0
-                    ? ((LinearLayout) panel.getChildAt(0)).getChildAt(0) : w;
+            View target = panel != null && panel.getChildCount() > 0 ? panel.getChildAt(0) : w;
             target.getLocationOnScreen(loc);
             return new float[]{loc[0] + target.getWidth() / 2f, loc[1] + target.getHeight() / 2f};
         }
@@ -484,17 +324,15 @@ public class TouchService extends AccessibilityService implements Player.Listene
     @Override
     public void onPlayerState(boolean playing, String status) {
         if (playing) showGhost(); else hideGhost();
-        if (runningBtn != null) {
-            ((GradientDrawable) runningBtn.getBackground()).setColor(
-                    playing ? GRAFITO : Color.parseColor("#F6F7F9"));
-            runningBtn.setTextColor(playing ? Color.WHITE : GRAFITO);
+        if (playing && runningBtn != null) {
+            ((GradientDrawable) runningBtn.getBackground()).setColor(GRAFITO);
         }
-        if (playing) {
-            setStatus("▶ " + (lastName == null ? "" : lastName) + "  ·  toca de nuevo o volumen − para parar");
-        } else {
-            if (runningBtn != null) runningBtn = null;
-            if (panel != null) rebuildPatterns();
-            if (status != null && !status.startsWith("Listo")) toast(status);
+        if (!playing) {
+            if (runningBtn != null) {
+                ((GradientDrawable) runningBtn.getBackground()).setColor(Color.argb(220, 64, 106, 180));
+                runningBtn = null;
+            }
+            if (status != null && !status.startsWith("Listo") && !status.equals("Detenido")) toast(status);
         }
     }
 
@@ -508,7 +346,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     private void startCalibration() {
         player.stop(null);
-        closePicker();
         if (calibView != null) return;
         Point sz = screenSize();
         if (sz.x < sz.y) {
@@ -633,8 +470,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 main.post(() -> {
                     boolean newer = l.version > lib.version;
                     lib = l;
-                    refresh();
-                    updateHeader();
                     if (manual || newer) toast("Biblioteca actualizada (v" + l.version + ")");
                 });
             } catch (Exception e) {
