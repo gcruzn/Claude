@@ -185,3 +185,19 @@ Respuesta: lote `edgar2`, que acorta los 7 patrones de Edgar a ~1,4–1,6 s y so
 usuario no editó (compara contra `EDGAR1`). ◀▶▲▼ del set Edgar = Pegar y alejarse · Gadget y golpes ·
 Salto y golpes · Escape. Probados en Terrenos: Salto (1,37 s) y Gadget (1,47 s) conectan sus golpes.
 Desde v3.1.4 el log dice qué patrón corre en cada flecha (`patrón «…» flecha=… modo=…`).
+
+## v4 (19-oct): botonera vertical, sets Brawler · Modo, disparo dentro del patrón
+
+- **Botonera:** columna con asa ≡ (toque = menú de sets, mantener 3 s = candado, arrastrar = mover),
+  botones 1..N (máx. 6) con los patrones del set, 🎲 Random y ✕. Toque = ese patrón en bucle; otro toque
+  = parar; tocar otro botón cambia. Random = en cada repetición un patrón del set al azar, sin repetir
+  el anterior (`Player.start(..., Supplier<Pattern>)`). Se eliminaron doble toque y mantener.
+- **Sets:** `brawler`, `mode` y `slots` (ids ordenados). Lote `v4` migra la cruceta: flechas ▲▶▼◀ →
+  slots, y antepone a cada patrón la línea de disparo del perfil de su set. Los perfiles ya no se ven.
+- **Disparo en el patrón:** `disparo toque cada 0.42` · `disparo mantener 1.2` ·
+  `disparo apuntado cada 0.55 arriba|movimiento`. Sin línea rige toque cada 0,5 s y súper auto.
+- **Charlie** (lote `charlie1`): sacado de 10 min de partidas de Gonzalo en BlueStacks (grabador de
+  ventana + mando por joyGetPosEx; el ADB de BlueStacks no deja screenrecord/getevent). 5 botones.
+- **Estado del celular al 19-oct:** Gonzalo recalibró con controles invertidos (joystick a la derecha),
+  borró los patrones de Edgar (el set Edgar quedó vacío) y armó patrones propios. Comando ADB nuevo:
+  `--es cmd set --es id <set>`.
