@@ -246,7 +246,56 @@ public class Data {
             seeds.add("v4");
             changed = true;
         }
+        if (!seeds.contains("kenji1")) {
+            seedKenji();
+            seeds.add("kenji1");
+            changed = true;
+        }
         return changed;
+    }
+
+    /**
+     * Kenji (wiki + SeeMeta, oct-2026): el ataque alterna Dash (2,67 tiles, desplaza) y Slash
+     * (3,67 tiles, arco de 135°), recarga 1 s; súper = pez a 7,33 tiles que corta en cruz y lo
+     * deja invulnerable; hipercarga = el súper atrae a los enemigos cercanos 1 s. Gadgets: Dashi
+     * Dash (3 s solo dash) u Hosomaki (cura). Mejores modos: Zona restringida y Balón Brawl.
+     * Toque = auto-apuntado: el Slash tolera error por el arco. Combos de guías, no de pros.
+     */
+    static final String[][] KENJI1 = {
+            {"k_combo", "Kenji · Combo corto",
+                    "# Dash y Slash al más cercano (~1 s)\ndisparo toque cada 0.5\ndisparar 2 toque"},
+            {"k_entrada", "Kenji · Entrada y combo",
+                    "# Avanzar y Dash + Slash (~1,4 s)\ndisparo toque cada 0.5\nmover arriba 0.4\ndisparar 2 toque\nparar"},
+            {"k_zona", "Kenji · Defender zona",
+                    "# Pegar moviéndose de lado dentro de la zona (~1,3 s)\ndisparo toque cada 0.5\n"
+                            + "disparar 1 toque\nmover izquierda 0.3\ndisparar 1 toque\nmover derecha 0.3\nparar"},
+            {"k_super", "Kenji · Súper y salida",
+                    "# Súper (invulnerable mientras corta) y un ataque de salida (~1,4 s)\ndisparo toque cada 0.5\n"
+                            + "súper auto\nesperar 0.5\ndisparar 1 toque\nmover abajo 0.4\nparar"},
+            {"k_hiper", "Kenji · Hiper y súper",
+                    "# Hiper primero: el súper atrae a los cercanos (~1,4 s)\ndisparo toque cada 0.5\n"
+                            + "hiper\nsúper auto\nesperar 0.5\ndisparar 1 toque"},
+            {"k_gadget", "Kenji · Gadget y persecución",
+                    "# Dashi Dash (3 s solo dash): perseguir pegando (~1,4 s)\ndisparo toque cada 0.35\n"
+                            + "gadget\nmover arriba 0.3\ndisparar 3 toque\nparar"},
+    };
+
+    private void seedKenji() {
+        for (String[] p : KENJI1) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);
+        String[][] sets = {
+                {"kenji_zona", "Zona restringida", "k_zona", "k_combo", "k_super", "k_gadget", "k_hiper"},
+                {"kenji_balon", "Balón Brawl", "k_entrada", "k_combo", "k_hiper", "k_super", "k_gadget"},
+        };
+        for (String[] d : sets) {
+            if (set(d[0]) != null) continue;
+            PadSet s = new PadSet();
+            s.id = d[0];
+            s.brawler = "Kenji";
+            s.mode = d[1];
+            s.name = "Kenji";
+            for (int i = 2; i < d.length; i++) s.slots.add(d[i]);
+            this.sets.add(s);
+        }
     }
 
     /**
