@@ -208,6 +208,5 @@ Sets «Kenji · Zona restringida» (Defender zona, Combo corto, Súper y salida,
 Entrada y combo) y «Kenji · Balón Brawl» (mismos patrones, otro orden). El Kenji de Gonzalo tiene
 **Hosomaki** (no Dashi Dash) y **no tiene hipercarga** (lote `kenji2`). Probado en Terrenos: Dash 1500
 + Slash 2000 conectan; el súper corta 2×2600. Botonera: el bucle se repite cada ~0,7 s y Random
-alterna sin repetir. **Pendiente:** los toques de `adb input tap` sobre la botonera mientras corre un
-gesto se pierden a veces (2 de 3); con el dedo real en v3 sí detenían. Verificar con el dedo; volumen −
-siempre detiene.
+alterna sin repetir. Parar tocando el mismo botón: verificado por Gonzalo con el dedo (19-oct). Los `adb input tap`
+sobre la botonera mientras corre un gesto se pierden a veces: para probar por ADB usar `--es cmd stop`.
