@@ -251,7 +251,33 @@ public class Data {
             seeds.add("kenji1");
             changed = true;
         }
+        if (!seeds.contains("kenji2")) {
+            seedKenji2();
+            seeds.add("kenji2");
+            changed = true;
+        }
         return changed;
+    }
+
+    /**
+     * kenji2 (19-oct, probado en Terrenos): el gadget de Gonzalo es Hosomaki (cura el daño de los
+     * últimos 3 s), no Dashi Dash, y su Kenji no tiene hipercarga. Se agrega «Curación y retirada»
+     * y reemplaza a Gadget y a Hiper en los sets que siguen como venían de fábrica.
+     */
+    private void seedKenji2() {
+        if (pattern("k_curacion") == null) addPattern("k_curacion", "Kenji · Curación y retirada",
+                "# Hosomaki tras recibir daño, retroceder y un ataque de salida (~1,4 s)\ndisparo toque cada 0.5\n"
+                        + "gadget\nmover abajo 0.5\ndisparar 1 toque\nparar");
+        String[][] upd = {
+                {"kenji_zona", "k_zona,k_combo,k_super,k_gadget,k_hiper", "k_zona,k_combo,k_super,k_curacion,k_entrada"},
+                {"kenji_balon", "k_entrada,k_combo,k_hiper,k_super,k_gadget", "k_entrada,k_combo,k_super,k_curacion,k_zona"},
+        };
+        for (String[] u : upd) {
+            PadSet s = set(u[0]);
+            if (s == null || !String.join(",", s.slots).equals(u[1])) continue;
+            s.slots.clear();
+            for (String id : u[2].split(",")) s.slots.add(id);
+        }
     }
 
     /**
