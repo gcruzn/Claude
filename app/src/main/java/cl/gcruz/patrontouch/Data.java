@@ -224,7 +224,60 @@ public class Data {
             seeds.add("edgar2");
             changed = true;
         }
+        if (!seeds.contains("charlie1")) {
+            seedCharlie();
+            seeds.add("charlie1");
+            changed = true;
+        }
         return changed;
+    }
+
+    /**
+     * Charlie, sacado de 10 min de partidas de Gonzalo en BlueStacks (19-oct, video + mando):
+     * 83 % de los ataques salen moviéndose, de a uno, cada 1,2–3 s (el yo-yo de 9 tiles va y vuelve
+     * en ~1,3 s y es su única munición); el movimiento cambia de dirección cada ~0,34 s; las ráfagas
+     * (4–8 ataques cada ~0,4 s) solo pegado al objetivo, donde el yo-yo vuelve rápido. Súper y
+     * gadget, poco. Wiki: el capullo dura hasta 5 s y se rompe antes si se le pega, así que tras el
+     * súper se reposiciona en vez de pegarle. Todo dura ≤1,5 s (en partida real se toca otra flecha
+     * a los ~1,4 s).
+     */
+    static final String[][] CHARLIE1 = {
+            {"c_esquiva_der", "Charlie · Disparo y esquiva →",
+                    "# Un yo-yo y zigzag corto a la derecha mientras vuelve (~1,3 s)\n"
+                            + "disparar 1 toque\nmover derecha 0.4\nmover abajo-derecha 0.4\nmover derecha 0.4\nparar"},
+            {"c_esquiva_izq", "Charlie · Disparo y esquiva ←",
+                    "# Un yo-yo y zigzag corto a la izquierda mientras vuelve (~1,3 s)\n"
+                            + "disparar 1 toque\nmover izquierda 0.4\nmover abajo-izquierda 0.4\nmover izquierda 0.4\nparar"},
+            {"c_capullo", "Charlie · Capullo y retroceder",
+                    "# Súper al más cercano (9 tiles) y tomar distancia mientras está atrapado (~1,4 s)\n"
+                            + "súper auto\nesperar 0.2\nmover abajo 1\nparar"},
+            {"c_rafaga", "Charlie · Ráfaga corta",
+                    "# Pegada al objetivo el yo-yo vuelve rápido: 3 ataques seguidos (~1,3 s)\n"
+                            + "disparar 3 toque"},
+            {"c_gadget", "Charlie · Gadget y disparo",
+                    "# Arañas (o Espacio personal) y un yo-yo (~0,7 s)\n"
+                            + "gadget\ndisparar 1 toque"},
+            {"c_avance", "Charlie · Avance disparando",
+                    "# Acercarse en diagonal con un yo-yo al empezar (~1,4 s)\n"
+                            + "disparar 1 toque\nmover arriba-derecha 0.5\nmover arriba-izquierda 0.5\nmover arriba 0.4\nparar"},
+    };
+
+    private void seedCharlie() {
+        if (profile("charlie") == null) addProfile("charlie", "Charlie", "tap", 420, 1000, "move", "auto");
+        for (String[] p : CHARLIE1) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);
+        if (set("charlie") == null) {
+            PadSet s = new PadSet();
+            s.id = "charlie";
+            s.name = "Charlie";
+            s.profileId = "charlie";
+            String[][] map = {{"up", "c_capullo"}, {"down", "c_rafaga"}, {"left", "c_esquiva_izq"}, {"right", "c_esquiva_der"}};
+            for (String[] m : map) {
+                Arrow ar = new Arrow();
+                ar.patternId = m[1];
+                s.arrows.put(m[0], ar);
+            }
+            sets.add(s);
+        }
     }
 
     /**

@@ -79,7 +79,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
      * Comandos de prueba desde el PC, sin tocar la pantalla (un toque real cancelaría el gesto):
      *   adb shell am broadcast -a cl.gcruz.patrontouch.DEBUG --es cmd run --es id e_salto [--es profile edgar] [--ei reps 1]
      *   ... --es cmd run --es script "súper auto\nesperar 0.6"     (patrón suelto, \n separa líneas)
-     *   ... --es cmd stop | dump | calib --es joy 555,800 --es attack 1664,794 ...
+     *   ... --es cmd stop | dump | set --es id charlie | calib --es joy 555,800 --es attack 1664,794 ...
      * La salida va a logcat con la etiqueta PatronTouch. Solo el shell puede enviarlos: el receptor
      * exige android.permission.DUMP, que ninguna app instalada tiene.
      */
@@ -113,6 +113,17 @@ public class TouchService extends AccessibilityService implements Player.Listene
             case "stop":
                 player.stop("Detenido por ADB");
                 break;
+            case "set": {
+                String id = i.getStringExtra("id");
+                if (id != null && data.set(id) != null) {
+                    data.activeSet = id;
+                    data.save();
+                    paintIdle();
+                    toast("Set: " + data.set(id).name);
+                }
+                android.util.Log.i(TAG, "set activo=" + data.activeSet);
+                break;
+            }
             case "calib": {
                 for (int k = 0; k < Calibration.KEYS.length; k++) {
                     String v = i.getStringExtra(Calibration.KEYS[k]);
