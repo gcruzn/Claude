@@ -31,11 +31,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Servicio de accesibilidad con la cruceta flotante.
+ * Servicio de accesibilidad con la botonera flotante (columna vertical).
  *
- * Flechas: toque = patrón del set (N repeticiones) · doble toque = bucle · mantener y soltar = solo moverse.
- * Centro: toque = menú (sets, candado, calibrar) · mantener 3 s = candado · arrastrar = mover (si no está bloqueada).
- * ✕: cerrar (desactivada con candado) · mantener ✕ = calibrar.
+ * Botones 1..N = patrones del set activo (Brawler · Modo): toque = ese patrón en bucle, otro toque = parar.
+ * 🎲 Random = en cada repetición un patrón del set al azar. Asa ≡: toque = menú (sets, candado, calibrar),
+ * mantener 3 s = candado, arrastrar = mover. ✕: cerrar (desactivada con candado) · mantener ✕ = calibrar.
  * Volumen −: detiene · Volumen +: repite la última acción.
  */
 public class TouchService extends AccessibilityService implements Player.Listener {
@@ -118,8 +118,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 if (id != null && data.set(id) != null) {
                     data.activeSet = id;
                     data.save();
-                    paintIdle();
-                    toast("Set: " + data.set(id).name);
+                    rebuildPanel();
+                    toast("Set: " + data.set(id).title());
                 }
                 android.util.Log.i(TAG, "set activo=" + data.activeSet);
                 break;
@@ -157,12 +157,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 }
                 if (script == null) return;
                 script = script.replace("\\n", "\n");
-                String pid = i.getStringExtra("profile");
-                Data.Profile prof = pid != null ? data.profile(pid) : null;
-                if (prof == null) prof = data.profileFor(data.active());
                 int reps = i.getIntExtra("reps", 1);
-                logCompiled(name, script, prof);
-                runScript(name, script, prof, Math.max(0, reps), -1, reps == 0 ? MODE_LOOP : MODE_ONCE);
+                logCompiled(name, script, Script.defaultProfile());
+                runScript(name, script, Math.max(0, reps), -1, reps == 0 ? MODE_LOOP : MODE_ONCE);
                 break;
             }
             default: {
@@ -171,9 +168,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
                         + " lotes=" + data.seeds);
                 for (Data.Profile p : data.profiles) android.util.Log.i(TAG, "perfil " + p.id + ": " + p.summary());
                 for (Data.PadSet s : data.sets) {
-                    StringBuilder b = new StringBuilder("set " + s.id + " (" + s.name + ", perfil " + data.profileFor(s).id + "):");
-                    for (java.util.Map.Entry<String, Data.Arrow> e : s.arrows.entrySet())
-                        b.append(' ').append(e.getKey()).append('=').append(e.getValue().patternId).append('×').append(e.getValue().reps);
+                    StringBuilder b = new StringBuilder("set " + s.id + " (" + s.title() + "):");
+                    for (int k = 0; k < s.slots.size(); k++) b.append(' ').append(k + 1).append('=').append(s.slots.get(k));
                     android.util.Log.i(TAG, b.toString());
                 }
                 for (Data.PatternDef p : data.patterns) {
@@ -287,17 +283,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     /** Botón Probar del editor: espera el juego en horizontal, cuenta 3-2-1 y ejecuta una vez. */
-    public void testSoon(String name, String script, String profileId) {
+    public void testSoon(String name, String script) {
         toast("Abre el juego: el patrón se ejecuta en unos segundos");
         whenLandscape(3000, () -> {
             toast("3…");
             main.postDelayed(() -> toast("2…"), 1000);
             main.postDelayed(() -> toast("1…"), 2000);
-            main.postDelayed(() -> {
-                Data.Profile prof = data.profile(profileId);
-                if (prof == null) prof = data.profileFor(data.active());
-                runScript(name, script, prof, 1, -1, MODE_ONCE);
-            }, 3000);
+            main.postDelayed(() -> runScript(name, script, 1, -1, MODE_ONCE), 3000);
         });
     }
 
@@ -314,24 +306,19 @@ public class TouchService extends AccessibilityService implements Player.Listene
         main.postDelayed(check, firstDelay);
     }
 
-    // ---------------------------------------------------------------- cruceta
+    // ---------------------------------------------------------------- botonera
 
-    /** dir, flecha, fila, columna en la cuadrícula 3×3. */
-    private static final String[][] DIRS = {
-            {"up", "▲", "0", "1"},
-            {"left", "◀", "1", "0"},
-            {"right", "▶", "1", "2"},
-            {"down", "▼", "2", "1"},
-    };
-    private static final int MODE_ONCE = 1, MODE_LOOP = 2, MODE_MOVE = 3;
-    private static final long DOUBLE_TAP_MS = 260, LONG_PRESS_MS = 450, LOCK_PRESS_MS = 3000;
+    private static final int MODE_ONCE = 1, MODE_LOOP = 2;
+    private static final long LOCK_PRESS_MS = 3000;
+    /** Índice del botón Random (los de patrón son 0..N-1). */
+    private static final int RANDOM = 100;
 
-    private final TextView[] dirButtons = new TextView[DIRS.length];
+    private final List<TextView> slotButtons = new ArrayList<>();
+    private TextView randomButton;
     private View releaseTarget;
     private int activeIdx = -1, activeMode = 0;
-    private Runnable pendingTap, longCue;
-    private int pendingIdx = -1;
-    private boolean touchDouble, touchLong, touchStopOnly;
+    private boolean touchStopOnly;
+    private final java.util.Random rnd = new java.util.Random();
 
     private int alpha() { return Math.round(255 * prefs.getInt("padAlpha", 45) / 100f); }
 
@@ -339,9 +326,16 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     private int activeColor(int mode) {
         int a = Math.max(150, alpha());
-        if (mode == MODE_LOOP) return Color.argb(a, 226, 94, 107);   // coral = bucle
-        if (mode == MODE_MOVE) return Color.argb(a, 115, 201, 106);  // verde = solo moverse
-        return Color.argb(a, 69, 74, 81);                            // grafito = patrón
+        if (mode == MODE_LOOP) return Color.argb(a, 226, 94, 107);   // coral = en bucle
+        return Color.argb(a, 69, 74, 81);                            // grafito = una vez (Probar)
+    }
+
+    /** «Edgar · Salto y golpes» → «Salto y g…»: lo que cabe en un botón. */
+    private static String shortName(String name) {
+        String n = name == null ? "" : name;
+        int dot = n.indexOf('·');
+        if (dot >= 0) n = n.substring(dot + 1).trim();
+        return n.length() > 9 ? n.substring(0, 8) + "…" : n;
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -349,45 +343,47 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (wm == null || panel != null) return;
         int size = dp(prefs.getInt("padSize", 58));
         boolean locked = isLocked();
+        slotButtons.clear();
+        randomButton = null;
 
         panel = new LinearLayout(this);
-        GridLayout g = new GridLayout(this);
-        g.setColumnCount(3);
-        g.setRowCount(3);
-        panel.addView(g);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        // Centro: menú / candado / arrastrar.
-        TextView center = new TextView(this);
-        center.setText(locked ? "🔒" : "•");
-        center.setGravity(Gravity.CENTER);
-        center.setTextColor(Color.argb(Math.min(255, alpha() + 60), 69, 74, 81));
-        center.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * (locked ? 0.3f : 0.5f));
-        center.setOnTouchListener(centerTouch(center));
-        g.addView(center, cell(1, 1, size));
+        // Asa: menú / candado / arrastrar.
+        TextView handle = new TextView(this);
+        handle.setText(locked ? "🔒" : "≡");
+        handle.setGravity(Gravity.CENTER);
+        handle.setTextColor(Color.argb(Math.min(255, alpha() + 90), 69, 74, 81));
+        handle.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * (locked ? 0.3f : 0.45f));
+        GradientDrawable hbg = new GradientDrawable();
+        hbg.setColor(Color.argb(Math.max(30, alpha() / 2), 255, 255, 255));
+        hbg.setCornerRadius(size * 0.2f);
+        handle.setBackground(hbg);
+        handle.setOnTouchListener(handleTouch());
+        panel.addView(handle, column(size, (int) (size * 0.5f)));
 
-        // Zona invisible (esquina inferior izquierda): absorbe el toque mínimo que se inyecta al
-        // terminar un patrón para soltar los dedos virtuales, sin activar nada.
-        View sink = new View(this);
-        sink.setOnTouchListener((v, e) -> true);
-        g.addView(sink, cell(2, 0, size));
-        releaseTarget = sink;
-
-        for (int i = 0; i < DIRS.length; i++) {
-            TextView b = new TextView(this);
-            b.setText(DIRS[i][1]);
-            b.setGravity(Gravity.CENTER);
-            b.setTextColor(Color.WHITE);
-            b.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * 0.38f);
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(idleColor());
-            bg.setCornerRadius(size * 0.28f);
-            b.setBackground(bg);
-            b.setOnTouchListener(dirTouch(i));
-            dirButtons[i] = b;
-            g.addView(b, cell(Integer.parseInt(DIRS[i][2]), Integer.parseInt(DIRS[i][3]), size));
+        List<Data.PatternDef> pats = data.slotPatterns(data.active());
+        for (int i = 0; i < pats.size() && i < Data.MAX_SLOTS; i++) {
+            TextView b = slotButton((i + 1) + "\n" + shortName(pats.get(i).name), size);
+            b.setOnTouchListener(slotTouch(i));
+            slotButtons.add(b);
+            panel.addView(b, column(size, (int) (size * 0.8f)));
+        }
+        if (pats.size() >= 2) {
+            randomButton = slotButton("🎲\nRandom", size);
+            randomButton.setOnTouchListener(slotTouch(RANDOM));
+            panel.addView(randomButton, column(size, (int) (size * 0.8f)));
+        } else if (pats.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("Set sin\npatrones");
+            empty.setGravity(Gravity.CENTER);
+            empty.setTextColor(Color.WHITE);
+            empty.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * 0.16f);
+            panel.addView(empty, column(size, (int) (size * 0.6f)));
         }
 
-        // ✕ arriba a la derecha; con candado queda desactivada.
+        // ✕ abajo; con candado queda desactivada. Mantenerla = calibrar.
         TextView close = new TextView(this);
         close.setText("✕");
         close.setGravity(Gravity.CENTER);
@@ -400,21 +396,26 @@ public class TouchService extends AccessibilityService implements Player.Listene
         close.setBackground(cbg);
         if (locked) {
             close.setAlpha(0.35f);
-            close.setOnClickListener(v -> toast("Bloqueada · mantén el centro 3 s o desbloquéala en la app"));
+            close.setOnClickListener(v -> toast("Bloqueada · mantén el asa 3 s o desbloquéala en la app"));
         } else {
             close.setOnClickListener(v -> {
                 player.stop(null);
                 hidePanel();
-                toast("Cruceta cerrada. Ábrela de nuevo desde la app Patrón Touch.");
+                toast("Botonera cerrada. Ábrela de nuevo desde la app Patrón Touch.");
             });
             close.setOnLongClickListener(v -> {
                 startCalibration();
                 return true;
             });
         }
-        GridLayout.LayoutParams clp = cell(0, 2, (int) (size * 0.6f));
-        clp.setGravity(Gravity.CENTER);
-        g.addView(close, clp);
+        panel.addView(close, column((int) (size * 0.55f), (int) (size * 0.55f)));
+
+        // Zona invisible al pie: absorbe el toque mínimo que se inyecta al detener un patrón
+        // para soltar los dedos virtuales, sin activar ningún botón.
+        View sink = new View(this);
+        sink.setOnTouchListener((v, e) -> true);
+        panel.addView(sink, column(size, dp(16)));
+        releaseTarget = sink;
 
         if (panelParams == null) {
             panelParams = overlayParams(false);
@@ -428,13 +429,35 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (!cal.calibrated) toast("Calibra tus controles: mantén presionada la ✕ con el juego abierto");
     }
 
+    private TextView slotButton(String text, int size) {
+        TextView b = new TextView(this);
+        b.setText(text);
+        b.setGravity(Gravity.CENTER);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_PX, size * 0.17f);
+        b.setLineSpacing(0, 0.9f);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(idleColor());
+        bg.setCornerRadius(size * 0.2f);
+        b.setBackground(bg);
+        return b;
+    }
+
+    private LinearLayout.LayoutParams column(int w, int h) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
+        lp.gravity = Gravity.CENTER_HORIZONTAL;
+        int m = dp(2);
+        lp.setMargins(m, m, m, m);
+        return lp;
+    }
+
     public void hidePanel() {
         closeMenu();
         if (panel != null && wm != null) try { wm.removeView(panel); } catch (Exception ignored) { }
         panel = null;
     }
 
-    /** Vuelve a dibujar la cruceta (cambios de tamaño, opacidad, candado o set). */
+    /** Vuelve a dibujar la botonera (cambios de tamaño, opacidad, candado o set). */
     public void rebuildPanel() {
         if (panel == null) return;
         player.stop(null);
@@ -443,17 +466,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
         showPanel();
     }
 
-    private GridLayout.LayoutParams cell(int row, int col, int size) {
-        GridLayout.LayoutParams lp = new GridLayout.LayoutParams(GridLayout.spec(row), GridLayout.spec(col));
-        lp.width = size;
-        lp.height = size;
-        int m = dp(3);
-        lp.setMargins(m, m, m, m);
-        return lp;
-    }
-
-    /** Centro: arrastrar (sin candado) · toque = menú · mantener 3 s = candado. */
-    private View.OnTouchListener centerTouch(View center) {
+    /** Asa: arrastrar (sin candado) · toque = menú · mantener 3 s = candado. */
+    private View.OnTouchListener handleTouch() {
         return new View.OnTouchListener() {
             float sx, sy;
             int px, py;
@@ -462,7 +476,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 lockFired = true;
                 vibrate(60);
                 boolean nowLocked = !isLocked();
-                toast(nowLocked ? "🔒 Cruceta bloqueada" : "🔓 Cruceta desbloqueada");
+                toast(nowLocked ? "🔒 Botonera bloqueada" : "🔓 Botonera desbloqueada");
                 setLocked(nowLocked);
             };
 
@@ -509,50 +523,22 @@ public class TouchService extends AccessibilityService implements Player.Listene
         };
     }
 
-    /** Toque = patrón del set · doble toque = bucle · mantener y soltar = solo moverse. */
-    private View.OnTouchListener dirTouch(int i) {
+    /**
+     * Toque = ese patrón en bucle hasta volver a tocarlo. Tocar otro botón cambia de patrón.
+     * El dedo real ya corta el gesto inyectado (Android), así que al bajar solo se detiene sin inyectar.
+     */
+    private View.OnTouchListener slotTouch(int i) {
         return (v, e) -> {
             switch (e.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN: {
-                    touchDouble = pendingTap != null && pendingIdx == i;
-                    if (pendingTap != null) {
-                        main.removeCallbacks(pendingTap);
-                        pendingTap = null;
-                    }
-                    boolean wasPlaying = player.isPlaying();
-                    touchStopOnly = wasPlaying && activeIdx == i && !touchDouble;
-                    if (wasPlaying) player.stopByUserTouch();
-                    touchLong = false;
-                    ((GradientDrawable) dirButtons[i].getBackground()).setColor(activeColor(MODE_ONCE));
-                    longCue = () -> {
-                        touchLong = true;
-                        vibrate(35);
-                        ((GradientDrawable) dirButtons[i].getBackground()).setColor(activeColor(MODE_MOVE));
-                    };
-                    main.postDelayed(longCue, LONG_PRESS_MS);
+                case MotionEvent.ACTION_DOWN:
+                    touchStopOnly = player.isPlaying() && activeIdx == i;
+                    if (player.isPlaying()) player.stopByUserTouch();
+                    ((GradientDrawable) v.getBackground()).setColor(activeColor(MODE_LOOP));
                     return true;
-                }
-                case MotionEvent.ACTION_UP: {
-                    main.removeCallbacks(longCue);
-                    if (touchDouble) {
-                        vibrate(20);
-                        startArrow(i, MODE_LOOP);
-                    } else if (touchLong) {
-                        startArrow(i, MODE_MOVE);
-                    } else if (touchStopOnly) {
-                        paintIdle();
-                    } else {
-                        pendingIdx = i;
-                        pendingTap = () -> {
-                            pendingTap = null;
-                            startArrow(i, MODE_ONCE);
-                        };
-                        main.postDelayed(pendingTap, DOUBLE_TAP_MS);
-                    }
+                case MotionEvent.ACTION_UP:
+                    if (touchStopOnly) paintIdle(); else startSlot(i);
                     return true;
-                }
                 case MotionEvent.ACTION_CANCEL:
-                    main.removeCallbacks(longCue);
                     paintIdle();
                     return true;
             }
@@ -560,51 +546,85 @@ public class TouchService extends AccessibilityService implements Player.Listene
         };
     }
 
-    private void startArrow(int i, int mode) {
-        String dir = DIRS[i][0];
-        Data.PadSet set = data.active();
-        Data.Profile prof = data.profileFor(set);
-        lastRun = () -> startArrow(i, mode);
-        if (mode == MODE_MOVE) {
-            runScript("Mover", "mover " + Script.dirLabel(dir) + " 25", prof, 0, i, MODE_MOVE);
+    private void startSlot(int i) {
+        lastRun = () -> startSlot(i);
+        List<Data.PatternDef> pats = data.slotPatterns(data.active());
+        if (i == RANDOM) {
+            startRandom(pats);
             return;
         }
-        Data.Arrow arrow = set == null ? null : set.arrows.get(dir);
-        Data.PatternDef def = arrow == null ? null : data.pattern(arrow.patternId);
-        if (def == null) {
+        if (i >= pats.size()) {
             paintIdle();
-            toast("Esta flecha no tiene patrón asignado (configúralo en la app)");
+            toast("Ese botón no tiene patrón (configúralo en la app)");
             return;
         }
-        runScript(def.name, def.script, prof, mode == MODE_LOOP ? 0 : Math.max(1, arrow.reps), i, mode);
+        Data.PatternDef def = pats.get(i);
+        runScript(def.name, def.script, 0, i, MODE_LOOP);
     }
 
-    private void runScript(String name, String script, Data.Profile prof, int reps, int idx, int mode) {
-        if (player.isPlaying()) player.stop(null);
-        Script.Result r = Script.parse(script);
-        if (!r.ok()) {
+    /** Random: cada repetición es un patrón del set al azar, sin repetir el anterior. */
+    private void startRandom(List<Data.PatternDef> pats) {
+        List<Pattern> compiled = new ArrayList<>();
+        for (Data.PatternDef d : pats) {
+            Pattern p = compileDef(d.name, d.script, false);
+            if (p != null) compiled.add(p);
+        }
+        if (compiled.size() < 2) {
             paintIdle();
-            toast(name + ": error en línea " + r.errorLine + " · " + r.error);
+            toast("Random necesita al menos 2 patrones válidos en el set");
             return;
         }
-        Pattern p = Script.compile(name, r.steps, prof, cal);
+        final int[] last = {rnd.nextInt(compiled.size())};
+        java.util.function.Supplier<Pattern> next = () -> {
+            int k = rnd.nextInt(compiled.size() - 1);
+            if (k >= last[0]) k++;
+            last[0] = k;
+            return compiled.get(k);
+        };
+        if (player.isPlaying()) player.stop(null);
+        activeIdx = RANDOM;
+        activeMode = MODE_LOOP;
+        android.util.Log.i(TAG, "random en «" + data.active().title() + "» entre " + compiled.size() + " patrones");
+        player.start(compiled.get(last[0]), 0, 120, next);
+    }
+
+    /** Compila un patrón con su propio tipo de disparo; null (y aviso) si tiene errores o no toca nada. */
+    private Pattern compileDef(String name, String script, boolean warn) {
+        Script.Result r = Script.parse(script);
+        if (!r.ok()) {
+            if (warn) toast(name + ": error en línea " + r.errorLine + " · " + r.error);
+            return null;
+        }
+        Pattern p = Script.compile(name, r.steps, Script.defaultProfile(), cal);
         if (p.touches.isEmpty() || p.duration <= 0) {
+            if (warn) toast(name + ": no hay toques con tus controles calibrados");
+            return null;
+        }
+        return p;
+    }
+
+    private void runScript(String name, String script, int reps, int idx, int mode) {
+        if (player.isPlaying()) player.stop(null);
+        Pattern p = compileDef(name, script, true);
+        if (p == null) {
             paintIdle();
-            toast(name + ": no hay toques con tus controles calibrados");
             return;
         }
         activeIdx = idx;
         activeMode = mode;
-        android.util.Log.i(TAG, "patrón «" + name + "» flecha=" + (idx >= 0 ? DIRS[idx][0] : "—")
-                + " modo=" + (mode == MODE_LOOP ? "bucle" : mode == MODE_MOVE ? "mover" : "una vez")
-                + " perfil=" + prof.id + " reps=" + reps);
+        android.util.Log.i(TAG, "patrón «" + name + "» botón=" + (idx == RANDOM ? "random" : idx >= 0 ? String.valueOf(idx + 1) : "—")
+                + " modo=" + (mode == MODE_LOOP ? "bucle" : "una vez") + " reps=" + (reps == 0 ? "∞" : reps));
         player.start(p, reps, mode == MODE_LOOP ? 120 : 0);
     }
 
+    private TextView buttonFor(int idx) {
+        if (idx == RANDOM) return randomButton;
+        return idx >= 0 && idx < slotButtons.size() ? slotButtons.get(idx) : null;
+    }
+
     private void paintIdle() {
-        for (TextView b : dirButtons) {
-            if (b != null) ((GradientDrawable) b.getBackground()).setColor(idleColor());
-        }
+        for (TextView b : slotButtons) ((GradientDrawable) b.getBackground()).setColor(idleColor());
+        if (randomButton != null) ((GradientDrawable) randomButton.getBackground()).setColor(idleColor());
     }
 
     // ---------------------------------------------------------------- menú del centro
@@ -616,12 +636,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
         Data.PadSet active = data.active();
         for (Data.PadSet s : data.sets) {
             boolean on = active != null && s.id.equals(active.id);
-            labels.add((on ? "● " : "○ ") + s.name + "   · " + data.profileFor(s).name);
+            labels.add((on ? "● " : "○ ") + s.title() + "   · " + data.slotPatterns(s).size() + " patrones");
             actions.add(() -> {
                 data.activeSet = s.id;
                 data.save();
-                toast("Set: " + s.name);
-                paintIdle();
+                toast("Set: " + s.title());
+                rebuildPanel();
             });
         }
         boolean locked = isLocked();
@@ -701,9 +721,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
         android.util.Log.i(TAG, (playing ? "▶ " : "■ ") + status);
         if (playing) showGhost(); else hideGhost();
         paintIdle();
-        if (playing && activeIdx >= 0 && dirButtons[activeIdx] != null) {
-            ((GradientDrawable) dirButtons[activeIdx].getBackground()).setColor(activeColor(activeMode));
-        }
+        TextView b = buttonFor(activeIdx);
+        if (playing && b != null) ((GradientDrawable) b.getBackground()).setColor(activeColor(activeMode));
         if (!playing) {
             activeIdx = -1;
             if (status != null && !status.startsWith("Listo") && !status.equals("Detenido")) toast(status);

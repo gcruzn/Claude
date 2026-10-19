@@ -42,6 +42,8 @@ public class PatternEditorActivity extends Activity {
 
     private static final String HELP =
             "Una instrucción por línea:\n"
+                    + "disparo toque cada 0.5 | disparo mantener 1.2 | disparo apuntado cada 0.55 [dirección | movimiento]\n"
+                    + "   (tipo de disparo del patrón; rige desde esa línea)\n"
                     + "mover arriba [segundos] [disparando]\n"
                     + "parar\n"
                     + "disparar [N] [toque | mantener | apuntado] [dirección]\n"
@@ -63,7 +65,7 @@ public class PatternEditorActivity extends Activity {
             def.id = Data.newId("p");
             def.name = "Nuevo patrón";
             String pasted = getIntent().getStringExtra("script");
-            def.script = pasted != null && !pasted.trim().isEmpty() ? pasted.trim() : "mover arriba\ndisparar 2\nparar";
+            def.script = pasted != null && !pasted.trim().isEmpty() ? pasted.trim() : "disparo toque cada 0.5\nmover arriba\ndisparar 2\nparar";
         }
         Script.Result r = Script.parse(def.script);
         if (r.ok()) {
@@ -118,7 +120,7 @@ public class PatternEditorActivity extends Activity {
         GridLayout add = new GridLayout(this);
         add.setColumnCount(4);
         String[][] kinds = {{"🕹 Mover", "move"}, {"✋ Parar", "stop"}, {"🎯 Disparar", "attack"}, {"⭐ Súper", "super"},
-                {"🧩 Gadget", "gadget"}, {"⚡ Hiper", "hyper"}, {"⏱ Esperar", "wait"}};
+                {"🧩 Gadget", "gadget"}, {"⚡ Hiper", "hyper"}, {"⏱ Esperar", "wait"}, {"🔧 Tipo de disparo", "config"}};
         for (String[] k : kinds) {
             TextView t = chip(k[0], v -> addStep(k[1]));
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
@@ -156,8 +158,7 @@ public class PatternEditorActivity extends Activity {
         root.addView(ui.row(
                 ui.button("Copiar texto", SUAVE, v -> copy()),
                 ui.button("Cancelar", SUAVE, v -> finish())));
-        root.addView(ui.text("Probar usa el perfil del set activo (" + data.profileFor(data.active()).name
-                + "): abre el juego y el patrón se ejecuta tras 3-2-1.", 12, GRIS, false));
+        root.addView(ui.text("Probar: abre el juego y el patrón se ejecuta una vez tras 3-2-1, con su propio tipo de disparo.", 12, GRIS, false));
         setContentView(sv);
         applyMode();
     }
@@ -297,6 +298,10 @@ public class PatternEditorActivity extends Activity {
             case "move":
                 s.dir = "up";
                 break;
+            case "config":
+                s.mode = "tap";
+                s.count = 500;
+                break;
         }
         stepDialog(s, true, -1);
     }
@@ -326,7 +331,7 @@ public class PatternEditorActivity extends Activity {
                 secs.setHint("—");
                 box.addView(labeled("Segundos (vacío = hasta el siguiente paso)", secs));
                 CheckBox fire = new CheckBox(this);
-                fire.setText("Disparar mientras se mueve (según perfil)");
+                fire.setText("Disparar mientras se mueve (según el tipo de disparo)");
                 fire.setChecked(s.fire);
                 box.addView(fire);
                 apply = () -> {
@@ -346,7 +351,7 @@ public class PatternEditorActivity extends Activity {
                 TextView modeSel = ui.selector("Forma", modeLabel(mode[0]), null);
                 TextView dirSel = ui.selector("Hacia", dir[0] == null ? "según perfil" : Script.dirLabel(dir[0]), null);
                 modeSel.setOnClickListener(v -> ui.choose("Forma de disparar",
-                        new String[]{"Según el perfil", "Toque (auto-apuntado)", "Mantener apretado", "Apuntado (arrastrar)"}, i -> {
+                        new String[]{"Según el tipo de disparo del patrón", "Toque (auto-apuntado)", "Mantener apretado", "Apuntado (arrastrar)"}, i -> {
                             mode[0] = i == 0 ? null : i == 1 ? "tap" : i == 2 ? "hold" : "aim";
                             modeSel.setText("Forma:  " + modeLabel(mode[0]) + "  ▾");
                             dirSel.setVisibility("aim".equals(mode[0]) ? View.VISIBLE : View.GONE);
@@ -372,7 +377,7 @@ public class PatternEditorActivity extends Activity {
                 TextView modeSel = ui.selector("Forma", superLabel(mode[0]), null);
                 TextView dirSel = ui.selector("Hacia", dir[0] == null ? "según perfil / movimiento" : Script.dirLabel(dir[0]), null);
                 modeSel.setOnClickListener(v -> ui.choose("Súper",
-                        new String[]{"Según el perfil", "Auto (toque)", "Apuntado (arrastrar)"}, i -> {
+                        new String[]{"Auto (toque)", "Auto (toque)", "Apuntado (arrastrar)"}, i -> {
                             mode[0] = i == 0 ? null : i == 1 ? "auto" : "aim";
                             modeSel.setText("Forma:  " + superLabel(mode[0]) + "  ▾");
                             dirSel.setVisibility("aim".equals(mode[0]) ? View.VISIBLE : View.GONE);
@@ -387,6 +392,45 @@ public class PatternEditorActivity extends Activity {
                 apply = () -> {
                     s.mode = mode[0];
                     s.dir = "aim".equals(mode[0]) ? dir[0] : null;
+                };
+                break;
+            }
+            case "config": {
+                title = "Tipo de disparo";
+                box.addView(ui.text("Rige para los «disparar» que vienen después en este patrón.", 12, GRIS, false));
+                final String[] mode = {s.mode == null ? "tap" : s.mode};
+                final String[] dir = {s.dir};
+                EditText every = Ui.field(this, Script.num((s.count > 1 ? s.count : 500) / 1000.0), true);
+                EditText hold = Ui.field(this, Script.num(s.secs > 0 ? s.secs : 1), true);
+                LinearLayout everyRow = labeled("Segundos entre disparos", every);
+                LinearLayout holdRow = labeled("Segundos manteniendo", hold);
+                TextView dirSel = ui.selector("Hacia", dir[0] == null || "move".equals(dir[0]) ? "hacia donde me muevo" : Script.dirLabel(dir[0]), null);
+                TextView modeSel = ui.selector("Forma", modeLabel(mode[0]), null);
+                Runnable vis = () -> {
+                    everyRow.setVisibility("hold".equals(mode[0]) ? View.GONE : View.VISIBLE);
+                    holdRow.setVisibility("hold".equals(mode[0]) ? View.VISIBLE : View.GONE);
+                    dirSel.setVisibility("aim".equals(mode[0]) ? View.VISIBLE : View.GONE);
+                };
+                modeSel.setOnClickListener(v -> ui.choose("Forma de disparar",
+                        new String[]{"Toque (auto-apuntado)", "Mantener apretado", "Apuntado (arrastrar)"}, i -> {
+                            mode[0] = i == 0 ? "tap" : i == 1 ? "hold" : "aim";
+                            modeSel.setText("Forma:  " + modeLabel(mode[0]) + "  ▾");
+                            vis.run();
+                        }));
+                dirSel.setOnClickListener(v -> ui.choose("Hacia dónde apuntar", withProfile(Ui.dirChoices(false, false)), i -> {
+                    dir[0] = i == 0 ? "move" : Script.DIRS[i - 1];
+                    dirSel.setText("Hacia:  " + ("move".equals(dir[0]) ? "hacia donde me muevo" : Script.dirLabel(dir[0])) + "  ▾");
+                }));
+                box.addView(modeSel);
+                box.addView(everyRow);
+                box.addView(holdRow);
+                box.addView(dirSel);
+                vis.run();
+                apply = () -> {
+                    s.mode = mode[0];
+                    s.count = (int) Math.round(Math.max(0.1, Ui.parseNum(every.getText().toString(), 0.5)) * 1000);
+                    s.secs = "hold".equals(mode[0]) ? Math.max(0.1, Ui.parseNum(hold.getText().toString(), 1)) : 0;
+                    s.dir = "aim".equals(mode[0]) ? (dir[0] == null ? "move" : dir[0]) : null;
                 };
                 break;
             }
@@ -409,18 +453,18 @@ public class PatternEditorActivity extends Activity {
 
     private static String[] withProfile(String[] dirs) {
         String[] out = new String[dirs.length + 1];
-        out[0] = "Según el perfil / hacia donde me muevo";
+        out[0] = "Según el tipo de disparo / hacia donde me muevo";
         System.arraycopy(dirs, 0, out, 1, dirs.length);
         return out;
     }
 
     private static String modeLabel(String m) {
-        if (m == null) return "según perfil";
+        if (m == null) return "según el tipo de disparo";
         return m.equals("tap") ? "toque" : m.equals("hold") ? "mantener" : "apuntado";
     }
 
     private static String superLabel(String m) {
-        if (m == null) return "según perfil";
+        if (m == null) return "auto";
         return m.equals("auto") ? "auto" : "apuntado";
     }
 
@@ -530,7 +574,7 @@ public class PatternEditorActivity extends Activity {
         }
         save(false);
         String name = nameEt.getText().toString().trim();
-        svc.testSoon(name.isEmpty() ? "Prueba" : name, script, data.profileFor(Data.load(this).active()).id);
+        svc.testSoon(name.isEmpty() ? "Prueba" : name, script);
         moveTaskToBack(true);
     }
 

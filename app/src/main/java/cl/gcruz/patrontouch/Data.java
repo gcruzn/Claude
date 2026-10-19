@@ -54,11 +54,23 @@ public class Data {
         public int reps = 1;
     }
 
+    /** Máximo de botones de patrón en la botonera (más el Random). */
+    public static final int MAX_SLOTS = 6;
+
     public static class PadSet {
         public String id, name;
-        /** "" = usar el perfil global. */
+        /** Brawler y modo de batalla: el set es «Edgar · Supervivencia». */
+        public String brawler = "", mode = "";
+        /** Patrones en el orden de los botones de la botonera (1..N). */
+        public final List<String> slots = new ArrayList<>();
+        /** Legado v3 (cruceta): perfil del set y patrón por flecha; solo se leen para migrar. */
         public String profileId = "";
         public final Map<String, Arrow> arrows = new LinkedHashMap<>();
+
+        public String title() {
+            if (brawler.isEmpty()) return name;
+            return mode.isEmpty() ? brawler : brawler + " · " + mode;
+        }
     }
 
     public final List<PatternDef> patterns = new ArrayList<>();
@@ -229,7 +241,96 @@ public class Data {
             seeds.add("charlie1");
             changed = true;
         }
+        if (!seeds.contains("v4")) {
+            migrateV4();
+            seeds.add("v4");
+            changed = true;
+        }
         return changed;
+    }
+
+    /**
+     * v4 (19-oct): la cruceta pasa a ser una columna de botones (toque = bucle, otro toque = parar,
+     * más Random) y el tipo de disparo deja de ser del set para ser parte de cada patrón.
+     * - Cada set queda como Brawler · Modo, con sus patrones en orden (las 4 flechas en ▲▶▼◀).
+     * - A cada patrón sin línea «disparo …» se le antepone la del perfil del primer set que lo usa
+     *   (o del perfil global si no está en ninguno), así se sigue disparando igual que antes.
+     * - Edgar y Charlie quedan con 5 botones (lo que se usó de verdad al grabar sus partidas).
+     */
+    private void migrateV4() {
+        String[] order = {"up", "right", "down", "left"};
+        Map<String, Profile> shotFor = new LinkedHashMap<>();
+        for (PadSet s : sets) {
+            if (s.slots.isEmpty()) {
+                for (String a : order) {
+                    Arrow ar = s.arrows.get(a);
+                    if (ar != null && ar.patternId != null && pattern(ar.patternId) != null && !s.slots.contains(ar.patternId))
+                        s.slots.add(ar.patternId);
+                }
+            }
+            Profile prof = profileFor(s);
+            for (String id : s.slots) if (!shotFor.containsKey(id)) shotFor.put(id, prof);
+            if (s.brawler.isEmpty()) {
+                switch (s.id) {
+                    case "edgar": s.brawler = "Edgar"; s.mode = "Supervivencia"; break;
+                    case "charlie": s.brawler = "Charlie"; s.mode = "Supervivencia"; break;
+                    case "general": s.brawler = "General"; s.mode = "Todos"; break;
+                    default: s.brawler = s.name; s.mode = "Todos";
+                }
+            }
+        }
+        Profile global = profileFor(null);
+        for (PatternDef p : patterns) {
+            if (Script.hasShotLine(p.script)) continue;
+            Profile prof = shotFor.containsKey(p.id) ? shotFor.get(p.id) : global;
+            p.script = insertShotLine(p.script, Script.shotLine(prof));
+        }
+        PadSet e = set("edgar");
+        if (e != null && sameSlots(e, "e_salto", "e_escape", "e_alejarse", "e_doble")) {
+            e.slots.clear();
+            for (String id : new String[]{"e_salto", "e_doble", "e_alejarse", "e_esquive", "e_escape"})
+                if (pattern(id) != null) e.slots.add(id);
+        }
+        PadSet c = set("charlie");
+        if (c != null && sameSlots(c, "c_capullo", "c_esquiva_der", "c_rafaga", "c_esquiva_izq")) {
+            c.slots.clear();
+            for (String id : new String[]{"c_esquiva_der", "c_esquiva_izq", "c_capullo", "c_rafaga", "c_gadget"})
+                if (pattern(id) != null) c.slots.add(id);
+        }
+    }
+
+    /** ¿El set sigue con los patrones de fábrica (en cualquier orden)? Si el usuario lo cambió, se respeta. */
+    private static boolean sameSlots(PadSet s, String... ids) {
+        if (s.slots.size() != ids.length) return false;
+        for (String id : ids) if (!s.slots.contains(id)) return false;
+        return true;
+    }
+
+    /** Pone la línea de disparo después de los comentarios iniciales. */
+    static String insertShotLine(String script, String line) {
+        String[] lines = script.split("\\r?\\n", -1);
+        StringBuilder b = new StringBuilder();
+        boolean done = false;
+        for (String l : lines) {
+            String t = l.trim();
+            if (!done && !t.isEmpty() && !t.startsWith("#") && !t.startsWith("//")) {
+                b.append(line).append('\n');
+                done = true;
+            }
+            b.append(l).append('\n');
+        }
+        if (!done) b.append(line).append('\n');
+        return b.toString().replaceAll("\\n+$", "");
+    }
+
+    /** Patrones de un set, en orden de botón (se saltan los que ya no existen). */
+    public List<PatternDef> slotPatterns(PadSet s) {
+        List<PatternDef> out = new ArrayList<>();
+        if (s != null) for (String id : s.slots) {
+            PatternDef p = pattern(id);
+            if (p != null) out.add(p);
+        }
+        return out;
     }
 
     /**
@@ -388,7 +489,8 @@ public class Data {
                 ar.put(e.getKey(), new JSONObject().put("p", e.getValue().patternId == null ? "" : e.getValue().patternId)
                         .put("r", e.getValue().reps));
             }
-            ss.put(new JSONObject().put("id", s.id).put("name", s.name).put("profile", s.profileId).put("arrows", ar));
+            ss.put(new JSONObject().put("id", s.id).put("name", s.name).put("profile", s.profileId).put("arrows", ar)
+                    .put("brawler", s.brawler).put("mode", s.mode).put("slots", new JSONArray(s.slots)));
         }
         o.put("sets", ss);
         o.put("seeds", new JSONArray(seeds));
@@ -419,6 +521,10 @@ public class Data {
             set.id = s.getString("id");
             set.name = s.getString("name");
             set.profileId = s.optString("profile", "");
+            set.brawler = s.optString("brawler", "");
+            set.mode = s.optString("mode", "");
+            JSONArray sl = s.optJSONArray("slots");
+            if (sl != null) for (int k = 0; k < sl.length(); k++) set.slots.add(sl.getString(k));
             JSONObject ar = s.optJSONObject("arrows");
             for (String a : ARROWS) {
                 Arrow arrow = new Arrow();

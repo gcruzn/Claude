@@ -65,8 +65,16 @@ public class Player {
     /** ms transcurridos desde que partió la repetición actual (para dibujar los dedos virtuales). */
     public long elapsedInRep() { return SystemClock.uptimeMillis() - repStartUptime; }
 
+    /** Si no es null, entrega el patrón de cada repetición siguiente (botón Random). */
+    private java.util.function.Supplier<Pattern> next;
+
     public void start(Pattern p, int repeats, long pauseMs) {
+        start(p, repeats, pauseMs, null);
+    }
+
+    public void start(Pattern p, int repeats, long pauseMs, java.util.function.Supplier<Pattern> next) {
         stop(null);
+        this.next = next;
         if (p == null || p.touches.isEmpty() || p.duration <= 0) {
             listener.onPlayerState(false, "No hay patrón grabado");
             return;
@@ -121,7 +129,8 @@ public class Player {
     private void beginRepetition(final int s) {
         if (!playing || s != session) return;
         repStartUptime = SystemClock.uptimeMillis();
-        listener.onPlayerState(true, "Repetición " + (rep + 1) + (repeats > 0 ? "/" + repeats : " (∞)"));
+        listener.onPlayerState(true, "Repetición " + (rep + 1) + (repeats > 0 ? "/" + repeats : " (∞)")
+                + (pattern.name != null ? " · " + pattern.name : ""));
         for (Chunk c : chunks) {
             handler.postAtTime(() -> dispatchChunk(s, c), repStartUptime + c.start);
         }
@@ -131,6 +140,13 @@ public class Player {
     private void endRepetition(int s) {
         if (!playing || s != session) return;
         rep++;
+        if (next != null && (repeats == 0 || rep < repeats)) {
+            Pattern n = next.get();
+            if (n != null && !n.touches.isEmpty() && n.duration > 0) {
+                pattern = n;
+                chunks = buildChunks(n);
+            }
+        }
         if (repeats == 0 || rep < repeats) {
             handler.postDelayed(() -> beginRepetition(s), Math.max(pauseMs, 15));
         } else {

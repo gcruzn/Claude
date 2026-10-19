@@ -21,7 +21,7 @@ import java.util.List;
 
 import static cl.gcruz.patrontouch.Ui.*;
 
-/** Pantalla principal: servicio, set activo (perfil + flechas), patrones, perfiles y cruceta. */
+/** Pantalla principal: servicio, set activo (brawler · modo y sus patrones), patrones y botonera. */
 public class MainActivity extends Activity {
 
     private Ui ui;
@@ -66,7 +66,7 @@ public class MainActivity extends Activity {
         TouchService svc = TouchService.get();
 
         root.addView(ui.text("Patrón Touch", 24, GRAFITO, true));
-        root.addView(ui.text("Cruceta con patrones creados por instrucciones.", 14, GRIS, false));
+        root.addView(ui.text("Botonera con patrones por brawler y modo de batalla.", 14, GRIS, false));
         root.addView(ui.space(12));
 
         // --- Servicio
@@ -79,10 +79,10 @@ public class MainActivity extends Activity {
                     startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
         } else {
             card.addView(ui.text("● Servicio activo", 16, VERDE, true));
-            card.addView(ui.text("Flechas: toque = patrón · doble toque = bucle · mantener (vibra) y soltar = solo moverse.\n"
-                    + "Centro: toque = cambiar set / candado · mantener 3 s = candado.\n"
+            card.addView(ui.text("Botones 1–N: toque = ese patrón en bucle · otro toque = parar · 🎲 = al azar.\n"
+                    + "Asa ≡: toque = cambiar set / candado · mantener 3 s = candado · arrastrar = mover.\n"
                     + "Volumen − detiene · volumen + repite.", 13, GRAFITO, false));
-            card.addView(ui.button(svc.isPanelVisible() ? "Ocultar cruceta" : "Mostrar cruceta", GRAFITO, v -> {
+            card.addView(ui.button(svc.isPanelVisible() ? "Ocultar botonera" : "Mostrar botonera", GRAFITO, v -> {
                 if (svc.isPanelVisible()) svc.hidePanel(); else svc.showPanel();
                 render();
             }));
@@ -93,8 +93,6 @@ public class MainActivity extends Activity {
         renderSet();
         root.addView(ui.space(12));
         renderPatterns();
-        root.addView(ui.space(12));
-        renderProfiles();
         root.addView(ui.space(12));
         renderPad(svc);
         root.addView(ui.space(12));
@@ -108,64 +106,62 @@ public class MainActivity extends Activity {
         Data.PadSet set = data.active();
         LinearLayout c = ui.card();
         c.addView(ui.text("Set activo", 16, GRAFITO, true));
-        c.addView(ui.text("Un set = un perfil + el patrón de cada flecha. Crea uno por brawler.", 12, GRIS, false));
-        c.addView(ui.selector("Set", set == null ? "—" : set.name, v -> pickSet()));
+        c.addView(ui.text("Un set = un brawler en un modo de batalla, con sus patrones en el orden de los botones. "
+                + "Cada patrón trae su propio tipo de disparo.", 12, GRIS, false));
+        c.addView(ui.selector("Set", set == null ? "—" : set.title(), v -> pickSet()));
         if (set == null) {
             root.addView(c);
             return;
         }
-        String profLabel = set.profileId.isEmpty()
-                ? "Usar global (" + data.profileFor(set).name + ")"
-                : data.profileFor(set).name;
-        c.addView(ui.selector("Perfil del set", profLabel, v -> pickSetProfile(set)));
+        c.addView(ui.selector("Brawler", set.brawler, v -> ui.ask("Brawler", set.brawler, false, s -> {
+            if (!s.isEmpty()) set.brawler = s;
+            commit();
+        })));
+        c.addView(ui.selector("Modo de batalla", set.mode.isEmpty() ? "—" : set.mode, v -> pickMode(set)));
 
-        for (int i = 0; i < Data.ARROWS.length; i++) {
-            String a = Data.ARROWS[i];
-            Data.Arrow ar = set.arrows.get(a);
-            if (ar == null) {
-                ar = new Data.Arrow();
-                set.arrows.put(a, ar);
-            }
-            final Data.Arrow arrow = ar;
-            Data.PatternDef def = data.pattern(arrow.patternId);
+        List<Data.PatternDef> pats = data.slotPatterns(set);
+        for (int i = 0; i < pats.size(); i++) {
+            final int idx = i;
+            Data.PatternDef def = pats.get(i);
             LinearLayout r = new LinearLayout(this);
             r.setOrientation(LinearLayout.HORIZONTAL);
             r.setGravity(Gravity.CENTER_VERTICAL);
             r.setPadding(0, ui.dp(6), 0, 0);
-            TextView icon = ui.text(Data.ARROW_ICONS[i], 20, AZUL, true);
-            icon.setPadding(ui.dp(4), 0, ui.dp(8), 0);
-            r.addView(icon);
-            TextView sel = ui.selector("Patrón", def == null ? "(ninguno)" : def.name, v -> pickArrowPattern(arrow));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            sel.setLayoutParams(lp);
-            sel.setText((def == null ? "(ninguno)" : def.name) + "  ▾");
-            r.addView(sel);
-            TextView minus = ui.link("−", GRAFITO, v -> {
-                arrow.reps = Math.max(1, arrow.reps - 1);
+            TextView num = ui.text(String.valueOf(i + 1), 18, AZUL, true);
+            num.setPadding(ui.dp(4), 0, ui.dp(10), 0);
+            r.addView(num);
+            TextView sel = ui.selector("Patrón", def.name, v -> pickSlotPattern(set, idx));
+            sel.setText(def.name + "  ▾");
+            r.addView(sel, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            TextView up = ui.link("↑", GRAFITO, v -> {
+                moveSlot(set, def.id, -1);
                 commit();
             });
-            TextView reps = ui.text("×" + arrow.reps, 15, GRAFITO, true);
-            TextView plus = ui.link("+", GRAFITO, v -> {
-                arrow.reps = Math.min(99, arrow.reps + 1);
+            TextView down = ui.link("↓", GRAFITO, v -> {
+                moveSlot(set, def.id, 1);
                 commit();
             });
-            minus.setTextSize(20);
-            plus.setTextSize(20);
-            r.addView(minus);
-            r.addView(reps);
-            r.addView(plus);
+            TextView del = ui.link("✕", CORAL, v -> {
+                set.slots.remove(def.id);
+                commit();
+            });
+            up.setTextSize(18);
+            down.setTextSize(18);
+            r.addView(up);
+            r.addView(down);
+            r.addView(del);
             c.addView(r);
         }
-        c.addView(ui.text("×N = repeticiones con un toque. Doble toque = infinito.", 12, GRIS, false));
+        if (pats.size() < Data.MAX_SLOTS) {
+            c.addView(ui.link("＋ Agregar patrón al set", AZUL, v -> pickSlotPattern(set, -1)));
+        }
+        c.addView(ui.text("En la botonera: toque = ese patrón en bucle hasta volver a tocarlo. "
+                + "🎲 Random = un patrón del set al azar en cada repetición.", 12, GRIS, false));
         c.addView(ui.row(
                 ui.button("Nuevo set", AZUL, v -> newSet(null)),
-                ui.button("Duplicar", SUAVE, v -> newSet(set)),
-                ui.button("Renombrar", SUAVE, v -> ui.ask("Nombre del set", set.name, false, s -> {
-                    if (!s.isEmpty()) set.name = s;
-                    commit();
-                }))));
+                ui.button("Duplicar", SUAVE, v -> newSet(set))));
         if (data.sets.size() > 1) {
-            c.addView(ui.link("Borrar este set", CORAL, v -> ui.confirm("¿Borrar el set \"" + set.name + "\"?", "Borrar", () -> {
+            c.addView(ui.link("Borrar este set", CORAL, v -> ui.confirm("¿Borrar el set \"" + set.title() + "\"?", "Borrar", () -> {
                 data.sets.remove(set);
                 data.activeSet = data.sets.get(0).id;
                 commit();
@@ -174,51 +170,74 @@ public class MainActivity extends Activity {
         root.addView(c);
     }
 
+    private static final String[] MODES = {"Supervivencia", "Supervivencia dúo", "Atrapagemas", "Balón Brawl",
+            "Atraco", "Zona restringida", "Noqueo", "Caza estelar", "Asedio", "Todos"};
+
+    private void pickMode(Data.PadSet set) {
+        String[] items = new String[MODES.length + 1];
+        System.arraycopy(MODES, 0, items, 0, MODES.length);
+        items[MODES.length] = "Otro…";
+        ui.choose("Modo de batalla", items, i -> {
+            if (i < MODES.length) {
+                set.mode = MODES[i];
+                commit();
+            } else {
+                ui.ask("Modo de batalla", set.mode, false, s -> {
+                    set.mode = s;
+                    commit();
+                });
+            }
+        });
+    }
+
     private void pickSet() {
         String[] items = new String[data.sets.size()];
-        for (int i = 0; i < items.length; i++) items[i] = data.sets.get(i).name + "  ·  " + data.profileFor(data.sets.get(i)).name;
+        for (int i = 0; i < items.length; i++) {
+            Data.PadSet s = data.sets.get(i);
+            items[i] = s.title() + "  ·  " + data.slotPatterns(s).size() + " patrones";
+        }
         ui.choose("Elige set", items, i -> {
             data.activeSet = data.sets.get(i).id;
             commit();
         });
     }
 
-    private void pickSetProfile(Data.PadSet set) {
-        String[] items = new String[data.profiles.size() + 1];
-        items[0] = "Usar perfil global (" + data.profileFor(null).name + ")";
-        for (int i = 0; i < data.profiles.size(); i++) items[i + 1] = data.profiles.get(i).name + "  ·  " + data.profiles.get(i).summary();
-        ui.choose("Perfil del set", items, i -> {
-            set.profileId = i == 0 ? "" : data.profiles.get(i - 1).id;
+    /** idx = -1 agrega al final; si no, reemplaza el patrón de ese botón. */
+    private void pickSlotPattern(Data.PadSet set, int idx) {
+        String[] items = new String[data.patterns.size()];
+        for (int i = 0; i < items.length; i++) items[i] = data.patterns.get(i).name;
+        ui.choose(idx < 0 ? "Agregar patrón" : "Patrón del botón " + (idx + 1), items, i -> {
+            String id = data.patterns.get(i).id;
+            List<Data.PatternDef> pats = data.slotPatterns(set);
+            set.slots.clear();
+            for (Data.PatternDef p : pats) set.slots.add(p.id);
+            set.slots.remove(id);
+            if (idx < 0 || idx >= set.slots.size() + 1) set.slots.add(id);
+            else set.slots.add(Math.min(idx, set.slots.size()), id);
+            while (set.slots.size() > Data.MAX_SLOTS) set.slots.remove(set.slots.size() - 1);
             commit();
         });
     }
 
-    private void pickArrowPattern(Data.Arrow arrow) {
-        String[] items = new String[data.patterns.size()];
-        for (int i = 0; i < items.length; i++) items[i] = data.patterns.get(i).name;
-        ui.choose("Patrón para esta flecha", items, i -> {
-            arrow.patternId = data.patterns.get(i).id;
-            commit();
-        });
+    private static void moveSlot(Data.PadSet set, String id, int d) {
+        int i = set.slots.indexOf(id), j = i + d;
+        if (i < 0 || j < 0 || j >= set.slots.size()) return;
+        set.slots.set(i, set.slots.get(j));
+        set.slots.set(j, id);
     }
 
     private void newSet(Data.PadSet from) {
-        ui.ask(from == null ? "Nombre del nuevo set (ej. Shade)" : "Nombre de la copia", from == null ? "" : from.name + " (copia)", false, name -> {
+        ui.ask(from == null ? "Brawler del nuevo set (ej. Kenji)" : "Brawler de la copia", from == null ? "" : from.brawler, false, name -> {
             Data.PadSet s = new Data.PadSet();
             s.id = Data.newId("s");
-            s.name = name.isEmpty() ? "Set " + (data.sets.size() + 1) : name;
-            Data.PadSet base = from != null ? from : data.active();
-            s.profileId = from != null ? from.profileId : "";
-            for (String a : Data.ARROWS) {
-                Data.Arrow ar = new Data.Arrow();
-                Data.Arrow src = base == null ? null : base.arrows.get(a);
-                ar.patternId = src == null ? "p_" + a : src.patternId;
-                ar.reps = src == null ? 1 : src.reps;
-                s.arrows.put(a, ar);
-            }
+            s.brawler = name.isEmpty() ? "Brawler " + (data.sets.size() + 1) : name;
+            s.mode = from != null ? from.mode : "Todos";
+            s.name = s.brawler;
+            if (from != null) s.slots.addAll(from.slots);
             data.sets.add(s);
             data.activeSet = s.id;
             commit();
+            pickMode(s);
         });
     }
 
@@ -274,127 +293,11 @@ public class MainActivity extends Activity {
         startActivity(i);
     }
 
-    // ---------------------------------------------------------------- perfiles
-
-    private void renderProfiles() {
-        LinearLayout c = ui.card();
-        c.addView(ui.text("Perfiles de disparo", 16, GRAFITO, true));
-        c.addView(ui.text("Definen cómo se ejecuta cada \"disparar\" y \"súper\" (rápido, lento, mantener, apuntado…).", 12, GRIS, false));
-        Data.Profile global = data.profileFor(null);
-        c.addView(ui.selector("Perfil global", global.name, v -> {
-            String[] items = new String[data.profiles.size()];
-            for (int i = 0; i < items.length; i++) items[i] = data.profiles.get(i).name;
-            ui.choose("Perfil global", items, i -> {
-                data.globalProfile = data.profiles.get(i).id;
-                commit();
-            });
-        }));
-        for (Data.Profile p : data.profiles) {
-            LinearLayout r = new LinearLayout(this);
-            r.setOrientation(LinearLayout.HORIZONTAL);
-            r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(0, ui.dp(6), 0, ui.dp(6));
-            LinearLayout info = new LinearLayout(this);
-            info.setOrientation(LinearLayout.VERTICAL);
-            info.addView(ui.text(p.name, 15, GRAFITO, true));
-            info.addView(ui.text(p.summary(), 12, GRIS, false));
-            r.addView(info, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            r.addView(ui.link("Editar", AZUL, v -> editProfile(p, false)));
-            if (data.profiles.size() > 1) {
-                r.addView(ui.link("Borrar", CORAL, v -> ui.confirm("¿Borrar el perfil \"" + p.name + "\"?", "Borrar", () -> {
-                    data.profiles.remove(p);
-                    for (Data.PadSet s : data.sets) if (s.profileId.equals(p.id)) s.profileId = "";
-                    if (data.globalProfile.equals(p.id)) data.globalProfile = data.profiles.get(0).id;
-                    commit();
-                })));
-            }
-            c.addView(r);
-        }
-        c.addView(ui.button("＋ Nuevo perfil", AZUL, v -> {
-            Data.Profile p = new Data.Profile();
-            p.id = Data.newId("f");
-            p.name = "Mi perfil";
-            editProfile(p, true);
-        }));
-        root.addView(c);
-    }
-
-    private void editProfile(Data.Profile p, boolean isNew) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pad = ui.dp(20);
-        box.setPadding(pad, ui.dp(8), pad, 0);
-
-        EditText name = new EditText(this);
-        name.setText(p.name);
-        name.setHint("Nombre");
-        box.addView(name);
-
-        box.addView(ui.text("Disparo", 14, GRAFITO, true));
-        RadioGroup rg = new RadioGroup(this);
-        String[] modes = {"tap", "hold", "aim"};
-        String[] labels = {"Toque (auto-apuntado)", "Mantener apretado", "Apuntado (arrastrar)"};
-        for (int i = 0; i < modes.length; i++) {
-            RadioButton rb = new RadioButton(this);
-            rb.setText(labels[i]);
-            rb.setId(1000 + i);
-            rg.addView(rb);
-            if (modes[i].equals(p.attack)) rb.setChecked(true);
-        }
-        box.addView(rg);
-
-        EditText interval = Ui.field(this, Data.fmt(p.interval), true);
-        EditText hold = Ui.field(this, Data.fmt(p.hold), true);
-        box.addView(labeled("Segundos entre disparos", interval));
-        box.addView(labeled("Segundos manteniendo (modo mantener)", hold));
-
-        final String[] aim = {p.aimDir};
-        final String[] sup = {p.superMode};
-        TextView aimSel = ui.selector("Dirección del disparo apuntado", Script.dirLabel(aim[0]), null);
-        aimSel.setOnClickListener(v -> ui.choose("Dirección del disparo apuntado", Ui.dirChoices(true, false), i -> {
-            aim[0] = Ui.dirFromChoice(i, true, false);
-            aimSel.setText("Dirección del disparo apuntado:  " + Script.dirLabel(aim[0]) + "  ▾");
-        }));
-        box.addView(aimSel);
-        TextView supSel = ui.selector("Súper", "auto".equals(sup[0]) ? "auto" : "apuntado " + Script.dirLabel(sup[0]), null);
-        supSel.setOnClickListener(v -> ui.choose("Súper", Ui.dirChoices(true, true), i -> {
-            sup[0] = Ui.dirFromChoice(i, true, true);
-            supSel.setText("Súper:  " + ("auto".equals(sup[0]) ? "auto" : "apuntado " + Script.dirLabel(sup[0])) + "  ▾");
-        }));
-        box.addView(supSel);
-
-        ScrollView s = new ScrollView(this);
-        s.addView(box);
-        new AlertDialog.Builder(this).setTitle(isNew ? "Nuevo perfil" : "Editar perfil").setView(s)
-                .setPositiveButton("Guardar", (d, w) -> {
-                    String n = name.getText().toString().trim();
-                    p.name = n.isEmpty() ? "Perfil" : n;
-                    int checked = rg.getCheckedRadioButtonId() - 1000;
-                    p.attack = checked >= 0 && checked < modes.length ? modes[checked] : "tap";
-                    p.interval = (int) Math.round(Math.max(0.1, Ui.parseNum(interval.getText().toString(), 0.55)) * 1000);
-                    p.hold = (int) Math.round(Math.max(0.1, Ui.parseNum(hold.getText().toString(), 1)) * 1000);
-                    p.aimDir = aim[0];
-                    p.superMode = sup[0];
-                    if (isNew) data.profiles.add(p);
-                    commit();
-                })
-                .setNegativeButton("Cancelar", null).show();
-    }
-
-    private LinearLayout labeled(String label, android.view.View field) {
-        LinearLayout r = new LinearLayout(this);
-        r.setOrientation(LinearLayout.HORIZONTAL);
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.addView(ui.text(label, 14, GRAFITO, false), new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        r.addView(field);
-        return r;
-    }
-
     // ---------------------------------------------------------------- cruceta y calibración
 
     private void renderPad(TouchService svc) {
         LinearLayout c = ui.card();
-        c.addView(ui.text("Cruceta", 16, GRAFITO, true));
+        c.addView(ui.text("Botonera", 16, GRAFITO, true));
         Switch lock = new Switch(this);
         lock.setText("🔒 Bloquear posición y ✕");
         lock.setTextColor(GRAFITO);
@@ -404,11 +307,11 @@ public class MainActivity extends Activity {
             if (TouchService.get() != null) TouchService.get().rebuildPanel();
         });
         c.addView(lock);
-        c.addView(ui.text("También se bloquea o desbloquea manteniendo el centro de la cruceta 3 s.", 12, GRIS, false));
+        c.addView(ui.text("También se bloquea o desbloquea manteniendo el asa ≡ 3 s.", 12, GRIS, false));
         c.addView(slider("Opacidad", "padAlpha", 45, 15, 90, "%"));
         c.addView(slider("Tamaño", "padSize", 58, 40, 90, " dp"));
         Switch vib = new Switch(this);
-        vib.setText("Vibrar al activar bucle, solo-movimiento o candado");
+        vib.setText("Vibrar al activar el candado");
         vib.setTextColor(GRAFITO);
         vib.setChecked(prefs.getBoolean("vibrate", true));
         vib.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("vibrate", on).apply());

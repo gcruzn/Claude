@@ -23,7 +23,7 @@ import java.util.Locale;
 public class Script {
 
     public static class Step {
-        /** move | stop | attack | super | gadget | hyper | wait */
+        /** move | stop | attack | super | gadget | hyper | wait | config (línea «disparo …»: count = ms entre disparos, secs = mantener) */
         public String kind;
         public String dir;      // move, o dirección de apuntado (attack/super)
         public double secs;     // move (opcional), wait
@@ -113,6 +113,70 @@ public class Script {
         try { return Double.parseDouble(w); } catch (Exception e) { return null; }
     }
 
+    /**
+     * «disparo toque cada 0.42» · «disparo mantener 1.2» · «disparo apuntado cada 0.55 arriba»
+     * (o «… apuntado movimiento»): fija cómo se dispara desde esa línea en adelante. Es parte del
+     * patrón; antes de la primera línea rige {@link #defaultProfile()}.
+     */
+    private static String parseShotConfig(String[] w, Step s) {
+        s.kind = "config";
+        s.mode = null;
+        for (int i = 1; i < w.length; i++) {
+            String x = w[i];
+            Double n = number(x);
+            if (n != null) {
+                if ("hold".equals(s.mode)) s.secs = n; else s.count = (int) Math.round(n * 1000);
+                continue;
+            }
+            String d = wordDir(x);
+            if (d != null) {
+                s.dir = s.dir == null || "move".equals(s.dir) ? d : combine(s.dir, d);
+                if (s.dir == null) return "Dirección inválida";
+                continue;
+            }
+            switch (x) {
+                case "toque": case "tap": s.mode = "tap"; break;
+                case "mantener": case "mantenido": case "hold": s.mode = "hold"; break;
+                case "apuntado": case "apuntar": case "aim": s.mode = "aim"; break;
+                case "movimiento": case "moviendo": s.dir = "move"; break;
+                case "cada": case "durante": case "hacia": case "a": case "al": case "de": case "s": break;
+                default: return "No entiendo \"" + x + "\" en disparo";
+            }
+        }
+        if (s.mode == null) return "Falta el tipo: toque, mantener o apuntado";
+        return null;
+    }
+
+    /** Disparo por defecto de un patrón que no dice nada: toque cada 0,5 s, súper auto. */
+    public static Data.Profile defaultProfile() {
+        Data.Profile p = new Data.Profile();
+        p.id = "patron";
+        p.name = "Patrón";
+        p.attack = "tap";
+        p.interval = 500;
+        p.hold = 1000;
+        p.aimDir = "move";
+        p.superMode = "auto";
+        return p;
+    }
+
+    /** Línea «disparo …» equivalente a un perfil (para migrar sets antiguos). */
+    public static String shotLine(Data.Profile p) {
+        switch (p.attack) {
+            case "hold": return "disparo mantener " + num(p.hold / 1000.0);
+            case "aim": return "disparo apuntado cada " + num(p.interval / 1000.0) + " "
+                    + ("move".equals(p.aimDir) ? "movimiento" : dirLabel(p.aimDir));
+            default: return "disparo toque cada " + num(p.interval / 1000.0);
+        }
+    }
+
+    public static boolean hasShotLine(String script) {
+        Result r = parse(script);
+        if (!r.ok()) return script != null && norm(script).contains("disparo ");
+        for (Step s : r.steps) if ("config".equals(s.kind)) return true;
+        return false;
+    }
+
     public static Result parse(String text) {
         Result r = new Result();
         String[] lines = text == null ? new String[0] : text.split("\\r?\\n");
@@ -124,6 +188,16 @@ public class Script {
             Step s = new Step();
             s.line = li + 1;
             String cmd = w[0];
+            if (cmd.equals("disparo") || cmd.equals("tiro")) {
+                String err = parseShotConfig(w, s);
+                if (err != null) {
+                    r.error = err;
+                    r.errorLine = s.line;
+                    return r;
+                }
+                r.steps.add(s);
+                continue;
+            }
             String dir = null, mode = null;
             Double num = null;
             boolean badDir = false, firing = false;
@@ -232,6 +306,7 @@ public class Script {
             case "gadget": return "gadget";
             case "hyper": return "hiper";
             case "wait": return "esperar " + num(s.secs);
+            case "config": return configText(s);
         }
         return "";
     }
@@ -261,8 +336,21 @@ public class Script {
             case "gadget": return "🧩 Gadget";
             case "hyper": return "⚡ Hipercarga";
             case "wait": return "⏱ Esperar " + num(s.secs) + " s";
+            case "config": return "🔧 Tipo de disparo: " + configText(s).substring("disparo ".length());
         }
         return s.kind;
+    }
+
+    static String configText(Step s) {
+        StringBuilder b = new StringBuilder("disparo ");
+        b.append("hold".equals(s.mode) ? "mantener" : "aim".equals(s.mode) ? "apuntado" : "toque");
+        if ("hold".equals(s.mode)) {
+            if (s.secs > 0) b.append(' ').append(num(s.secs));
+        } else if (s.count > 1) {
+            b.append(" cada ").append(num(s.count / 1000.0));
+        }
+        if ("aim".equals(s.mode) && s.dir != null) b.append(' ').append("move".equals(s.dir) ? "movimiento" : dirLabel(s.dir));
+        return b.toString();
     }
 
     static String num(double v) {
@@ -278,7 +366,8 @@ public class Script {
     }
 
     /** Traduce los pasos a toques concretos según el perfil y la calibración. */
-    public static Pattern compile(String name, List<Step> steps, Data.Profile prof, Calibration cal) {
+    public static Pattern compile(String name, List<Step> steps, Data.Profile base, Calibration cal) {
+        Data.Profile prof = copy(base != null ? base : defaultProfile());
         Pattern p = new Pattern();
         p.name = name;
         p.screenW = cal.screenW;
@@ -363,6 +452,12 @@ public class Script {
                 case "wait":
                     t += Math.round(s.secs * 1000);
                     break;
+                case "config":
+                    prof.attack = s.mode;
+                    if (s.count > 1) prof.interval = s.count;
+                    if (s.secs > 0) prof.hold = (int) Math.round(s.secs * 1000);
+                    if (s.dir != null) prof.aimDir = s.dir;
+                    break;
             }
         }
         if (js != null) {
@@ -372,6 +467,18 @@ public class Script {
             p.touches.add(js);
         }
         p.normalize();
+        return p;
+    }
+
+    private static Data.Profile copy(Data.Profile b) {
+        Data.Profile p = new Data.Profile();
+        p.id = b.id;
+        p.name = b.name;
+        p.attack = b.attack;
+        p.interval = b.interval;
+        p.hold = b.hold;
+        p.aimDir = b.aimDir;
+        p.superMode = b.superMode;
         return p;
     }
 
