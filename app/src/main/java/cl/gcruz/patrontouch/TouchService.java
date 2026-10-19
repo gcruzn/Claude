@@ -335,7 +335,16 @@ public class TouchService extends AccessibilityService implements Player.Listene
         String n = name == null ? "" : name;
         int dot = n.indexOf('·');
         if (dot >= 0) n = n.substring(dot + 1).trim();
-        return n.length() > 9 ? n.substring(0, 8) + "…" : n;
+        if (n.length() > 9) {
+            // Si termina en flecha, se conserva: «Disparo y esquiva →» → «Disparo →».
+            char last = n.charAt(n.length() - 1);
+            if ("→←↑↓↗↖↘↙".indexOf(last) >= 0) {
+                String first = n.split(" ")[0];
+                return (first.length() > 7 ? first.substring(0, 7) : first) + " " + last;
+            }
+            return n.substring(0, 8) + "…";
+        }
+        return n;
     }
 
     @SuppressLint("ClickableViewAccessibility")
