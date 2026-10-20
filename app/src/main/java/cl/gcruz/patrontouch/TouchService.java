@@ -14,6 +14,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -329,13 +330,47 @@ public class TouchService extends AccessibilityService implements Player.Listene
         return prefs.getBoolean("showEscape", true) && prefs.getBoolean("escapeMode", false);
     }
 
-    private void toggleEscape() {
+    /**
+     * Cambia el modo. wasPlaying: había un patrón corriendo (ya detenido por el toque real); se
+     * suelta el joystick y se reinicia con el modo nuevo, 120 ms después de levantar el dedo.
+     */
+    private void toggleEscape(boolean wasPlaying) {
         boolean on = !escapeOn();
         prefs.edit().putBoolean("escapeMode", on).apply();
         paintEscape();
         vibrate(on ? 40 : 20);
-        android.util.Log.i(TAG, "escape " + (on ? "ON" : "OFF"));
-        if (player.isPlaying() && lastRun != null) lastRun.run();
+        android.util.Log.i(TAG, "escape " + (on ? "ON" : "OFF") + (wasPlaying ? " · reinicia " : ""));
+        main.postDelayed(() -> {
+            player.releaseNow();
+            if (wasPlaying && lastRun != null) main.postDelayed(lastRun, 60);
+        }, 120);
+    }
+
+    private void toggleEscape() {
+        boolean was = player.isPlaying();
+        if (was) player.stop(null);
+        toggleEscape(was);
+    }
+
+    /** Escape con el dedo: igual que los botones de patrón, detiene al apoyar sin inyectar nada. */
+    private View.OnTouchListener escapeTouch() {
+        final boolean[] was = {false};
+        return (v, e) -> {
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    // Android puede cortar el gesto un instante antes de entregarnos el toque.
+                    was[0] = player.isPlaying() || SystemClock.uptimeMillis() - interruptedAt < 400;
+                    if (player.isPlaying()) player.stopByUserTouch();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    toggleEscape(was[0]);
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    if (was[0]) main.postDelayed(player::releaseNow, 120);
+                    return true;
+            }
+            return false;
+        };
     }
 
     private void paintEscape() {
@@ -414,7 +449,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (!pats.isEmpty() && prefs.getBoolean("showEscape", true)) {
             escapeButton = slotButton("", size);
             paintEscape();
-            escapeButton.setOnClickListener(v -> toggleEscape());
+            escapeButton.setOnTouchListener(escapeTouch());
             panel.addView(escapeButton, column(size, (int) (size * 0.8f)));
         }
         if (pats.size() >= 2 && prefs.getBoolean("showRandom", true)) {
@@ -583,7 +618,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
                     ((GradientDrawable) v.getBackground()).setColor(activeColor(MODE_LOOP));
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (touchStopOnly) paintIdle(); else startSlot(i);
+                    if (touchStopOnly) {
+                        paintIdle();
+                        main.postDelayed(player::releaseNow, 120); // soltar el joystick ya sin el dedo real
+                    } else {
+                        startSlot(i);
+                    }
                     return true;
                 case MotionEvent.ACTION_CANCEL:
                     paintIdle();
@@ -777,9 +817,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
         return new float[]{screenSize().x / 2f, 1f};
     }
 
+    /** Cuándo un toque real cortó el último gesto (para que Escape sepa que había un patrón corriendo). */
+    private long interruptedAt;
+
     @Override
     public void onPlayerState(boolean playing, String status) {
         android.util.Log.i(TAG, (playing ? "▶ " : "■ ") + status);
+        if (!playing && status != null && status.startsWith("Interrumpido")) interruptedAt = SystemClock.uptimeMillis();
         if (playing) showGhost(); else hideGhost();
         paintIdle();
         TextView b = buttonFor(activeIdx);

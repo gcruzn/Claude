@@ -111,6 +111,15 @@ public class Player {
         if (was || reason != null) listener.onPlayerState(false, reason == null ? "Detenido" : reason);
     }
 
+    /**
+     * Suelta los dedos virtuales con el reproductor detenido. Se llama cuando el dedo real ya se
+     * levantó: si se inyecta con el dedo real abajo, Android lo descarta y el juego se queda con el
+     * joystick empujado.
+     */
+    public void releaseNow() {
+        if (!playing) releaseFingers();
+    }
+
     /** Un gesto nuevo cancela el anterior y suelta cualquier dedo virtual que siga abajo. */
     private void releaseFingers() {
         try {
