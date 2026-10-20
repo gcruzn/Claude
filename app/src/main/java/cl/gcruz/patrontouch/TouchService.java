@@ -638,67 +638,118 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     // ---------------------------------------------------------------- menú del centro
 
+    /**
+     * Menú del asa: una fila por brawler con sus modos como botones al lado (con 30+ sets, una
+     * línea por set obligaba a scrollear mucho). El brawler activo va primero; el resto en orden
+     * alfabético. Candado, calibrar y cerrar en una sola fila al pie. Hasta el 85 % del alto.
+     */
     private void showMenu() {
         closeMenu();
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
         Data.PadSet active = data.active();
+        java.util.Map<String, List<Data.PadSet>> byBrawler = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (Data.PadSet s : data.sets) {
-            boolean on = active != null && s.id.equals(active.id);
-            labels.add((on ? "● " : "○ ") + s.title() + "   · " + data.slotPatterns(s).size() + " patrones");
-            actions.add(() -> {
-                data.activeSet = s.id;
-                data.save();
-                toast("Set: " + s.title());
-                rebuildPanel();
-            });
+            String b = s.brawler.isEmpty() ? s.name : s.brawler;
+            if (!byBrawler.containsKey(b)) byBrawler.put(b, new ArrayList<>());
+            byBrawler.get(b).add(s);
         }
-        boolean locked = isLocked();
-        labels.add(locked ? "🔓 Desbloquear cruceta" : "🔒 Bloquear cruceta");
-        actions.add(() -> setLocked(!locked));
-        labels.add("◎ Calibrar controles");
-        actions.add(this::startCalibration);
+        List<String> order = new ArrayList<>(byBrawler.keySet());
+        if (active != null) {
+            String ab = active.brawler.isEmpty() ? active.name : active.brawler;
+            if (order.remove(ab)) order.add(0, ab);
+        }
 
+        Point scr = screenSize();
+        int width = Math.min(dp(460), (int) (scr.x * 0.9f));
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(10), dp(10), dp(10), dp(10));
+        box.setPadding(dp(10), dp(8), dp(10), dp(6));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.argb(245, 255, 255, 255));
         bg.setCornerRadius(dp(16));
         box.setBackground(bg);
         box.setElevation(dp(8));
         TextView t = new TextView(this);
-        t.setText("Set activo");
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        t.setText("Set activo · " + (active == null ? "—" : active.title()));
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setTextColor(GRAFITO);
-        t.setPadding(dp(8), dp(4), dp(8), dp(6));
+        t.setPadding(dp(6), dp(2), dp(6), dp(6));
         box.addView(t);
+
         ScrollView sv = new ScrollView(this);
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        for (int i = 0; i < labels.size(); i++) {
-            final Runnable a = actions.get(i);
-            TextView row = new TextView(this);
-            row.setText(labels.get(i));
-            row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-            row.setTextColor(i >= data.sets.size() ? AZUL : GRAFITO);
-            row.setPadding(dp(12), dp(10), dp(12), dp(10));
-            row.setOnClickListener(v -> {
-                closeMenu();
-                a.run();
-            });
+        for (String b : order) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, dp(2), 0, dp(2));
+            TextView name = new TextView(this);
+            name.setText(b);
+            name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            name.setTypeface(Typeface.DEFAULT_BOLD);
+            name.setTextColor(GRAFITO);
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            row.addView(name, new LinearLayout.LayoutParams(dp(92), LinearLayout.LayoutParams.WRAP_CONTENT));
+            LinearLayout chips = new LinearLayout(this);
+            chips.setOrientation(LinearLayout.HORIZONTAL);
+            for (Data.PadSet s : byBrawler.get(b)) {
+                boolean on = active != null && s.id.equals(active.id);
+                TextView chip = new TextView(this);
+                chip.setText((s.mode.isEmpty() ? s.name : s.mode) + " · " + data.slotPatterns(s).size());
+                chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+                chip.setTextColor(on ? Color.WHITE : AZUL);
+                chip.setPadding(dp(10), dp(7), dp(10), dp(7));
+                GradientDrawable cb = new GradientDrawable();
+                cb.setColor(on ? AZUL : Color.argb(255, 236, 240, 247));
+                cb.setCornerRadius(dp(14));
+                chip.setBackground(cb);
+                chip.setOnClickListener(v -> {
+                    closeMenu();
+                    data.activeSet = s.id;
+                    data.save();
+                    toast("Set: " + s.title());
+                    rebuildPanel();
+                });
+                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                clp.setMargins(0, 0, dp(6), 0);
+                chips.addView(chip, clp);
+            }
+            android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
+            hs.setHorizontalScrollBarEnabled(false);
+            hs.addView(chips);
+            row.addView(hs, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             list.addView(row);
         }
         sv.addView(list);
-        box.addView(sv, new LinearLayout.LayoutParams(dp(300), Math.min(dp(250), dp(44) * labels.size())));
-        TextView cancel = new TextView(this);
-        cancel.setText("Cerrar");
-        cancel.setGravity(Gravity.CENTER);
-        cancel.setTextColor(CORAL);
-        cancel.setPadding(dp(12), dp(10), dp(12), dp(6));
-        cancel.setOnClickListener(v -> closeMenu());
-        box.addView(cancel);
+        int listMax = (int) (scr.y * 0.85f) - dp(96);
+        box.addView(sv, new LinearLayout.LayoutParams(width, Math.min(listMax, dp(38) * order.size() + dp(4))));
+
+        // Pie: candado · calibrar · cerrar, en una fila.
+        LinearLayout foot = new LinearLayout(this);
+        foot.setOrientation(LinearLayout.HORIZONTAL);
+        foot.setGravity(Gravity.CENTER);
+        foot.setPadding(0, dp(6), 0, 0);
+        boolean locked = isLocked();
+        String[] labels = {locked ? "🔓 Desbloquear" : "🔒 Bloquear", "◎ Calibrar", "Cerrar"};
+        Runnable[] acts = {() -> setLocked(!locked), this::startCalibration, null};
+        for (int i = 0; i < labels.length; i++) {
+            final Runnable a = acts[i];
+            TextView f = new TextView(this);
+            f.setText(labels[i]);
+            f.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            f.setTextColor(a == null ? CORAL : AZUL);
+            f.setGravity(Gravity.CENTER);
+            f.setPadding(dp(8), dp(8), dp(8), dp(4));
+            f.setOnClickListener(v -> {
+                closeMenu();
+                if (a != null) a.run();
+            });
+            foot.addView(f, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        box.addView(foot, new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         WindowManager.LayoutParams lp = overlayParams(false);
         lp.width = WindowManager.LayoutParams.WRAP_CONTENT;

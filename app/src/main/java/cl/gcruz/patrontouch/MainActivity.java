@@ -190,15 +190,36 @@ public class MainActivity extends Activity {
         });
     }
 
+    /** Dos pasos (con 30+ sets la lista plana obligaba a scrollear mucho): brawler y después modo. */
     private void pickSet() {
-        String[] items = new String[data.sets.size()];
-        for (int i = 0; i < items.length; i++) {
-            Data.PadSet s = data.sets.get(i);
-            items[i] = s.title() + "  ·  " + data.slotPatterns(s).size() + " patrones";
+        java.util.Map<String, List<Data.PadSet>> byBrawler = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Data.PadSet s : data.sets) {
+            String b = s.brawler.isEmpty() ? s.name : s.brawler;
+            if (!byBrawler.containsKey(b)) byBrawler.put(b, new ArrayList<>());
+            byBrawler.get(b).add(s);
         }
-        ui.choose("Elige set", items, i -> {
-            data.activeSet = data.sets.get(i).id;
-            commit();
+        List<String> names = new ArrayList<>(byBrawler.keySet());
+        String[] items = new String[names.size()];
+        for (int i = 0; i < items.length; i++) {
+            List<Data.PadSet> ss = byBrawler.get(names.get(i));
+            StringBuilder modes = new StringBuilder();
+            for (Data.PadSet s : ss) modes.append(modes.length() > 0 ? " · " : "").append(s.mode.isEmpty() ? s.name : s.mode);
+            items[i] = names.get(i) + "   (" + modes + ")";
+        }
+        ui.choose("Elige brawler", items, i -> {
+            List<Data.PadSet> ss = byBrawler.get(names.get(i));
+            if (ss.size() == 1) {
+                data.activeSet = ss.get(0).id;
+                commit();
+                return;
+            }
+            String[] modes = new String[ss.size()];
+            for (int k = 0; k < modes.length; k++)
+                modes[k] = (ss.get(k).mode.isEmpty() ? ss.get(k).name : ss.get(k).mode) + "  ·  " + data.slotPatterns(ss.get(k)).size() + " patrones";
+            ui.choose(names.get(i) + " · modo", modes, k -> {
+                data.activeSet = ss.get(k).id;
+                commit();
+            });
         });
     }
 
