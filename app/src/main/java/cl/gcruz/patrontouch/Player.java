@@ -191,8 +191,13 @@ public class Player {
     }
 
     /**
-     * Agrupa los toques en bloques que no se solapan en el tiempo y caben en un gesto
-     * (máx. strokes y duración de Android).
+     * Agrupa los toques en gestos. Lanzar un gesto CANCELA el que está corriendo, así que lo ideal es
+     * un solo gesto por vuelta; Android limita los strokes por gesto (getMaxStrokeCount, 20 en el
+     * S26) y la duración. Si no caben, se corta en el momento T en que entraría el toque de más: los
+     * toques que siguen abajo (el joystick) terminan en T en este gesto y continúan en el siguiente,
+     * que vuelve a apoyar en su punto inicial y en 60 ms retoma la posición que llevaban, como al
+     * empezar cualquier movimiento. (20-oct: «Aleatorio · Ráfagas», 23 toques, perdía el joystick a
+     * los 4,6 s de cada vuelta.)
      */
     private static List<Chunk> buildChunks(Pattern p) {
         int maxStrokes = GestureDescription.getMaxStrokeCount();
@@ -203,22 +208,51 @@ public class Player {
         List<Chunk> out = new ArrayList<>();
         Chunk cur = null;
         for (Pattern.Touch t : sorted) {
-            boolean overlaps = cur != null && t.down() < cur.end;
-            boolean fits = cur != null && cur.touches.size() < maxStrokes
-                    && Math.max(cur.end, t.up()) - cur.start <= maxDur;
-            boolean merge = cur != null && fits && (overlaps || Math.max(cur.end, t.up()) - cur.start <= maxDur);
-            if (merge) {
-                cur.touches.add(t);
-                cur.end = Math.max(cur.end, t.up());
-            } else {
-                cur = new Chunk();
-                cur.start = t.down();
-                cur.end = t.up();
-                cur.touches.add(t);
+            if (cur == null) {
+                cur = newChunk(t.down());
+                out.add(cur);
+            } else if (cur.touches.size() + 1 > maxStrokes || t.up() - cur.start > maxDur) {
+                long cut = t.down();
+                Chunk next = newChunk(cut);
+                for (int i = 0; i < cur.touches.size(); i++) {
+                    Pattern.Touch o = cur.touches.get(i);
+                    if (o.up() <= cut) continue;
+                    Pattern.Touch[] ab = splitAt(o, cut);
+                    cur.touches.set(i, ab[0]);
+                    next.touches.add(ab[1]);
+                    next.end = Math.max(next.end, ab[1].up());
+                }
+                cur.end = 0;
+                for (Pattern.Touch o : cur.touches) cur.end = Math.max(cur.end, o.up());
+                cur = next;
                 out.add(cur);
             }
+            cur.touches.add(t);
+            cur.end = Math.max(cur.end, t.up());
         }
         return out;
+    }
+
+    private static Chunk newChunk(long start) {
+        Chunk c = new Chunk();
+        c.start = start;
+        c.end = start;
+        return c;
+    }
+
+    /** Parte un toque en T: [antes de T] y [desde T, re-apoyando en su punto inicial]. */
+    static Pattern.Touch[] splitAt(Pattern.Touch o, long cut) {
+        Pattern.Touch a = new Pattern.Touch(), b = new Pattern.Touch();
+        float[] at = o.at(cut);
+        for (Pattern.Point q : o.pts) if (q.t < cut) a.pts.add(q);
+        a.pts.add(new Pattern.Point(cut, at[0], at[1]));
+        Pattern.Point first = o.pts.get(0);
+        b.pts.add(new Pattern.Point(cut, first.x, first.y));
+        long re = Math.min(cut + 60, o.up());
+        float[] back = o.at(re);
+        b.pts.add(new Pattern.Point(re, back[0], back[1]));
+        for (Pattern.Point q : o.pts) if (q.t > re) b.pts.add(q);
+        return new Pattern.Touch[]{a, b};
     }
 
     /** Trazo de longitud proporcional al tiempo, para que la velocidad constante de Android respete los tiempos. */
