@@ -89,15 +89,20 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private Runnable penResume;
 
     private void observePen() {
+        // AccessibilityServiceInfo.setMotionEventSources (API 34) + setObservedMotionEventSources
+        // (API 35), por reflexión porque se compila con SDK 34. Las dos o ninguna.
         try {
-            java.lang.reflect.Method observed = AccessibilityService.class
-                    .getMethod("setObservedMotionEventSources", int.class);
-            setMotionEventSources(android.view.InputDevice.SOURCE_STYLUS);
-            observed.invoke(this, android.view.InputDevice.SOURCE_STYLUS);
+            android.accessibilityservice.AccessibilityServiceInfo info = getServiceInfo();
+            Class<?> c = info.getClass();
+            java.lang.reflect.Method sources = c.getMethod("setMotionEventSources", int.class);
+            java.lang.reflect.Method observed = c.getMethod("setObservedMotionEventSources", int.class);
+            sources.invoke(info, android.view.InputDevice.SOURCE_STYLUS);
+            observed.invoke(info, android.view.InputDevice.SOURCE_STYLUS);
+            setServiceInfo(info);
             penObserved = true;
         } catch (Throwable t) {
             penObserved = false;
-            try { setMotionEventSources(0); } catch (Throwable ignored) { }
+            android.util.Log.w(TAG, "S Pen no observable: " + t);
         }
         android.util.Log.i(TAG, "S Pen observado: " + penObserved);
     }
