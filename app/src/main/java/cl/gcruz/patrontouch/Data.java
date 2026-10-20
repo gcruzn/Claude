@@ -292,6 +292,40 @@ public class Data {
             seeds.add("corta1");
             changed = true;
         }
+        if (!seeds.contains("corta2")) {
+            // 20-oct, tras probarlo Gonzalo: el primer tramo va EXACTO hacia donde movía el lápiz
+            // («mover ultima») y después aleatorio hacia ese lado. Solo si sigue como venía.
+            PatternDef c = pattern("ale_corta");
+            if (c != null && c.script.contains("mover dirigido
+disparar 3
+gadget")) {
+                c.script = "# Primero exacto hacia donde movías el S Pen, luego ±45° al azar; ráfagas de 3 y habilidades (~1,7 s)
+"
+                        + "disparo toque cada 0.15
+"
+                        + "mover ultima
+disparar 3
+"
+                        + "mover dirigido
+gadget
+hiper
+súper auto
+"
+                        + "disparar 3
+parar";
+            }
+            PatternDef d = pattern("ale_dirigido");
+            if (d != null && d.script.contains("disparo toque cada 0.15
+mover dirigido
+"))
+                d.script = d.script.replace("disparo toque cada 0.15
+mover dirigido
+", "disparo toque cada 0.15
+mover ultima
+");
+            seeds.add("corta2");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1")) {
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.

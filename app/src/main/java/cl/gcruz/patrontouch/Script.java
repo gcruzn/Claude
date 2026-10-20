@@ -53,6 +53,7 @@ public class Script {
         if ("move".equals(dir)) return "hacia donde te mueves";
         if ("random".equals(dir)) return "aleatorio";
         if ("steer".equals(dir)) return "dirigido";
+        if ("last".equals(dir)) return "ultima";
         if ("opposite".equals(dir)) return "opuesto";
         for (int i = 0; i < DIRS.length; i++) if (DIRS[i].equals(dir)) return DIR_ES[i];
         return dir == null ? "" : dir;
@@ -273,8 +274,10 @@ public class Script {
                     case "escape": case "huida": case "huir": escaping = true; break;
                     case "aleatorio": case "aleatoria": case "azar": case "random":
                         if (dir != null) badDir = true; else dir = "random"; break;
-                    case "dirigido": case "dirigida": case "seguir": case "ultima":
+                    case "dirigido": case "dirigida": case "seguir":
                         if (dir != null) badDir = true; else dir = "steer"; break;
+                    case "ultima": case "ultimo": case "misma": case "mismo":
+                        if (dir != null) badDir = true; else dir = "last"; break;
                     case "opuesto": case "opuesta": case "volver": case "vuelta":
                         if (dir != null) badDir = true; else dir = "opposite"; break;
                     default:
@@ -475,13 +478,16 @@ public class Script {
             switch (s.kind) {
                 case "move": {
                     if (joy == null) break;
-                    if ("random".equals(s.dir) || "opposite".equals(s.dir) || "steer".equals(s.dir)) {
+                    if ("random".equals(s.dir) || "opposite".equals(s.dir) || "steer".equals(s.dir) || "last".equals(s.dir)) {
                         Step r = new Step();
                         r.kind = "move";
                         r.secs = s.secs;
                         r.fire = s.fire;
                         r.escape = s.escape;
-                        if ("steer".equals(s.dir)) {
+                        if ("last".equals(s.dir)) {
+                            r.dir = steerDir != null ? steerDir : DIRS[RND.nextInt(DIRS.length)];
+                            lastRandom = r.dir;
+                        } else if ("steer".equals(s.dir)) {
                             r.dir = steered();
                             lastRandom = r.dir;
                         } else if ("random".equals(s.dir)) {
@@ -583,7 +589,7 @@ public class Script {
 
     /** ¿El patrón usa «aleatorio» o «dirigido»? Entonces se vuelve a compilar en cada vuelta. */
     public static boolean isRandom(List<Step> steps) {
-        for (Step s : steps) if ("random".equals(s.dir) || "steer".equals(s.dir)) return true;
+        for (Step s : steps) if ("random".equals(s.dir) || "steer".equals(s.dir) || "last".equals(s.dir)) return true;
         return false;
     }
 
