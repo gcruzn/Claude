@@ -207,9 +207,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     private final Runnable penHoverTimeout = () -> { if (!penTouching) penUp(); };
 
+    /** Botón del patrón que el lápiz dejó en pausa (para que tocarlo lo detenga). */
+    private int penPausedIdx = -1;
+
     private void penDown() {
         main.removeCallbacks(penHoverTimeout);
         if (player.isPlaying() && lastRun != null) {
+            penPausedIdx = activeIdx;
             penResume = lastRun;
             player.stopByUserTouch();
             android.util.Log.i(TAG, "lápiz abajo: patrón en pausa");
@@ -820,7 +824,10 @@ public class TouchService extends AccessibilityService implements Player.Listene
         return (v, e) -> {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    touchStopOnly = player.isPlaying() && activeIdx == i;
+                    // Con el S Pen, el puente avisa el apoyo antes que este toque y deja el patrón en
+                    // pausa: igual cuenta como «estaba corriendo» para que el toque lo DETENGA.
+                    touchStopOnly = (player.isPlaying() && activeIdx == i)
+                            || (penResume != null && penPausedIdx == i);
                     if (player.isPlaying()) player.stopByUserTouch();
                     ((GradientDrawable) v.getBackground()).setColor(activeColor(MODE_LOOP));
                     return true;
