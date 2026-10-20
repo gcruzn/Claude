@@ -83,6 +83,22 @@ public class SetPicker {
         return box;
     }
 
+    /** Una fila «etiqueta + lista desplegable» suelta (p. ej. el filtro de la tarjeta Patrones). */
+    public static LinearLayout dropdown(Context c, String label, List<String> items, int sel,
+                                        java.util.function.IntConsumer onPick) {
+        Spinner sp = spinner(c);
+        sp.setAdapter(adapter(c, items));
+        sp.setSelection(Math.max(0, Math.min(sel, items.size() - 1)));
+        sp.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> p, View v, int pos, long id) { onPick.accept(pos); }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> p) { }
+        });
+        return row(c, label, sp);
+    }
+
     static String brawlerOf(Data.PadSet s) {
         return s.brawler.isEmpty() ? s.name : s.brawler;
     }

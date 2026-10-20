@@ -269,11 +269,53 @@ public class MainActivity extends Activity {
 
     // ---------------------------------------------------------------- patrones
 
+    /** Grupo de un patrón: lo que va antes de «·» en su nombre («Rico · Ráfaga» → Rico). */
+    private static String groupOf(Data.PatternDef p) {
+        int dot = p.name.indexOf('·');
+        return dot > 0 ? p.name.substring(0, dot).trim() : "Otros";
+    }
+
+    /** Grupo elegido en el filtro (se recuerda mientras la app está abierta). */
+    private String patternGroup;
+
     private void renderPatterns() {
         LinearLayout c = ui.card();
         c.addView(ui.text("Patrones", 16, GRAFITO, true));
         c.addView(ui.text("Se crean con instrucciones: pasos con botones o texto libre.", 12, GRIS, false));
+        java.util.TreeMap<String, Integer> groups = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (Data.PatternDef p : data.patterns) groups.merge(groupOf(p), 1, Integer::sum);
+        List<String> names = new ArrayList<>(groups.keySet());
+        if (patternGroup == null || !groups.containsKey(patternGroup)) {
+            Data.PadSet act = data.active();
+            String b = act == null ? null : SetPicker.brawlerOf(act);
+            patternGroup = b != null && groups.containsKey(b) ? b : names.isEmpty() ? "Otros" : names.get(0);
+        }
+        List<String> labels = new ArrayList<>();
+        for (String n : names) labels.add(n + "  ·  " + groups.get(n));
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        c.addView(SetPicker.dropdown(this, "Brawler", labels, names.indexOf(patternGroup), i -> {
+            patternGroup = names.get(i);
+            fillPatterns(list);
+        }));
+        c.addView(list);
+        fillPatterns(list);
+        c.addView(ui.row(
+                ui.button("＋ Nuevo patrón", AZUL, v -> edit(null, null)),
+                ui.button("Pegar texto", SUAVE, v -> {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    CharSequence cs = cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0
+                            ? cm.getPrimaryClip().getItemAt(0).coerceToText(this) : null;
+                    edit(null, cs == null ? "" : cs.toString());
+                })));
+        root.addView(c);
+    }
+
+    /** Solo los patrones del grupo elegido. */
+    private void fillPatterns(LinearLayout c) {
+        c.removeAllViews();
         for (Data.PatternDef p : data.patterns) {
+            if (!groupOf(p).equalsIgnoreCase(patternGroup)) continue;
             LinearLayout r = new LinearLayout(this);
             r.setOrientation(LinearLayout.HORIZONTAL);
             r.setGravity(Gravity.CENTER_VERTICAL);
@@ -301,15 +343,6 @@ public class MainActivity extends Activity {
             })));
             c.addView(r);
         }
-        c.addView(ui.row(
-                ui.button("＋ Nuevo patrón", AZUL, v -> edit(null, null)),
-                ui.button("Pegar texto", SUAVE, v -> {
-                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    CharSequence cs = cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0
-                            ? cm.getPrimaryClip().getItemAt(0).coerceToText(this) : null;
-                    edit(null, cs == null ? "" : cs.toString());
-                })));
-        root.addView(c);
     }
 
     private void edit(String id, String script) {
