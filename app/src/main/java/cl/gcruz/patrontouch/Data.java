@@ -296,33 +296,16 @@ public class Data {
             // 20-oct, tras probarlo Gonzalo: el primer tramo va EXACTO hacia donde movía el lápiz
             // («mover ultima») y después aleatorio hacia ese lado. Solo si sigue como venía.
             PatternDef c = pattern("ale_corta");
-            if (c != null && c.script.contains("mover dirigido
-disparar 3
-gadget")) {
-                c.script = "# Primero exacto hacia donde movías el S Pen, luego ±45° al azar; ráfagas de 3 y habilidades (~1,7 s)
-"
-                        + "disparo toque cada 0.15
-"
-                        + "mover ultima
-disparar 3
-"
-                        + "mover dirigido
-gadget
-hiper
-súper auto
-"
-                        + "disparar 3
-parar";
+            if (c != null && c.script.contains("mover dirigido\ndisparar 3\ngadget")) {
+                c.script = "# Primero exacto hacia donde movías el S Pen, luego ±45° al azar; ráfagas de 3 y habilidades (~1,7 s)\n"
+                        + "disparo toque cada 0.15\n"
+                        + "mover ultima\ndisparar 3\n"
+                        + "mover dirigido\ngadget\nhiper\nsúper auto\n"
+                        + "disparar 3\nparar";
             }
             PatternDef d = pattern("ale_dirigido");
-            if (d != null && d.script.contains("disparo toque cada 0.15
-mover dirigido
-"))
-                d.script = d.script.replace("disparo toque cada 0.15
-mover dirigido
-", "disparo toque cada 0.15
-mover ultima
-");
+            String from = "disparo toque cada 0.15\nmover dirigido\n", to = "disparo toque cada 0.15\nmover ultima\n";
+            if (d != null && d.script.contains(from)) d.script = d.script.replace(from, to);
             seeds.add("corta2");
             changed = true;
         }
