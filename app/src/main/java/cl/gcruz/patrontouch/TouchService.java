@@ -639,32 +639,19 @@ public class TouchService extends AccessibilityService implements Player.Listene
     // ---------------------------------------------------------------- menú del centro
 
     /**
-     * Menú del asa: una fila por brawler con sus modos como botones al lado (con 30+ sets, una
-     * línea por set obligaba a scrollear mucho). El brawler activo va primero; el resto en orden
-     * alfabético. Candado, calibrar y cerrar en una sola fila al pie. Hasta el 85 % del alto.
+     * Menú del asa: el set se elige con dos listas desplegables (Brawler y Modo) y «Usar este set»;
+     * escala a cientos de sets sin alargar el menú. Candado, calibrar y cerrar en una fila al pie.
      */
     private void showMenu() {
         closeMenu();
         Data.PadSet active = data.active();
-        java.util.Map<String, List<Data.PadSet>> byBrawler = new java.util.TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-        for (Data.PadSet s : data.sets) {
-            String b = s.brawler.isEmpty() ? s.name : s.brawler;
-            if (!byBrawler.containsKey(b)) byBrawler.put(b, new ArrayList<>());
-            byBrawler.get(b).add(s);
-        }
-        List<String> order = new ArrayList<>(byBrawler.keySet());
-        if (active != null) {
-            String ab = active.brawler.isEmpty() ? active.name : active.brawler;
-            if (order.remove(ab)) order.add(0, ab);
-        }
-
         Point scr = screenSize();
-        int width = Math.min(dp(460), (int) (scr.x * 0.9f));
+        int width = Math.min(dp(420), (int) (scr.x * 0.9f));
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(10), dp(8), dp(10), dp(6));
+        box.setPadding(dp(12), dp(10), dp(12), dp(6));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.argb(245, 255, 255, 255));
+        bg.setColor(Color.argb(250, 255, 255, 255));
         bg.setCornerRadius(dp(16));
         box.setBackground(bg);
         box.setElevation(dp(8));
@@ -673,59 +660,35 @@ public class TouchService extends AccessibilityService implements Player.Listene
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         t.setTypeface(Typeface.DEFAULT_BOLD);
         t.setTextColor(GRAFITO);
-        t.setPadding(dp(6), dp(2), dp(6), dp(6));
+        t.setPadding(dp(2), 0, dp(2), dp(6));
         box.addView(t);
 
-        ScrollView sv = new ScrollView(this);
-        LinearLayout list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-        for (String b : order) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(0, dp(2), 0, dp(2));
-            TextView name = new TextView(this);
-            name.setText(b);
-            name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-            name.setTypeface(Typeface.DEFAULT_BOLD);
-            name.setTextColor(GRAFITO);
-            name.setSingleLine(true);
-            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            row.addView(name, new LinearLayout.LayoutParams(dp(92), LinearLayout.LayoutParams.WRAP_CONTENT));
-            LinearLayout chips = new LinearLayout(this);
-            chips.setOrientation(LinearLayout.HORIZONTAL);
-            for (Data.PadSet s : byBrawler.get(b)) {
-                boolean on = active != null && s.id.equals(active.id);
-                TextView chip = new TextView(this);
-                chip.setText((s.mode.isEmpty() ? s.name : s.mode) + " · " + data.slotPatterns(s).size());
-                chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-                chip.setTextColor(on ? Color.WHITE : AZUL);
-                chip.setPadding(dp(10), dp(7), dp(10), dp(7));
-                GradientDrawable cb = new GradientDrawable();
-                cb.setColor(on ? AZUL : Color.argb(255, 236, 240, 247));
-                cb.setCornerRadius(dp(14));
-                chip.setBackground(cb);
-                chip.setOnClickListener(v -> {
-                    closeMenu();
-                    data.activeSet = s.id;
-                    data.save();
-                    toast("Set: " + s.title());
-                    rebuildPanel();
-                });
-                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                clp.setMargins(0, 0, dp(6), 0);
-                chips.addView(chip, clp);
-            }
-            android.widget.HorizontalScrollView hs = new android.widget.HorizontalScrollView(this);
-            hs.setHorizontalScrollBarEnabled(false);
-            hs.addView(chips);
-            row.addView(hs, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            list.addView(row);
-        }
-        sv.addView(list);
-        int listMax = (int) (scr.y * 0.85f) - dp(96);
-        box.addView(sv, new LinearLayout.LayoutParams(width, Math.min(listMax, dp(38) * order.size() + dp(4))));
+        final Data.PadSet[] chosen = {active};
+        box.addView(SetPicker.build(this, data, active, s -> chosen[0] = s),
+                new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT));
+        TextView use = new TextView(this);
+        use.setText("Usar este set");
+        use.setGravity(Gravity.CENTER);
+        use.setTextColor(Color.WHITE);
+        use.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        use.setTypeface(Typeface.DEFAULT_BOLD);
+        use.setPadding(dp(12), dp(10), dp(12), dp(10));
+        GradientDrawable ub = new GradientDrawable();
+        ub.setColor(AZUL);
+        ub.setCornerRadius(dp(12));
+        use.setBackground(ub);
+        use.setOnClickListener(v -> {
+            closeMenu();
+            Data.PadSet s = chosen[0];
+            if (s == null) return;
+            data.activeSet = s.id;
+            data.save();
+            toast("Set: " + s.title());
+            rebuildPanel();
+        });
+        LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
+        ulp.setMargins(0, dp(8), 0, 0);
+        box.addView(use, ulp);
 
         // Pie: candado · calibrar · cerrar, en una fila.
         LinearLayout foot = new LinearLayout(this);

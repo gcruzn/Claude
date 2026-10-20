@@ -108,7 +108,12 @@ public class MainActivity extends Activity {
         c.addView(ui.text("Set activo", 16, GRAFITO, true));
         c.addView(ui.text("Un set = un brawler en un modo de batalla, con sus patrones en el orden de los botones. "
                 + "Cada patrón trae su propio tipo de disparo.", 12, GRIS, false));
-        c.addView(ui.selector("Set", set == null ? "—" : set.title(), v -> pickSet()));
+        c.addView(SetPicker.build(this, data, set, s -> {
+            if (s != null && !s.id.equals(data.activeSet)) {
+                data.activeSet = s.id;
+                commit();
+            }
+        }));
         if (set == null) {
             root.addView(c);
             return;
