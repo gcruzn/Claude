@@ -227,3 +227,14 @@ cada uno según SeeMeta (oct-2026). Combos inferidos de la wiki, no de guías de
 los agentes están en `tools/combos/`; `tools/armar_lote.py` los normaliza (parar tras cada movimiento
 con tiempo + vuelta al origen) y genera el asset. Validado en el celular: 170 patrones sin errores.
 Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
+
+### Pruebas del 20-oct (v4.4.6, Terrenos con Starr Nova, ADB por Wi-Fi)
+
+- **Escape (v4.4.5):** el toque real en Escape cortaba el gesto y el «soltar» se inyectaba con el dedo
+  todavía abajo → joystick pegado. Ahora Escape detiene al apoyar y suelta/reinicia al levantar.
+  Probado con tiempos del log alineados al video: Escape = 0 daño en 5 s; al detener queda quieto 6 s.
+  Ojo al probar por Wi-Fi: cada `am broadcast` tarda ~1 s; usar `log -t PatronTouch REC_START` y
+  `logcat -v time` para alinear fases.
+- **Disparo automático con el joystick en manos de Gonzalo: NO sirve en el S26.** Con su dedo en el
+  joystick, 20 toques inyectados (cada 0,5 s) no hicieron daño (muñecos a 1500 todo el rato) y Android
+  no reportó cancelación: el juego los ignora. Su movimiento sí siguió normal. Alternativa: BlueStacks.
