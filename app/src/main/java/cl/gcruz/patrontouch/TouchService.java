@@ -320,8 +320,11 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (player.isPlaying() && lastRun != null) {
             penPausedIdx = activeIdx;
             penResume = lastRun;
-            player.stopByUserTouch();
-            android.util.Log.i(TAG, "lápiz abajo: patrón en pausa");
+            // 20-oct: el dedo o el lápiz NO cortan el gesto inyectado en curso (en el S26 conviven),
+            // y ese gesto seguía apretando el joystick: el juego atendía a ese dedo virtual y no al
+            // de Gonzalo. Se corta ya, con el toque mínimo de soltar en la zona invisible del panel.
+            player.stop(null);
+            android.util.Log.i(TAG, "lápiz/dedo abajo: patrón en pausa y gesto cortado");
         }
     }
 
