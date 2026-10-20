@@ -218,3 +218,12 @@ constante (toque cada 0,4 s mientras se mueve) y evasión en figura cerrada; gad
 vez por vuelta dentro de un lado acortado para que cierre (simulado: desplazamiento neto ≈ 0). Probado
 en Terrenos con Poco (tiene hipercarga), 2 vueltas cada una: vuelven al punto de partida, los ataques
 conectan (1520) y se activan gadget, hiper y súper.
+
+### Sets por brawler y modo (v4.3.0, 19-oct)
+
+`assets/brawlers1.json` (lote `brawlers1`): 28 sets de 5 botones para 14 brawlers (Rico, Poco, Shade,
+El Primo, Cordelius, Charlie, Starr Nova, Fang, Buzz, Larry & Lawrie, Jessie, Emz, Wendy, Nita), 2 modos
+cada uno según SeeMeta (oct-2026). Combos inferidos de la wiki, no de guías de pros. Los JSON crudos de
+los agentes están en `tools/combos/`; `tools/armar_lote.py` los normaliza (parar tras cada movimiento
+con tiempo + vuelta al origen) y genera el asset. Validado en el celular: 170 patrones sin errores.
+Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
