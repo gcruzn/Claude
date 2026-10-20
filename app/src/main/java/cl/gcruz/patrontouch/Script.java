@@ -171,6 +171,55 @@ public class Script {
         }
     }
 
+    /**
+     * Devuelve el patrón con disparo, gadget e hiper (agrega lo que falte):
+     * - gadget, al inicio (brawler quieto, antes del primer paso);
+     * - hiper, justo antes del primer súper si en ese punto el joystick está suelto (así el súper
+     *   sale potenciado); si no hay súper o el joystick va empujado, al inicio;
+     * - si no dispara nunca, «disparar 2» al final.
+     * Agregar al inicio o con el joystick suelto no cambia el recorrido; solo alarga la vuelta.
+     */
+    public static String ensureFull(String script) {
+        Result r = parse(script);
+        if (!r.ok()) return script;
+        boolean attack = false, gadget = false, hyper = false;
+        for (Step s : r.steps) {
+            if ("attack".equals(s.kind) || ("move".equals(s.kind) && s.fire)) attack = true;
+            if ("gadget".equals(s.kind)) gadget = true;
+            if ("hyper".equals(s.kind)) hyper = true;
+        }
+        if (attack && gadget && hyper) return script;
+
+        List<String> lines = new ArrayList<>(java.util.Arrays.asList(script.split("\\r?\\n", -1)));
+        int first = -1, superIdx = -1;
+        boolean held = false, superFree = false;
+        for (int i = 0; i < lines.size(); i++) {
+            String t = lines.get(i).trim();
+            if (t.isEmpty() || t.startsWith("#") || t.startsWith("//")) continue;
+            String cmd = norm(t).split(" ")[0];
+            if (cmd.equals("disparo") || cmd.equals("tiro")) continue;
+            if (first < 0) first = i;
+            if (cmd.startsWith("mov") || cmd.equals("caminar") || cmd.equals("camina") || cmd.equals("ir") || cmd.equals("move")) held = true;
+            else if (cmd.equals("parar") || cmd.equals("para") || cmd.equals("soltar") || cmd.equals("detener")
+                    || cmd.equals("quieto") || cmd.equals("stop")) held = false;
+            else if (superIdx < 0 && (cmd.equals("super") || cmd.equals("superataque") || cmd.equals("especial"))) {
+                superIdx = i;
+                superFree = !held;
+            }
+        }
+        if (first < 0) first = lines.size();
+        if (!attack) {
+            while (!lines.isEmpty() && lines.get(lines.size() - 1).trim().isEmpty()) lines.remove(lines.size() - 1);
+            lines.add("disparar 2");
+        }
+        if (!hyper && superIdx >= 0 && superFree) lines.add(superIdx, "hiper");
+        List<String> head = new ArrayList<>();
+        if (!gadget) head.add("gadget");
+        if (!hyper && !(superIdx >= 0 && superFree)) head.add("hiper");
+        lines.addAll(first, head);
+        return String.join("\n", lines);
+    }
+
     public static boolean hasShotLine(String script) {
         Result r = parse(script);
         if (!r.ok()) return script != null && norm(script).contains("disparo ");

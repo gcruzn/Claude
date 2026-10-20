@@ -107,6 +107,11 @@ public class Data {
         }
         boolean changed = d.applySeeds();
         for (String f : new String[]{"brawlers1.json"}) changed |= d.applyAssetSeed(ctx, f);
+        if (!d.seeds.contains("completos1")) {
+            d.completeBrawlerPatterns();
+            d.seeds.add("completos1");
+            changed = true;
+        }
         if (changed) d.save();
         return d;
     }
@@ -550,6 +555,26 @@ public class Data {
             android.util.Log.e("PatronTouch", "lote " + file + ": " + e);
             return false;
         }
+    }
+
+    /**
+     * completos1 (20-oct, pedido de Gonzalo): todo patrón de un set de brawler (no «General»)
+     * debe usar disparo, gadget e hiper. Lo que falte se agrega donde no deforma el recorrido.
+     */
+    void completeBrawlerPatterns() {
+        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        for (PadSet s : sets) if (!"General".equalsIgnoreCase(s.brawler)) ids.addAll(s.slots);
+        int n = 0;
+        for (String id : ids) {
+            PatternDef p = pattern(id);
+            if (p == null) continue;
+            String full = Script.ensureFull(p.script);
+            if (!full.equals(p.script)) {
+                p.script = full;
+                n++;
+            }
+        }
+        android.util.Log.i("PatronTouch", "completos1: " + n + " de " + ids.size() + " patrones completados");
     }
 
     /** Patrones de un set, en orden de botón (se saltan los que ya no existen). */
