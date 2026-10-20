@@ -278,6 +278,20 @@ public class Data {
             seeds.add("aleatorio1");
             changed = true;
         }
+        if (!seeds.contains("corta1")) {
+            // Vuelta corta (~1,4 s): al levantar el S Pen la ráfaga sale de inmediato y, aunque el
+            // lápiz haya tapado una vuelta, la siguiente llega en poco más de 1 s.
+            if (pattern("ale_corta") == null) addPattern("ale_corta", "Aleatorio · Corta",
+                    "# Ráfaga de 3 de inmediato hacia donde movías el S Pen; luego gadget, hiper y súper (~1,4 s)\n"
+                            + "disparo toque cada 0.15\n"
+                            + "mover dirigido\ndisparar 3\n"
+                            + "gadget\nhiper\nsúper auto\n"
+                            + "esperar 0.1\nparar");
+            PadSet s = set("aleatorio");
+            if (s != null && !s.slots.contains("ale_corta") && s.slots.size() < MAX_SLOTS) s.slots.add(0, "ale_corta");
+            seeds.add("corta1");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1")) {
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.

@@ -73,6 +73,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         showPanel();
         registerDebug();
         observePen();
+        startPenBridge();
     }
 
     // ---------------------------------------------------------------- S Pen
@@ -102,6 +103,99 @@ public class TouchService extends AccessibilityService implements Player.Listene
         }
         penObserved = false;
         android.util.Log.i(TAG, "S Pen observado: false (desactivado)");
+    }
+
+    /**
+     * Puente del S Pen por ADB (20-oct): un proceso lanzado una vez con ADB publica en
+     * 127.0.0.1:7787 la salida de «getevent -l» del lápiz (solo lee el dispositivo de entrada; el
+     * juego recibe el lápiz igual). La app se conecta y traduce: BTN_TOUCH DOWN = lápiz apoyado,
+     * UP = levantado, ABS_X/ABS_Y = posición en coordenadas del panel (vertical). Se reintenta cada
+     * 3 s, así funciona aunque el proceso se lance después.
+     */
+    static final int PEN_PORT = 7787;
+    private volatile boolean penBridgeRun;
+    private int penDownX = -1, penDownY = -1, penCurX = -1, penCurY = -1;
+    private boolean penTouching;
+
+    private void startPenBridge() {
+        if (penBridgeRun) return;
+        penBridgeRun = true;
+        Thread th = new Thread(() -> {
+            while (penBridgeRun) {
+                try (java.net.Socket so = new java.net.Socket()) {
+                    so.connect(new java.net.InetSocketAddress("127.0.0.1", PEN_PORT), 1500);
+                    android.util.Log.i(TAG, "puente S Pen conectado");
+                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(so.getInputStream()));
+                    String line;
+                    while (penBridgeRun && (line = in.readLine()) != null) penLine(line);
+                } catch (Exception ignored) {
+                }
+                try { Thread.sleep(3000); } catch (InterruptedException e) { return; }
+            }
+        }, "puente-spen");
+        th.setDaemon(true);
+        th.start();
+    }
+
+    private void penLine(String line) {
+        String[] w = line.trim().split("\\s+");
+        if (w.length < 3) return;
+        String code = w[w.length - 2], val = w[w.length - 1];
+        if (code.equals("ABS_X") || code.equals("ABS_Y")) {
+            int v;
+            try { v = Integer.parseInt(val, 16); } catch (NumberFormatException e) { return; }
+            if (code.equals("ABS_X")) penCurX = v; else penCurY = v;
+            if (penTouching && penDownX < 0 && penCurX >= 0 && penCurY >= 0) {
+                penDownX = penCurX;
+                penDownY = penCurY;
+            }
+            if (penTouching && penDownX >= 0) updatePenDir();
+        } else if (code.equals("BTN_TOUCH")) {
+            boolean down = val.equals("DOWN");
+            if (down == penTouching) return;
+            penTouching = down;
+            if (down) {
+                penDownX = penCurX;
+                penDownY = penCurY;
+                main.post(this::penDown);
+            } else {
+                penDownX = -1;
+                main.post(this::penUp);
+            }
+        }
+    }
+
+    /** Vector desde donde apoyó el lápiz, pasado de panel vertical a pantalla según la rotación. */
+    private void updatePenDir() {
+        float rx = penCurX - penDownX, ry = penCurY - penDownY; // panel: x a lo corto, y a lo largo, y hacia abajo
+        if (rx * rx + ry * ry < 250f * 250f) return;
+        float sx, sy;
+        switch (wm.getDefaultDisplay().getRotation()) {
+            case android.view.Surface.ROTATION_90: sx = ry; sy = -rx; break;
+            case android.view.Surface.ROTATION_270: sx = -ry; sy = rx; break;
+            case android.view.Surface.ROTATION_180: sx = -rx; sy = -ry; break;
+            default: sx = rx; sy = ry;
+        }
+        double ang = (Math.toDegrees(Math.atan2(-sy, sx)) + 360) % 360;
+        String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
+        String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
+        if (!d.equals(Script.steerDir)) android.util.Log.i(TAG, "lápiz hacia " + d);
+        Script.steerDir = d;
+    }
+
+    private void penDown() {
+        if (player.isPlaying() && lastRun != null) {
+            penResume = lastRun;
+            player.stopByUserTouch();
+            android.util.Log.i(TAG, "lápiz abajo: patrón en pausa");
+        }
+    }
+
+    private void penUp() {
+        if (penResume != null && !player.isPlaying()) {
+            android.util.Log.i(TAG, "lápiz arriba: reanuda hacia " + Script.steerDir);
+            penResume.run();
+        }
     }
 
     @SuppressWarnings("unused")
@@ -320,6 +414,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     private void cleanup() {
+        penBridgeRun = false;
         if (debugReceiver != null) try { unregisterReceiver(debugReceiver); } catch (Exception ignored) { }
         debugReceiver = null;
         if (player != null) player.stop(null);
