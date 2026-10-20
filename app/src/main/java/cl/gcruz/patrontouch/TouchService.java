@@ -164,7 +164,10 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 script = script.replace("\\n", "\n");
                 int reps = i.getIntExtra("reps", 1);
                 logCompiled(name, script, Script.defaultProfile());
-                runScript(name, script, Math.max(0, reps), -1, reps == 0 ? MODE_LOOP : MODE_ONCE);
+                final String n = name, sc = script;
+                final int rp = Math.max(0, reps), md = reps == 0 ? MODE_LOOP : MODE_ONCE;
+                lastRun = () -> runScript(n, sc, rp, -1, md); // Escape reinicia este, no el último botón
+                lastRun.run();
                 break;
             }
             default: {
