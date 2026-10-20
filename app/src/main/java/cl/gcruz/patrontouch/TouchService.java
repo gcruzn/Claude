@@ -113,6 +113,10 @@ public class TouchService extends AccessibilityService implements Player.Listene
             case "stop":
                 player.stop("Detenido por ADB");
                 break;
+            case "escape":
+                if (i.getBooleanExtra("on", !escapeOn()) != escapeOn()) toggleEscape();
+                android.util.Log.i(TAG, "escape=" + escapeOn());
+                break;
             case "set": {
                 String id = i.getStringExtra("id");
                 if (id != null && data.set(id) != null) {
@@ -314,7 +318,32 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private static final int RANDOM = 100;
 
     private final List<TextView> slotButtons = new ArrayList<>();
-    private TextView randomButton;
+    private TextView randomButton, escapeButton;
+
+    /**
+     * 🏃 Escape: interruptor, no patrón. Encendido, todos los patrones se compilan sin disparos,
+     * súper, gadget ni hiper, y con el movimiento de huida estirado (ver Script.ESCAPE_*). Si hay
+     * un patrón corriendo, se reinicia al tiro con el modo nuevo.
+     */
+    private boolean escapeOn() { return prefs.getBoolean("escapeMode", false); }
+
+    private void toggleEscape() {
+        boolean on = !escapeOn();
+        prefs.edit().putBoolean("escapeMode", on).apply();
+        paintEscape();
+        vibrate(on ? 40 : 20);
+        android.util.Log.i(TAG, "escape " + (on ? "ON" : "OFF"));
+        if (player.isPlaying() && lastRun != null) lastRun.run();
+    }
+
+    private void paintEscape() {
+        if (escapeButton == null) return;
+        boolean on = escapeOn();
+        escapeButton.setText(on ? "🏃\nEscape ON" : "🏃\nEscape");
+        int a = Math.max(on ? 200 : 0, alpha());
+        ((GradientDrawable) escapeButton.getBackground()).setColor(on
+                ? Color.argb(a, 115, 201, 106) : idleColor());
+    }
     private View releaseTarget;
     private int activeIdx = -1, activeMode = 0;
     private boolean touchStopOnly;
@@ -354,6 +383,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         boolean locked = isLocked();
         slotButtons.clear();
         randomButton = null;
+        escapeButton = null;
 
         panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -378,6 +408,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
             b.setOnTouchListener(slotTouch(i));
             slotButtons.add(b);
             panel.addView(b, column(size, (int) (size * 0.8f)));
+        }
+        if (!pats.isEmpty()) {
+            escapeButton = slotButton("", size);
+            paintEscape();
+            escapeButton.setOnClickListener(v -> toggleEscape());
+            panel.addView(escapeButton, column(size, (int) (size * 0.8f)));
         }
         if (pats.size() >= 2) {
             randomButton = slotButton("🎲\nRandom", size);
@@ -604,7 +640,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
             if (warn) toast(name + ": error en línea " + r.errorLine + " · " + r.error);
             return null;
         }
-        Pattern p = Script.compile(name, r.steps, Script.defaultProfile(), cal);
+        Pattern p = Script.compile(name, r.steps, Script.defaultProfile(), cal, escapeOn());
         if (p.touches.isEmpty() || p.duration <= 0) {
             if (warn) toast(name + ": no hay toques con tus controles calibrados");
             return null;

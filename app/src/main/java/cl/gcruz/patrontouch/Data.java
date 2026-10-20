@@ -263,6 +263,11 @@ public class Data {
             seeds.add("formas1");
             changed = true;
         }
+        if (!seeds.contains("circular1")) {
+            seedCircular();
+            seeds.add("circular1");
+            changed = true;
+        }
         return changed;
     }
 
@@ -309,6 +314,51 @@ public class Data {
                             + "mover abajo\nhiper\nsúper auto\nmover abajo 0.45 disparando\n"
                             + "mover izquierda 0.4 disparando\nparar"},
     };
+
+    /**
+     * Círculo de 8 tramos de 0,25 s disparando (cada toque se auto-apunta), con gadget en el primer
+     * tramo y hiper + súper en el 5.º y 6.º. Arriba-derecha dura 0,3 s para compensar los 0,05 s
+     * que el súper (0,3 s) estira el tramo abajo-izquierda: así la vuelta cierra.
+     */
+    static final String CIRCULO = "disparo toque cada 0.4\n"
+            + "mover derecha\ngadget\nmover derecha 0.05 disparando\n"
+            + "mover arriba-derecha 0.3 disparando\nmover arriba 0.25 disparando\n"
+            + "mover arriba-izquierda 0.25 disparando\n"
+            + "mover izquierda\nhiper\n"
+            + "mover abajo-izquierda\nsúper auto\n"
+            + "mover abajo 0.25 disparando\nmover abajo-derecha 0.25 disparando\n";
+
+    /**
+     * Circulares (20-oct, pedido de Gonzalo): uno en el sitio y cuatro que avanzan girando hacia
+     * arriba, abajo, izquierda o derecha (tramo marcado «escape»). Con el botón 🏃 Escape quedan sin
+     * disparos ni habilidades, con giros a la mitad y el avance ×3: casi todo el tiempo es huida.
+     */
+    static final String[][] CIRCULAR1 = {
+            {"cir_sitio", "Circular · En el sitio",
+                    "# Gira sin moverse de su sitio (~2,1 s por vuelta)\n" + CIRCULO + "parar"},
+            {"cir_arriba", "Circular · Arriba",
+                    "# Gira y avanza hacia arriba (~2,6 s por vuelta)\n" + CIRCULO + "mover arriba 0.5 disparando escape\nparar"},
+            {"cir_abajo", "Circular · Abajo",
+                    "# Gira y avanza hacia abajo (~2,6 s por vuelta)\n" + CIRCULO + "mover abajo 0.5 disparando escape\nparar"},
+            {"cir_izquierda", "Circular · Izquierda",
+                    "# Gira y avanza hacia la izquierda (~2,6 s por vuelta)\n" + CIRCULO + "mover izquierda 0.5 disparando escape\nparar"},
+            {"cir_derecha", "Circular · Derecha",
+                    "# Gira y avanza hacia la derecha (~2,6 s por vuelta)\n" + CIRCULO + "mover derecha 0.5 disparando escape\nparar"},
+    };
+
+    private void seedCircular() {
+        for (String[] p : CIRCULAR1) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);
+        if (set("circular") == null) {
+            PadSet s = new PadSet();
+            s.id = "circular";
+            s.brawler = "General";
+            s.mode = "Circular";
+            s.name = "Circular";
+            for (String[] p : CIRCULAR1) s.slots.add(p[0]);
+            sets.add(s);
+            activeSet = s.id;
+        }
+    }
 
     private void seedFormas() {
         for (String[] p : FORMAS1) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);

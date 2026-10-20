@@ -30,6 +30,7 @@ public class Script {
         public int count = 1;   // attack
         public String mode;     // attack: tap|hold|aim ; super: auto|aim  (null = según perfil)
         public boolean fire;    // move: dispara durante el movimiento
+        public boolean escape;  // move: tramo de huida (en modo Escape dura ESCAPE_RUN veces más)
         public int line;
     }
 
@@ -200,7 +201,7 @@ public class Script {
             }
             String dir = null, mode = null;
             Double num = null;
-            boolean badDir = false, firing = false;
+            boolean badDir = false, firing = false, escaping = false;
             for (int i = 1; i < w.length; i++) {
                 String d = wordDir(w[i]);
                 Double n = number(w[i]);
@@ -217,6 +218,7 @@ public class Script {
                     case "hacia": case "a": case "al": case "la": case "el": case "y": case "por": case "durante":
                     case "en": case "de": break;
                     case "disparando": case "atacando": firing = true; break;
+                    case "escape": case "huida": case "huir": escaping = true; break;
                     default:
                         r.error = "No entiendo \"" + w[i] + "\"";
                         r.errorLine = s.line;
@@ -239,6 +241,7 @@ public class Script {
                     s.dir = dir;
                     s.secs = num == null ? 0 : Math.max(0, Math.min(30, num));
                     s.fire = firing;
+                    s.escape = escaping;
                     if (firing && s.secs == 0) s.secs = 1.5;
                     break;
                 case "parar": case "para": case "soltar": case "detener": case "quieto": case "stop":
@@ -285,7 +288,7 @@ public class Script {
 
     public static String format(Step s) {
         switch (s.kind) {
-            case "move": return "mover " + dirLabel(s.dir) + (s.secs > 0 ? " " + num(s.secs) : "") + (s.fire ? " disparando" : "");
+            case "move": return "mover " + dirLabel(s.dir) + (s.secs > 0 ? " " + num(s.secs) : "") + (s.fire ? " disparando" : "") + (s.escape ? " escape" : "");
             case "stop": return "parar";
             case "attack": {
                 StringBuilder b = new StringBuilder("disparar");
@@ -365,8 +368,20 @@ public class Script {
         return new float[]{(float) (c[0] + Math.cos(r) * dist), (float) (c[1] - Math.sin(r) * dist)};
     }
 
+    /**
+     * Modo Escape (botón 🏃 de la botonera): sin disparos, súper, gadget, hiper ni esperas; los
+     * tramos normales duran ESCAPE_TURN de lo escrito (giros más cortos) y los marcados «escape»
+     * duran ESCAPE_RUN veces más. El brawler ya camina a tope con el joystick empujado: «acelerar»
+     * es dedicar casi todo el tiempo a alejarse zigzagueando.
+     */
+    public static final float ESCAPE_TURN = 0.5f, ESCAPE_RUN = 3f;
+
     /** Traduce los pasos a toques concretos según el perfil y la calibración. */
     public static Pattern compile(String name, List<Step> steps, Data.Profile base, Calibration cal) {
+        return compile(name, steps, base, cal, false);
+    }
+
+    public static Pattern compile(String name, List<Step> steps, Data.Profile base, Calibration cal, boolean escapeMode) {
         Data.Profile prof = copy(base != null ? base : defaultProfile());
         Pattern p = new Pattern();
         p.name = name;
@@ -380,6 +395,25 @@ public class Script {
         String curDir = null;
 
         for (Step s : steps) {
+            if (escapeMode) {
+                if (!"move".equals(s.kind) && !"stop".equals(s.kind)) {
+                    // Sin la acción; si el joystick venía empujado, ese tiempo sigue siendo
+                    // movimiento (acortado), para que la figura no se deforme.
+                    if (curDir != null && !"config".equals(s.kind)) t += Math.round(actionMs(s, prof) * ESCAPE_TURN);
+                    if ("config".equals(s.kind)) {
+                        prof.attack = s.mode;
+                        if (s.count > 1) prof.interval = s.count;
+                    }
+                    continue;
+                }
+                if ("move".equals(s.kind)) {
+                    Step e = new Step();
+                    e.kind = "move";
+                    e.dir = s.dir;
+                    e.secs = s.secs * (s.escape ? ESCAPE_RUN : ESCAPE_TURN);
+                    s = e;
+                }
+            }
             switch (s.kind) {
                 case "move": {
                     if (joy == null) break;
@@ -468,6 +502,23 @@ public class Script {
         }
         p.normalize();
         return p;
+    }
+
+    /** Cuánto avanza el reloj una acción fuera del modo Escape (mismo criterio que compile). */
+    private static long actionMs(Step s, Data.Profile prof) {
+        switch (s.kind) {
+            case "attack": {
+                String mode = s.mode != null ? s.mode : prof.attack;
+                long one = "hold".equals(mode) ? Math.max(100, prof.hold) + 150
+                        : "aim".equals(mode) ? Math.max(350, prof.interval) : Math.max(120, prof.interval);
+                return one * s.count;
+            }
+            case "super": return "aim".equals(s.mode) || s.dir != null ? 400 : 300;
+            case "gadget": return 200;
+            case "hyper": return 250;
+            case "wait": return Math.round(s.secs * 1000);
+        }
+        return 0;
     }
 
     private static Data.Profile copy(Data.Profile b) {
