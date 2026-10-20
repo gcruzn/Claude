@@ -256,7 +256,69 @@ public class Data {
             seeds.add("kenji2");
             changed = true;
         }
+        if (!seeds.contains("formas1")) {
+            seedFormas();
+            seeds.add("formas1");
+            changed = true;
+        }
         return changed;
+    }
+
+    /**
+     * Formas (20-oct, pedido de Gonzalo): presión constante (disparo con toque cada 0,4 s durante
+     * todo el recorrido) y evasión (el joystick dibuja una figura cerrada que vuelve al punto de
+     * partida, así no se aleja del objetivo). Gadget, hiper y súper una vez por vuelta, en esquinas
+     * distintas y con la hiper antes del súper; si no están cargados, el toque no hace nada.
+     * Direcciones de pantalla (arriba = hacia arriba en la pantalla). Pensados para el bucle.
+     * Gadget (0,2 s), hiper (0,25 s) y súper (0,3 s) corren el reloj con el joystick empujado: van
+     * dentro de un lado («mover X» sin tiempo) y ese lado se acorta en lo que duran, para que cada
+     * lado mida lo que debe y la figura cierre (si no, cada vuelta se desplaza hacia un costado).
+     */
+    static final String[][] FORMAS1 = {
+            {"f_cuadrado", "Formas · Cuadrado",
+                    "# Cuatro lados de 0,6 s (~2,5 s por vuelta)\ndisparo toque cada 0.4\n"
+                            + "mover derecha\ngadget\nmover derecha 0.4 disparando\n"
+                            + "mover arriba 0.6 disparando\n"
+                            + "mover izquierda\nhiper\nsúper auto\nmover izquierda 0.05\n"
+                            + "mover abajo 0.6 disparando\nparar"},
+            {"f_circulo", "Formas · Círculo",
+                    "# Ocho tramos de 0,3 s girando (~2,5 s por vuelta)\ndisparo toque cada 0.4\n"
+                            + "mover derecha\ngadget\nmover derecha 0.1 disparando\n"
+                            + "mover arriba-derecha 0.3 disparando\nmover arriba 0.3 disparando\n"
+                            + "mover arriba-izquierda\nhiper\nmover arriba-izquierda 0.05\n"
+                            + "mover izquierda\nsúper auto\n"
+                            + "mover abajo-izquierda 0.3 disparando\nmover abajo 0.3 disparando\n"
+                            + "mover abajo-derecha 0.3 disparando\nparar"},
+            {"f_triangulo", "Formas · Triángulo",
+                    "# Dos diagonales de 0,7 s y la base de 1 s (~2,5 s por vuelta)\ndisparo toque cada 0.4\n"
+                            + "mover arriba-derecha\ngadget\nmover arriba-derecha 0.5 disparando\n"
+                            + "mover abajo-derecha\nhiper\nsúper auto\nmover abajo-derecha 0.15\n"
+                            + "mover izquierda 1 disparando\nparar"},
+            {"f_rect_h", "Formas · Rectángulo horizontal",
+                    "# Lados de 1 s a lo ancho y 0,4 s a lo alto (~2,9 s por vuelta)\ndisparo toque cada 0.4\n"
+                            + "mover derecha\ngadget\nmover derecha 0.8 disparando\n"
+                            + "mover arriba 0.4 disparando\n"
+                            + "mover izquierda\nhiper\nsúper auto\nmover izquierda 0.45 disparando\n"
+                            + "mover abajo 0.4 disparando\nparar"},
+            {"f_rect_v", "Formas · Rectángulo vertical",
+                    "# Lados de 1 s a lo alto y 0,4 s a lo ancho (~2,9 s por vuelta)\ndisparo toque cada 0.4\n"
+                            + "mover arriba\ngadget\nmover arriba 0.8 disparando\n"
+                            + "mover derecha 0.4 disparando\n"
+                            + "mover abajo\nhiper\nsúper auto\nmover abajo 0.45 disparando\n"
+                            + "mover izquierda 0.4 disparando\nparar"},
+    };
+
+    private void seedFormas() {
+        for (String[] p : FORMAS1) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);
+        if (set("formas") == null) {
+            PadSet s = new PadSet();
+            s.id = "formas";
+            s.brawler = "General";
+            s.mode = "Formas";
+            s.name = "Formas";
+            for (String[] p : FORMAS1) s.slots.add(p[0]);
+            sets.add(s);
+        }
     }
 
     /**
