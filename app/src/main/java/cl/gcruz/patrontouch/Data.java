@@ -273,6 +273,11 @@ public class Data {
             seeds.add("circular1");
             changed = true;
         }
+        if (!seeds.contains("aleatorio1")) {
+            seedAleatorio();
+            seeds.add("aleatorio1");
+            changed = true;
+        }
         return changed;
     }
 
@@ -350,6 +355,39 @@ public class Data {
             {"cir_derecha", "Circular · Derecha",
                     "# Gira y avanza hacia la derecha (~2,6 s por vuelta)\n" + CIRCULO + "mover derecha 0.5 disparando escape\nparar"},
     };
+
+    /**
+     * Aleatorio · Ráfagas (20-oct, pedido de Gonzalo): 6 tramos en dirección al azar (cada uno
+     * seguido de su opuesto, para no irse contra una pared), en cada tramo 3 disparos lo más rápido
+     * que acepta el juego (un toque cada 0,15 s, el mínimo del compilador es 0,12). Gadget al inicio
+     * de la vuelta; hiper y súper a la mitad. ~4,5 s por vuelta; el recorrido cambia en cada vuelta.
+     */
+    static final String RAFAGA_TRAMO = "disparar 3\nesperar 0.3\n";
+
+    private void seedAleatorio() {
+        if (pattern("ale_rafagas") == null) addPattern("ale_rafagas", "Aleatorio · Ráfagas",
+                "# Movimiento al azar con ráfagas de 3 disparos; gadget, hiper y súper cada vuelta (~4,5 s)\n"
+                        + "disparo toque cada 0.15\n"
+                        + "gadget\n"
+                        + "mover aleatorio\n" + RAFAGA_TRAMO
+                        + "mover opuesto\n" + RAFAGA_TRAMO
+                        + "mover aleatorio\n" + RAFAGA_TRAMO
+                        + "parar\nhiper\nsúper auto\n"
+                        + "mover opuesto\n" + RAFAGA_TRAMO
+                        + "mover aleatorio\n" + RAFAGA_TRAMO
+                        + "mover opuesto\n" + RAFAGA_TRAMO
+                        + "parar");
+        if (set("aleatorio") == null) {
+            PadSet s = new PadSet();
+            s.id = "aleatorio";
+            s.brawler = "General";
+            s.mode = "Aleatorio";
+            s.name = "Aleatorio";
+            s.slots.add("ale_rafagas");
+            sets.add(s);
+            activeSet = s.id;
+        }
+    }
 
     private void seedCircular() {
         for (String[] p : CIRCULAR1) if (pattern(p[0]) == null) addPattern(p[0], p[1], p[2]);

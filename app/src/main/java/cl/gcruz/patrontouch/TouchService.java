@@ -704,7 +704,10 @@ public class TouchService extends AccessibilityService implements Player.Listene
         activeMode = mode;
         android.util.Log.i(TAG, "patrón «" + name + "» botón=" + (idx == RANDOM ? "random" : idx >= 0 ? String.valueOf(idx + 1) : "—")
                 + " modo=" + (mode == MODE_LOOP ? "bucle" : "una vez") + " reps=" + (reps == 0 ? "∞" : reps));
-        player.start(p, reps, mode == MODE_LOOP ? 120 : 0);
+        // «mover aleatorio»: cada vuelta se vuelve a compilar para que el recorrido cambie.
+        java.util.function.Supplier<Pattern> next = Script.isRandom(Script.parse(script).steps)
+                ? () -> compileDef(name, script, false) : null;
+        player.start(p, reps, mode == MODE_LOOP ? 120 : 0, next);
     }
 
     private TextView buttonFor(int idx) {

@@ -51,6 +51,8 @@ public class Script {
 
     public static String dirLabel(String dir) {
         if ("move".equals(dir)) return "hacia donde te mueves";
+        if ("random".equals(dir)) return "aleatorio";
+        if ("opposite".equals(dir)) return "opuesto";
         for (int i = 0; i < DIRS.length; i++) if (DIRS[i].equals(dir)) return DIR_ES[i];
         return dir == null ? "" : dir;
     }
@@ -268,6 +270,10 @@ public class Script {
                     case "en": case "de": break;
                     case "disparando": case "atacando": firing = true; break;
                     case "escape": case "huida": case "huir": escaping = true; break;
+                    case "aleatorio": case "aleatoria": case "azar": case "random":
+                        if (dir != null) badDir = true; else dir = "random"; break;
+                    case "opuesto": case "opuesta": case "volver": case "vuelta":
+                        if (dir != null) badDir = true; else dir = "opposite"; break;
                     default:
                         r.error = "No entiendo \"" + w[i] + "\"";
                         r.errorLine = s.line;
@@ -441,7 +447,7 @@ public class Script {
         Pattern.Touch js = null;
         long jsLast = 0;
         float[] jsPos = null;
-        String curDir = null;
+        String curDir = null, lastRandom = null;
 
         for (Step s : steps) {
             if (escapeMode) {
@@ -466,6 +472,20 @@ public class Script {
             switch (s.kind) {
                 case "move": {
                     if (joy == null) break;
+                    if ("random".equals(s.dir) || "opposite".equals(s.dir)) {
+                        Step r = new Step();
+                        r.kind = "move";
+                        r.secs = s.secs;
+                        r.fire = s.fire;
+                        r.escape = s.escape;
+                        if ("random".equals(s.dir)) {
+                            r.dir = DIRS[RND.nextInt(DIRS.length)];
+                            lastRandom = r.dir;
+                        } else {
+                            r.dir = opposite(lastRandom != null ? lastRandom : curDir != null ? curDir : "down");
+                        }
+                        s = r;
+                    }
                     float[] target = offset(joy, s.dir, cal.joyRadius());
                     if (js == null) {
                         js = new Pattern.Touch();
@@ -551,6 +571,28 @@ public class Script {
         }
         p.normalize();
         return p;
+    }
+
+    private static final java.util.Random RND = new java.util.Random();
+
+    /** ¿El patrón usa «aleatorio»? Entonces se vuelve a compilar en cada vuelta (otro recorrido). */
+    public static boolean isRandom(List<Step> steps) {
+        for (Step s : steps) if ("random".equals(s.dir)) return true;
+        return false;
+    }
+
+    static String opposite(String d) {
+        switch (d) {
+            case "up": return "down";
+            case "down": return "up";
+            case "left": return "right";
+            case "right": return "left";
+            case "upleft": return "downright";
+            case "downright": return "upleft";
+            case "upright": return "downleft";
+            case "downleft": return "upright";
+        }
+        return "down";
     }
 
     /** Cuánto avanza el reloj una acción fuera del modo Escape (mismo criterio que compile). */
