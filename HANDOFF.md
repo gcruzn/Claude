@@ -261,3 +261,16 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
 - Lenguaje: `mover dirigido` (última dirección del lápiz ±45° al azar) y `mover ultima` (exacta).
   Set Aleatorio: 1 Corta (ráfaga hacia la última dirección + habilidades, ~1,7 s), 2 Ráfagas, 3 Dirigido.
 - El puente y el puerto 5555 se pierden si se cae ADB (Bloqueador automático): relanzar ambos.
+
+### Dedo (v4.7.5 → v4.8.1, 20-oct)
+
+- **Puente del dedo:** `nohup setsid nc -L -s 127.0.0.1 -p 7788 getevent -l /dev/input/event7 &`
+  (event7 = sec_touchscreen, multitáctil 0–4095). Solo ve dedos reales. Con un dedo abajo el patrón
+  se pausa; el dedo que empezó sobre el joystick (radio 2,2 × joyRadius de la calibración) da la
+  dirección; al levantar el último dedo se reanuda en 60 ms. Probado y OK por Gonzalo.
+- **Joystick tomado por el dedo virtual (v4.8.1):** en el S26 el dedo/lápiz real NO cancela el gesto
+  inyectado en curso; ese gesto seguía apretando el joystick y el juego lo atendía a él. Ahora al
+  apoyar dedo o lápiz se llama `player.stop(null)` (inyecta el soltar en la zona invisible y corta).
+- **v4.7.5:** tocar el botón del patrón con lápiz/dedo lo detiene (antes el puente pausaba primero y
+  el toque se leía como «iniciar»).
+- Al reconectar ADB relanzar los DOS puentes (7787 lápiz, 7788 dedo).
