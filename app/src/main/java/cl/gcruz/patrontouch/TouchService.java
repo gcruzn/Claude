@@ -88,7 +88,24 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private float penX, penY;
     private Runnable penResume;
 
+    /**
+     * DESACTIVADO (20-oct): en el S26 (Android 16), pedir las fuentes del lápiz le quitó el S Pen al
+     * juego aunque se pidieran como «observadas», y onMotionEvent no recibió nada. Se dejan las
+     * fuentes en 0 (como antes) hasta encontrar una vía que no interfiera.
+     */
     private void observePen() {
+        try {
+            android.accessibilityservice.AccessibilityServiceInfo info = getServiceInfo();
+            info.getClass().getMethod("setMotionEventSources", int.class).invoke(info, 0);
+            setServiceInfo(info);
+        } catch (Throwable ignored) {
+        }
+        penObserved = false;
+        android.util.Log.i(TAG, "S Pen observado: false (desactivado)");
+    }
+
+    @SuppressWarnings("unused")
+    private void observePenExperimental() {
         // AccessibilityServiceInfo.setMotionEventSources (API 34) + setObservedMotionEventSources
         // (API 35), por reflexión porque se compila con SDK 34. Las dos o ninguna.
         try {
