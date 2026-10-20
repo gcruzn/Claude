@@ -10,8 +10,8 @@ android {
         applicationId 'cl.gcruz.patrontouch'
         minSdk 26
         targetSdk 34
-        versionCode 39
-        versionName '4.7.3'
+        versionCode 40
+        versionName '4.7.4'
     }
 
     // Clave fija desde el secreto SIDELOAD_KEYSTORE del CI (el workflow la deja en

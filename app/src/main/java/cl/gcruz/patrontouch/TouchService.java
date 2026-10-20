@@ -160,6 +160,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 main.post(this::penDown);
             } else {
                 penDownX = -1;
+                penUpAt = android.os.SystemClock.uptimeMillis();
                 android.util.Log.i(TAG, "lápiz levantado (sigue cerca de la pantalla)");
                 // Mientras el lápiz flota cerca, Android rechaza los toques (rechazo de palma):
                 // se reanuda al salir del rango; si no llega ese aviso, a los 1,5 s igual.
@@ -169,10 +170,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
             android.util.Log.i(TAG, "lápiz " + (val.equals("DOWN") ? "entra en rango" : "sale de rango"));
             if (val.equals("UP")) {
                 android.util.Log.i(TAG, "lápiz fuera de rango");
-                main.post(() -> {
+                // Si el lápiz «se levantó» hace muy poco puede ser un rebote: se confirma 150 ms después.
+                long wait = Math.max(0, 150 - (android.os.SystemClock.uptimeMillis() - penUpAt));
+                main.postDelayed(() -> {
                     main.removeCallbacks(penHoverTimeout);
                     if (!penTouching) penUp();
-                });
+                }, wait);
             }
         }
     }
@@ -195,6 +198,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
         Script.steerDir = d;
     }
 
+    /**
+     * Rebotes (20-oct): con poca presión el S Pen reporta «levantado» y «apoyado» en ráfagas de
+     * 10–200 ms mientras se arrastra; si el patrón se reanudaba en ese hueco, el toque inyectado del
+     * joystick quedaba a medias y el juego lo dejaba pegado. Solo se reanuda si el lápiz sigue arriba.
+     */
+    private volatile long penUpAt;
+
     private final Runnable penHoverTimeout = () -> { if (!penTouching) penUp(); };
 
     private void penDown() {
@@ -207,6 +217,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     private void penUp() {
+        if (penTouching) return;
         if (penResume != null && !player.isPlaying()) {
             android.util.Log.i(TAG, "lápiz arriba: reanuda hacia " + Script.steerDir);
             penResume.run();
