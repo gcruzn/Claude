@@ -278,6 +278,24 @@ public class Data {
             seeds.add("aleatorio1");
             changed = true;
         }
+        if (!seeds.contains("dirigido1")) {
+            // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
+            // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
+            if (pattern("ale_dirigido") == null) addPattern("ale_dirigido", "Aleatorio · Dirigido",
+                    "# Hacia donde movías el S Pen (±45° al azar), ráfagas de 3; gadget, hiper y súper cada vuelta\n"
+                            + "disparo toque cada 0.15\n"
+                            + "mover dirigido\n" + RAFAGA_TRAMO
+                            + "gadget\n"
+                            + "mover dirigido\n" + RAFAGA_TRAMO
+                            + "mover dirigido\n" + RAFAGA_TRAMO
+                            + "hiper\nsúper auto\n"
+                            + "mover dirigido\n" + RAFAGA_TRAMO
+                            + "parar");
+            PadSet s = set("aleatorio");
+            if (s != null && !s.slots.contains("ale_dirigido") && s.slots.size() < MAX_SLOTS) s.slots.add("ale_dirigido");
+            seeds.add("dirigido1");
+            changed = true;
+        }
         return changed;
     }
 

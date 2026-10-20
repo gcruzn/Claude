@@ -72,6 +72,66 @@ public class TouchService extends AccessibilityService implements Player.Listene
         cal = new Calibration(this, s.x, s.y);
         showPanel();
         registerDebug();
+        observePen();
+    }
+
+    // ---------------------------------------------------------------- S Pen
+
+    /**
+     * Observa el S Pen SIN quitarle los eventos al juego (Android 15+: setObservedMotionEventSources).
+     * Con el lápiz abajo el juego ignora los toques inyectados, así que el patrón se pausa al apoyarlo
+     * y se reanuda al instante al levantarlo; mientras se arrastra se guarda la dirección (para
+     * «mover dirigido»). Si el sistema no permite observar, NO se activa: setMotionEventSources solo
+     * consumiría los eventos del lápiz y le quitaría el control a Gonzalo.
+     */
+    private boolean penObserved;
+    private float penX, penY;
+    private Runnable penResume;
+
+    private void observePen() {
+        try {
+            java.lang.reflect.Method observed = AccessibilityService.class
+                    .getMethod("setObservedMotionEventSources", int.class);
+            setMotionEventSources(android.view.InputDevice.SOURCE_STYLUS);
+            observed.invoke(this, android.view.InputDevice.SOURCE_STYLUS);
+            penObserved = true;
+        } catch (Throwable t) {
+            penObserved = false;
+            try { setMotionEventSources(0); } catch (Throwable ignored) { }
+        }
+        android.util.Log.i(TAG, "S Pen observado: " + penObserved);
+    }
+
+    @Override
+    public void onMotionEvent(MotionEvent e) {
+        if (!penObserved || e.getToolType(0) != MotionEvent.TOOL_TYPE_STYLUS) return;
+        switch (e.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                penX = e.getRawX();
+                penY = e.getRawY();
+                if (player.isPlaying() && lastRun != null) {
+                    penResume = lastRun;
+                    player.stopByUserTouch();
+                    android.util.Log.i(TAG, "lápiz abajo: patrón en pausa");
+                }
+                break;
+            case MotionEvent.ACTION_MOVE: {
+                float dx = e.getRawX() - penX, dy = penY - e.getRawY();
+                if (dx * dx + dy * dy > dp(18) * dp(18)) {
+                    double ang = (Math.toDegrees(Math.atan2(dy, dx)) + 360) % 360;
+                    String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
+                    Script.steerDir = dirs[(int) (((ang + 22.5) % 360) / 45)];
+                }
+                break;
+            }
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                if (penResume != null && !player.isPlaying()) {
+                    android.util.Log.i(TAG, "lápiz arriba: reanuda hacia " + Script.steerDir);
+                    main.post(penResume);
+                }
+                break;
+        }
     }
 
     // ---------------------------------------------------------------- pruebas por ADB
@@ -112,6 +172,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (cmd == null) cmd = "dump";
         switch (cmd) {
             case "stop":
+                penResume = null;
                 player.stop("Detenido por ADB");
                 break;
             case "escape":
@@ -622,6 +683,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (touchStopOnly) {
+                        penResume = null; // detenido a propósito: el lápiz ya no lo reanuda
                         paintIdle();
                         main.postDelayed(player::releaseNow, 120); // soltar el joystick ya sin el dedo real
                     } else {
@@ -638,6 +700,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     private void startSlot(int i) {
         lastRun = () -> startSlot(i);
+        penResume = null;
         List<Data.PatternDef> pats = data.slotPatterns(data.active());
         if (i == RANDOM) {
             startRandom(pats);

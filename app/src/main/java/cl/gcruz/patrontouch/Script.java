@@ -52,6 +52,7 @@ public class Script {
     public static String dirLabel(String dir) {
         if ("move".equals(dir)) return "hacia donde te mueves";
         if ("random".equals(dir)) return "aleatorio";
+        if ("steer".equals(dir)) return "dirigido";
         if ("opposite".equals(dir)) return "opuesto";
         for (int i = 0; i < DIRS.length; i++) if (DIRS[i].equals(dir)) return DIR_ES[i];
         return dir == null ? "" : dir;
@@ -272,6 +273,8 @@ public class Script {
                     case "escape": case "huida": case "huir": escaping = true; break;
                     case "aleatorio": case "aleatoria": case "azar": case "random":
                         if (dir != null) badDir = true; else dir = "random"; break;
+                    case "dirigido": case "dirigida": case "seguir": case "ultima":
+                        if (dir != null) badDir = true; else dir = "steer"; break;
                     case "opuesto": case "opuesta": case "volver": case "vuelta":
                         if (dir != null) badDir = true; else dir = "opposite"; break;
                     default:
@@ -472,13 +475,16 @@ public class Script {
             switch (s.kind) {
                 case "move": {
                     if (joy == null) break;
-                    if ("random".equals(s.dir) || "opposite".equals(s.dir)) {
+                    if ("random".equals(s.dir) || "opposite".equals(s.dir) || "steer".equals(s.dir)) {
                         Step r = new Step();
                         r.kind = "move";
                         r.secs = s.secs;
                         r.fire = s.fire;
                         r.escape = s.escape;
-                        if ("random".equals(s.dir)) {
+                        if ("steer".equals(s.dir)) {
+                            r.dir = steered();
+                            lastRandom = r.dir;
+                        } else if ("random".equals(s.dir)) {
                             r.dir = DIRS[RND.nextInt(DIRS.length)];
                             lastRandom = r.dir;
                         } else {
@@ -575,10 +581,23 @@ public class Script {
 
     private static final java.util.Random RND = new java.util.Random();
 
-    /** ¿El patrón usa «aleatorio»? Entonces se vuelve a compilar en cada vuelta (otro recorrido). */
+    /** ¿El patrón usa «aleatorio» o «dirigido»? Entonces se vuelve a compilar en cada vuelta. */
     public static boolean isRandom(List<Step> steps) {
-        for (Step s : steps) if ("random".equals(s.dir)) return true;
+        for (Step s : steps) if ("random".equals(s.dir) || "steer".equals(s.dir)) return true;
         return false;
+    }
+
+    /** Última dirección en que Gonzalo movió el joystick con el S Pen (la pone TouchService). */
+    public static volatile String steerDir = null;
+
+    /** «mover dirigido»: la última dirección del lápiz o 45° hacia un lado u otro, al azar. Sin dato, al azar. */
+    static String steered() {
+        String d = steerDir;
+        if (d == null) return DIRS[RND.nextInt(DIRS.length)];
+        String[] ring = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
+        int i = java.util.Arrays.asList(ring).indexOf(d);
+        if (i < 0) return d;
+        return ring[(i + RND.nextInt(3) + 7) % 8]; // -45°, 0° o +45°
     }
 
     static String opposite(String d) {
