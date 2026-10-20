@@ -325,7 +325,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
      * súper, gadget ni hiper, y con el movimiento de huida estirado (ver Script.ESCAPE_*). Si hay
      * un patrón corriendo, se reinicia al tiro con el modo nuevo.
      */
-    private boolean escapeOn() { return prefs.getBoolean("escapeMode", false); }
+    private boolean escapeOn() {
+        return prefs.getBoolean("showEscape", true) && prefs.getBoolean("escapeMode", false);
+    }
 
     private void toggleEscape() {
         boolean on = !escapeOn();
@@ -409,13 +411,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
             slotButtons.add(b);
             panel.addView(b, column(size, (int) (size * 0.8f)));
         }
-        if (!pats.isEmpty()) {
+        if (!pats.isEmpty() && prefs.getBoolean("showEscape", true)) {
             escapeButton = slotButton("", size);
             paintEscape();
             escapeButton.setOnClickListener(v -> toggleEscape());
             panel.addView(escapeButton, column(size, (int) (size * 0.8f)));
         }
-        if (pats.size() >= 2) {
+        if (pats.size() >= 2 && prefs.getBoolean("showRandom", true)) {
             randomButton = slotButton("🎲\nRandom", size);
             randomButton.setOnTouchListener(slotTouch(RANDOM));
             panel.addView(randomButton, column(size, (int) (size * 0.8f)));

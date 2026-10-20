@@ -342,6 +342,26 @@ public class MainActivity extends Activity {
         vib.setChecked(prefs.getBoolean("vibrate", true));
         vib.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("vibrate", on).apply());
         c.addView(vib);
+        Switch esc = new Switch(this);
+        esc.setText("Mostrar botón 🏃 Escape");
+        esc.setTextColor(GRAFITO);
+        esc.setChecked(prefs.getBoolean("showEscape", true));
+        esc.setOnCheckedChangeListener((b, on) -> {
+            SharedPreferences.Editor e = prefs.edit().putBoolean("showEscape", on);
+            if (!on) e.putBoolean("escapeMode", false); // oculto = apagado: nada queda sin disparos
+            e.apply();
+            if (TouchService.get() != null) TouchService.get().rebuildPanel();
+        });
+        c.addView(esc);
+        Switch rnd = new Switch(this);
+        rnd.setText("Mostrar botón 🎲 Random");
+        rnd.setTextColor(GRAFITO);
+        rnd.setChecked(prefs.getBoolean("showRandom", true));
+        rnd.setOnCheckedChangeListener((b, on) -> {
+            prefs.edit().putBoolean("showRandom", on).apply();
+            if (TouchService.get() != null) TouchService.get().rebuildPanel();
+        });
+        c.addView(rnd);
         Switch vol = new Switch(this);
         vol.setText("Volumen + repite la última acción");
         vol.setTextColor(GRAFITO);
