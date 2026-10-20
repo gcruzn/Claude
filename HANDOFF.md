@@ -210,3 +210,11 @@ Entrada y combo) y «Kenji · Balón Brawl» (mismos patrones, otro orden). El K
 + Slash 2000 conectan; el súper corta 2×2600. Botonera: el bucle se repite cada ~0,7 s y Random
 alterna sin repetir. Parar tocando el mismo botón: verificado por Gonzalo con el dedo (19-oct). Los `adb input tap`
 sobre la botonera mientras corre un gesto se pierden a veces: para probar por ADB usar `--es cmd stop`.
+
+### Formas (v4.2.0, 19-oct)
+
+Set «General · Formas»: Cuadrado, Círculo, Triángulo, Rectángulo horizontal y vertical. Presión
+constante (toque cada 0,4 s mientras se mueve) y evasión en figura cerrada; gadget, hiper y súper una
+vez por vuelta dentro de un lado acortado para que cierre (simulado: desplazamiento neto ≈ 0). Probado
+en Terrenos con Poco (tiene hipercarga), 2 vueltas cada una: vuelven al punto de partida, los ataques
+conectan (1520) y se activan gadget, hiper y súper.
