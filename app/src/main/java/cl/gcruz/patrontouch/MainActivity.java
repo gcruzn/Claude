@@ -286,8 +286,9 @@ public class MainActivity extends Activity {
         for (Data.PatternDef p : data.patterns) groups.merge(groupOf(p), 1, Integer::sum);
         List<String> names = new ArrayList<>(groups.keySet());
         if (patternGroup == null || !groups.containsKey(patternGroup)) {
-            Data.PadSet act = data.active();
-            String b = act == null ? null : SetPicker.brawlerOf(act);
+            // Parte en el grupo del primer patrón del set activo (en «General · Circular» es «Circular»).
+            List<Data.PatternDef> act = data.slotPatterns(data.active());
+            String b = act.isEmpty() ? null : groupOf(act.get(0));
             patternGroup = b != null && groups.containsKey(b) ? b : names.isEmpty() ? "Otros" : names.get(0);
         }
         List<String> labels = new ArrayList<>();
