@@ -160,7 +160,18 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 main.post(this::penDown);
             } else {
                 penDownX = -1;
-                main.post(this::penUp);
+                android.util.Log.i(TAG, "lápiz levantado (sigue cerca de la pantalla)");
+                // Mientras el lápiz flota cerca, Android rechaza los toques (rechazo de palma):
+                // se reanuda al salir del rango; si no llega ese aviso, a los 1,5 s igual.
+                main.postDelayed(penHoverTimeout, 1500);
+            }
+        } else if (code.equals("BTN_TOOL_PEN")) {
+            if (val.equals("UP")) {
+                android.util.Log.i(TAG, "lápiz fuera de rango");
+                main.post(() -> {
+                    main.removeCallbacks(penHoverTimeout);
+                    if (!penTouching) penUp();
+                });
             }
         }
     }
@@ -183,7 +194,10 @@ public class TouchService extends AccessibilityService implements Player.Listene
         Script.steerDir = d;
     }
 
+    private final Runnable penHoverTimeout = () -> { if (!penTouching) penUp(); };
+
     private void penDown() {
+        main.removeCallbacks(penHoverTimeout);
         if (player.isPlaying() && lastRun != null) {
             penResume = lastRun;
             player.stopByUserTouch();
