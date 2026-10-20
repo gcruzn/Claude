@@ -1,0 +1,1043 @@
+{
+ "lote": "brawlers1",
+ "patterns": [
+  {
+   "id": "rico_balon_1",
+   "name": "Rico · Ráfaga fija",
+   "script": "disparo toque cada 0.5\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "rico_balon_2",
+   "name": "Rico · Paso lateral",
+   "script": "disparo toque cada 0.5\nmover izquierda 0.4 disparando\nmover derecha 0.4 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "rico_balon_3",
+   "name": "Rico · Rebote y súper",
+   "script": "disparo toque cada 0.5\ndisparar 2\nsúper auto\nmover abajo 0.4\nmover arriba 0.4\nparar"
+  },
+  {
+   "id": "rico_balon_4",
+   "name": "Rico · Gadget ráfaga",
+   "script": "disparo toque cada 0.5\ngadget\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "rico_balon_5",
+   "name": "Rico · Zigzag diagonal",
+   "script": "disparo toque cada 0.5\nmover arriba-izquierda 0.4 disparando\nmover abajo-derecha 0.4 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "rico_gemas_1",
+   "name": "Rico · Ráfaga larga",
+   "script": "disparo toque cada 0.5\ndisparar 4"
+  },
+  {
+   "id": "rico_gemas_2",
+   "name": "Rico · Avance corto",
+   "script": "disparo toque cada 0.5\nmover arriba 0.4 disparando\nparar\ndisparar 2\nmover abajo 0.4\nparar"
+  },
+  {
+   "id": "rico_gemas_3",
+   "name": "Rico · Hiper y súper",
+   "script": "disparo toque cada 0.5\nhiper\nsúper auto\ndisparar 2\nesperar 0.3"
+  },
+  {
+   "id": "rico_gemas_4",
+   "name": "Rico · Guardia lateral",
+   "script": "disparo toque cada 0.5\nmover derecha 0.5 disparando\nmover izquierda 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "rico_gemas_5",
+   "name": "Rico · Máquina ráfaga",
+   "script": "disparo toque cada 0.5\ngadget\ndisparar 2\nmover abajo 0.3\nmover arriba 0.3\nparar\ndisparar 1"
+  },
+  {
+   "id": "poco_zona_1",
+   "name": "Poco · Serenata",
+   "script": "disparo toque cada 0.6\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "poco_zona_2",
+   "name": "Poco · Paso y disparo",
+   "script": "disparo toque cada 0.6\nmover derecha 0.4 disparando\nmover izquierda 0.4 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "poco_zona_3",
+   "name": "Poco · Súper zona",
+   "script": "disparo toque cada 0.6\ndisparar 1\nsúper auto\ndisparar 2\nesperar 0.2"
+  },
+  {
+   "id": "poco_zona_4",
+   "name": "Poco · Gadget cura",
+   "script": "disparo toque cada 0.6\ngadget\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "poco_zona_5",
+   "name": "Poco · Avance retirada",
+   "script": "disparo toque cada 0.6\nmover arriba 0.4 disparando\nparar\ndisparar 2\nmover abajo 0.4\nparar"
+  },
+  {
+   "id": "poco_superv_1",
+   "name": "Poco · Ráfaga",
+   "script": "disparo toque cada 0.6\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "poco_superv_2",
+   "name": "Poco · Esquiva",
+   "script": "disparo toque cada 0.6\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 1"
+  },
+  {
+   "id": "poco_superv_3",
+   "name": "Poco · Súper y huida",
+   "script": "disparo toque cada 0.6\nsúper auto\nmover abajo 0.6\nmover arriba 0.6\nparar"
+  },
+  {
+   "id": "poco_superv_4",
+   "name": "Poco · Gadget escudo",
+   "script": "disparo toque cada 0.6\ngadget\ndisparar 2\nmover abajo 0.3\nmover arriba 0.3\nparar"
+  },
+  {
+   "id": "poco_superv_5",
+   "name": "Poco · Diagonal",
+   "script": "disparo toque cada 0.6\nmover arriba-derecha 0.5 disparando\nmover abajo-izquierda 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "shade_balon_1",
+   "name": "Shade · Golpes rápidos",
+   "script": "disparo toque cada 0.4\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "shade_balon_2",
+   "name": "Shade · Embestida",
+   "script": "disparo toque cada 0.4\nmover arriba 0.5 disparando\nparar\ndisparar 2\nmover abajo 0.5\nparar"
+  },
+  {
+   "id": "shade_balon_3",
+   "name": "Shade · Súper golpes",
+   "script": "disparo toque cada 0.4\nsúper auto\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "shade_balon_4",
+   "name": "Shade · Salto susto",
+   "script": "disparo toque cada 0.4\ngadget\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "shade_balon_5",
+   "name": "Shade · Zigzag",
+   "script": "disparo toque cada 0.4\nmover arriba-izquierda 0.4 disparando\nmover abajo-derecha 0.4 disparando\nparar\ndisparar 3"
+  },
+  {
+   "id": "shade_atraco_1",
+   "name": "Shade · Ráfaga corta",
+   "script": "disparo toque cada 0.4\ndisparar 4"
+  },
+  {
+   "id": "shade_atraco_2",
+   "name": "Shade · Acometida",
+   "script": "disparo toque cada 0.4\nmover arriba 0.6 disparando\nparar\ndisparar 2\nmover abajo 0.6\nparar"
+  },
+  {
+   "id": "shade_atraco_3",
+   "name": "Shade · Hiper y súper",
+   "script": "disparo toque cada 0.4\nhiper\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "shade_atraco_4",
+   "name": "Shade · Salto golpes",
+   "script": "disparo toque cada 0.4\ngadget\ndisparar 3\nmover abajo 0.4\nmover arriba 0.4\nparar"
+  },
+  {
+   "id": "shade_atraco_5",
+   "name": "Shade · Barrido lateral",
+   "script": "disparo toque cada 0.4\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 3"
+  },
+  {
+   "id": "primo_balon_1",
+   "name": "El Primo · Puñetazos",
+   "script": "disparo toque cada 0.4\ndisparar 4"
+  },
+  {
+   "id": "primo_balon_2",
+   "name": "El Primo · Embestida",
+   "script": "disparo toque cada 0.4\nmover arriba 0.6 disparando\nparar\ndisparar 3\nmover abajo 0.6\nparar"
+  },
+  {
+   "id": "primo_balon_3",
+   "name": "El Primo · Salto súper",
+   "script": "disparo toque cada 0.4\nsúper auto\ndisparar 4\nesperar 0.2"
+  },
+  {
+   "id": "primo_balon_4",
+   "name": "El Primo · Agarrón",
+   "script": "disparo toque cada 0.4\ngadget\ndisparar 4"
+  },
+  {
+   "id": "primo_balon_5",
+   "name": "El Primo · Zigzag",
+   "script": "disparo toque cada 0.4\nmover arriba-derecha 0.5 disparando\nmover abajo-izquierda 0.5 disparando\nparar\ndisparar 3"
+  },
+  {
+   "id": "primo_noqueo_1",
+   "name": "El Primo · Golpes",
+   "script": "disparo toque cada 0.4\ndisparar 5"
+  },
+  {
+   "id": "primo_noqueo_2",
+   "name": "El Primo · Cargar y volver",
+   "script": "disparo toque cada 0.4\nmover arriba 0.7 disparando\nparar\ndisparar 3\nmover abajo 0.7\nparar"
+  },
+  {
+   "id": "primo_noqueo_3",
+   "name": "El Primo · Súper golpes",
+   "script": "disparo toque cada 0.4\nsúper auto\ndisparar 4\nesperar 0.3"
+  },
+  {
+   "id": "primo_noqueo_4",
+   "name": "El Primo · Escudo meteoro",
+   "script": "disparo toque cada 0.4\ngadget\ndisparar 4\nesperar 0.2"
+  },
+  {
+   "id": "primo_noqueo_5",
+   "name": "El Primo · Hiper y súper",
+   "script": "disparo toque cada 0.4\nhiper\nsúper auto\ndisparar 4"
+  },
+  {
+   "id": "cordelius_superv_1",
+   "name": "Cordelius · Doble hongo",
+   "script": "disparo toque cada 0.5\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "cordelius_superv_2",
+   "name": "Cordelius · Esquiva lateral",
+   "script": "disparo toque cada 0.5\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "cordelius_superv_3",
+   "name": "Cordelius · Súper reino",
+   "script": "disparo toque cada 0.5\ndisparar 1\nsúper auto\ndisparar 2\nesperar 0.2"
+  },
+  {
+   "id": "cordelius_superv_4",
+   "name": "Cordelius · Hongo veneno",
+   "script": "disparo toque cada 0.5\ngadget\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "cordelius_superv_5",
+   "name": "Cordelius · Salto disparo",
+   "script": "disparo toque cada 0.5\ngadget\nmover abajo 0.4\nmover arriba 0.4\nparar\ndisparar 3"
+  },
+  {
+   "id": "cordelius_balon_1",
+   "name": "Cordelius · Ráfaga",
+   "script": "disparo toque cada 0.5\ndisparar 4"
+  },
+  {
+   "id": "cordelius_balon_2",
+   "name": "Cordelius · Acecho",
+   "script": "disparo toque cada 0.5\nmover arriba 0.5 disparando\nparar\ndisparar 2\nmover abajo 0.5\nparar"
+  },
+  {
+   "id": "cordelius_balon_3",
+   "name": "Cordelius · Súper duelo",
+   "script": "disparo toque cada 0.5\nsúper auto\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "cordelius_balon_4",
+   "name": "Cordelius · Zigzag",
+   "script": "disparo toque cada 0.5\nmover arriba-izquierda 0.4 disparando\nmover abajo-derecha 0.4 disparando\nparar\ndisparar 3"
+  },
+  {
+   "id": "cordelius_balon_5",
+   "name": "Cordelius · Hiper y súper",
+   "script": "disparo toque cada 0.5\nhiper\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "charlie_atrapagemas_1",
+   "name": "Charlie · Yoyó firme",
+   "script": "# yoyó continuo a distancia, 1,8 s\ndisparo toque cada 0.6\ndisparar 3"
+  },
+  {
+   "id": "charlie_atrapagemas_2",
+   "name": "Charlie · Zigzag",
+   "script": "# esquiva lateral disparando, 1,6 s, vuelve al punto\ndisparo toque cada 0.6\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 1"
+  },
+  {
+   "id": "charlie_atrapagemas_3",
+   "name": "Charlie · Capullo",
+   "script": "# súper al más cercano y remate, 2,1 s\ndisparo toque cada 0.6\ndisparar 1\nsúper auto\ndisparar 2"
+  },
+  {
+   "id": "charlie_atrapagemas_4",
+   "name": "Charlie · Arañas",
+   "script": "# gadget arañas y presión, 2,2 s\ndisparo toque cada 0.6\ngadget\ndisparar 2\nmover arriba-izquierda 0.4\nmover abajo-derecha 0.4\nparar"
+  },
+  {
+   "id": "charlie_atrapagemas_5",
+   "name": "Charlie · Retirada",
+   "script": "# disparar y retroceder, vuelve al punto, 2,6 s\ndisparo toque cada 0.6\ndisparar 1\nmover abajo 0.6 disparando\nparar\nesperar 0.2\ndisparar 1\nmover arriba 0.6\nparar"
+  },
+  {
+   "id": "charlie_cazaestelar_1",
+   "name": "Charlie · Poke largo",
+   "script": "# hostigar a máximo alcance, 2,4 s\ndisparo toque cada 0.6\ndisparar 4"
+  },
+  {
+   "id": "charlie_cazaestelar_2",
+   "name": "Charlie · Paso lateral",
+   "script": "# strafe derecha-izquierda, 1,8 s\ndisparo toque cada 0.6\nmover derecha 0.6 disparando\nmover izquierda 0.6 disparando\nparar\ndisparar 1"
+  },
+  {
+   "id": "charlie_cazaestelar_3",
+   "name": "Charlie · Súper y yoyó",
+   "script": "# súper y yoyó sobre el atrapado, 2,1 s\ndisparo toque cada 0.6\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "charlie_cazaestelar_4",
+   "name": "Charlie · Escudo arañas",
+   "script": "# arañas de señuelo, 2,6 s\ndisparo toque cada 0.6\ngadget\ndisparar 3\nmover abajo 0.3\nmover arriba 0.3\nparar"
+  },
+  {
+   "id": "charlie_cazaestelar_5",
+   "name": "Charlie · Hostigar atrás",
+   "script": "# retrocede disparando y regresa, 2,2 s\ndisparo toque cada 0.6\nmover abajo 0.5 disparando\nparar\ndisparar 2\nmover arriba 0.5 disparando\nparar"
+  },
+  {
+   "id": "starr_nova_balon_1",
+   "name": "Nova · Dash y tajo",
+   "script": "# súper y espada, 2,3 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 4"
+  },
+  {
+   "id": "starr_nova_balon_2",
+   "name": "Nova · Avance cortes",
+   "script": "# avance intencional disparando, 1,6 s\ndisparo toque cada 0.5\nmover arriba 0.6 disparando\nparar\ndisparar 2\nmover abajo 0.60\nparar"
+  },
+  {
+   "id": "starr_nova_balon_3",
+   "name": "Nova · Chispas",
+   "script": "# tres tandas de chispas, 1,5 s\ndisparo toque cada 0.5\ndisparar 3"
+  },
+  {
+   "id": "starr_nova_balon_4",
+   "name": "Nova · Gadget y giro",
+   "script": "# gadget y vaivén, vuelve al punto, 2,0 s\ndisparo toque cada 0.5\ngadget\ndisparar 2\nmover arriba-derecha 0.4\nmover abajo-izquierda 0.4\nparar"
+  },
+  {
+   "id": "starr_nova_balon_5",
+   "name": "Nova · Hiper dash",
+   "script": "# hiper, súper y espada ilimitada, 2,55 s\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 4"
+  },
+  {
+   "id": "starr_nova_noqueo_1",
+   "name": "Nova · Dos oleadas",
+   "script": "# chispas a media distancia, 1,5 s\ndisparo toque cada 0.5\ndisparar 3"
+  },
+  {
+   "id": "starr_nova_noqueo_2",
+   "name": "Nova · Zigzag",
+   "script": "# esquiva lateral, 1,8 s, vuelve al punto\ndisparo toque cada 0.5\nmover izquierda 0.4 disparando\nmover derecha 0.4 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "starr_nova_noqueo_3",
+   "name": "Nova · Dash y tajo",
+   "script": "# súper y espada, 2,3 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 4"
+  },
+  {
+   "id": "starr_nova_noqueo_4",
+   "name": "Nova · Curar y salir",
+   "script": "# disparos, retroceso y regreso, 2,5 s\ndisparo toque cada 0.5\ndisparar 2\nmover abajo 0.5\nmover arriba 0.5\nparar\ndisparar 1"
+  },
+  {
+   "id": "starr_nova_noqueo_5",
+   "name": "Nova · Gadget teletransporte",
+   "script": "# gadget, reactivar para teletransportar, 2,2 s\ndisparo toque cada 0.5\ngadget\nesperar 0.3\ngadget\ndisparar 3"
+  },
+  {
+   "id": "fang_noqueo_1",
+   "name": "Fang · Patada corta",
+   "script": "# avanza, patea y vuelve, 2,3 s\ndisparo toque cada 0.5\nmover arriba 0.4\nparar\ndisparar 3\nmover abajo 0.4\nparar"
+  },
+  {
+   "id": "fang_noqueo_2",
+   "name": "Fang · Salto",
+   "script": "# súper, patadas y retirada, 2,4 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 3\nmover abajo 0.6\nmover arriba 0.60\nparar"
+  },
+  {
+   "id": "fang_noqueo_3",
+   "name": "Fang · Zigzag",
+   "script": "# esquiva lateral disparando, 1,8 s\ndisparo toque cada 0.5\nmover izquierda 0.4 disparando\nmover derecha 0.4 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "fang_noqueo_4",
+   "name": "Fang · Giro",
+   "script": "# gadget giro y patadas, 1,8 s\ndisparo toque cada 0.5\ngadget\ndisparar 2\nmover arriba 0.3\nmover abajo 0.3\nparar"
+  },
+  {
+   "id": "fang_noqueo_5",
+   "name": "Fang · Hiper kick",
+   "script": "# hiper, súper y salida, 2,05 s\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 2\nmover abajo 0.5\nmover arriba 0.50\nparar"
+  },
+  {
+   "id": "fang_balon_1",
+   "name": "Fang · Empuje",
+   "script": "# avance intencional pateando, 1,8 s\ndisparo toque cada 0.5\nmover arriba 0.8 disparando\nparar\ndisparar 2\nmover abajo 0.80\nparar"
+  },
+  {
+   "id": "fang_balon_2",
+   "name": "Fang · Patada fuerte",
+   "script": "# patadas seguidas, 2,0 s\ndisparo toque cada 0.5\ndisparar 4"
+  },
+  {
+   "id": "fang_balon_3",
+   "name": "Fang · Súper balón",
+   "script": "# súper y patadas, 1,6 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 2\nesperar 0.3"
+  },
+  {
+   "id": "fang_balon_4",
+   "name": "Fang · Palomitas",
+   "script": "# gadget Corn-Fu y vaivén, 2,0 s\ndisparo toque cada 0.5\ngadget\nmover arriba-izquierda 0.4\nmover abajo-derecha 0.4\nparar\ndisparar 2"
+  },
+  {
+   "id": "fang_balon_5",
+   "name": "Fang · Cruce",
+   "script": "# cruce diagonal y vuelta, 2,0 s\ndisparo toque cada 0.5\nmover arriba-derecha 0.5 disparando\nparar\ndisparar 2\nmover abajo-izquierda 0.5\nparar"
+  },
+  {
+   "id": "buzz_supervivencia_1",
+   "name": "Buzz · Silbato",
+   "script": "# acercarse, silbar y volver, 2,6 s\ndisparo toque cada 0.6\nmover arriba 0.4\nparar\ndisparar 3\nmover abajo 0.4\nparar"
+  },
+  {
+   "id": "buzz_supervivencia_2",
+   "name": "Buzz · Torpedo",
+   "script": "# boya y silbido, 2,1 s\ndisparo toque cada 0.6\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "buzz_supervivencia_3",
+   "name": "Buzz · Rodeo",
+   "script": "# esquiva lateral, 2,2 s\ndisparo toque cada 0.6\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "buzz_supervivencia_4",
+   "name": "Buzz · Boya extra",
+   "script": "# Reserve Buoy y súper, 2,3 s\ndisparo toque cada 0.6\ngadget\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "buzz_supervivencia_5",
+   "name": "Buzz · Hiper doble",
+   "script": "# hiper y dos súper, 2,05 s\ndisparo toque cada 0.6\nhiper\nsúper auto\nsúper auto\ndisparar 2"
+  },
+  {
+   "id": "buzz_balon_1",
+   "name": "Buzz · Embestida",
+   "script": "# boya y avance, 2,5 s\ndisparo toque cada 0.6\nsúper auto\nmover arriba 0.4 disparando\nparar\ndisparar 3\nmover abajo 0.40\nparar"
+  },
+  {
+   "id": "buzz_balon_2",
+   "name": "Buzz · Silbidos",
+   "script": "# silbidos seguidos, 1,8 s\ndisparo toque cada 0.6\ndisparar 3"
+  },
+  {
+   "id": "buzz_balon_3",
+   "name": "Buzz · Cerca y lejos",
+   "script": "# entra y sale, vuelve al punto, 2,2 s\ndisparo toque cada 0.6\nmover arriba 0.5 disparando\nparar\ndisparar 2\nmover abajo 0.5\nparar"
+  },
+  {
+   "id": "buzz_balon_4",
+   "name": "Buzz · Boya aturde",
+   "script": "# gadget, súper, silbido, 1,7 s\ndisparo toque cada 0.6\ngadget\nsúper auto\ndisparar 2"
+  },
+  {
+   "id": "buzz_balon_5",
+   "name": "Buzz · Hiper pared",
+   "script": "# hiper y doble boya, 2,35 s\ndisparo toque cada 0.6\nhiper\nsúper auto\nmover arriba 0.3\nparar\nsúper auto\ndisparar 2\nmover abajo 0.30\nparar"
+  },
+  {
+   "id": "larry_balon_1",
+   "name": "Larry · Bombardeo",
+   "script": "# tickets de largo alcance, 2,4 s\ndisparo toque cada 0.8\ndisparar 3"
+  },
+  {
+   "id": "larry_balon_2",
+   "name": "Larry · Gemelo",
+   "script": "# invoca a Lawrie y dispara, 1,9 s\ndisparo toque cada 0.8\nsúper auto\ndisparar 2"
+  },
+  {
+   "id": "larry_balon_3",
+   "name": "Larry · Cambio",
+   "script": "# gadget y vaivén, 2,6 s\ndisparo toque cada 0.8\ngadget\ndisparar 2\nmover izquierda 0.4\nmover derecha 0.4\nparar"
+  },
+  {
+   "id": "larry_balon_4",
+   "name": "Larry · Paso atrás",
+   "script": "# tiro y repliegue, vuelve al punto, 2,6 s\ndisparo toque cada 0.8\ndisparar 1\nmover abajo 0.5\nparar\ndisparar 1\nmover arriba 0.5\nparar"
+  },
+  {
+   "id": "larry_balon_5",
+   "name": "Larry · Doble Lawrie",
+   "script": "# hiper, súper y tickets, 2,15 s\ndisparo toque cada 0.8\nhiper\nsúper auto\ndisparar 2"
+  },
+  {
+   "id": "larry_zona_1",
+   "name": "Larry · Cobertura",
+   "script": "# artillería continua, 2,4 s\ndisparo toque cada 0.8\ndisparar 3"
+  },
+  {
+   "id": "larry_zona_2",
+   "name": "Larry · Guardia",
+   "script": "# Lawrie y tickets, 2,4 s\ndisparo toque cada 0.8\nsúper auto\nesperar 0.5\ndisparar 2"
+  },
+  {
+   "id": "larry_zona_3",
+   "name": "Larry · Lateral",
+   "script": "# strafe corto, 1,8 s\ndisparo toque cada 0.8\nmover derecha 0.5 disparando\nmover izquierda 0.5 disparando\nparar\ndisparar 1"
+  },
+  {
+   "id": "larry_zona_4",
+   "name": "Larry · Relevo",
+   "script": "# gadget y tickets, 2,0 s\ndisparo toque cada 0.8\ngadget\ndisparar 2\nesperar 0.2"
+  },
+  {
+   "id": "larry_zona_5",
+   "name": "Larry · Hiper zona",
+   "script": "# hiper, súper y vaivén, 2,15 s\ndisparo toque cada 0.8\nhiper\nsúper auto\ndisparar 1\nmover abajo 0.4\nmover arriba 0.4\nparar"
+  },
+  {
+   "id": "jessie_atraco_1",
+   "name": "Jessie · Orbe firme",
+   "script": "# tres orbes seguidos y pausa corta\ndisparo toque cada 0.5\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "jessie_atraco_2",
+   "name": "Jessie · Torreta avance",
+   "script": "# avanza, deja la torreta al frente, dispara y retrocede\ndisparo toque cada 0.5\nmover arriba 0.3\nparar\nsúper apuntado arriba\ndisparar 2\nmover abajo 0.3\nparar"
+  },
+  {
+   "id": "jessie_atraco_3",
+   "name": "Jessie · Strafe",
+   "script": "# zigzag lateral disparando y vuelve al punto\ndisparo toque cada 0.5\nmover izquierda 0.4 disparando\nmover derecha 0.4 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "jessie_atraco_4",
+   "name": "Jessie · Gadget y orbes",
+   "script": "# gadget sobre la torreta y ráfaga\ndisparo toque cada 0.5\ngadget\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "jessie_atraco_5",
+   "name": "Jessie · Tira y retira",
+   "script": "# dispara, se aparta y vuelve\ndisparo toque cada 0.5\ndisparar 2\nmover abajo 0.5\nparar\ndisparar 1\nmover arriba 0.5\nparar"
+  },
+  {
+   "id": "jessie_zona_1",
+   "name": "Jessie · Ráfaga zona",
+   "script": "# orbes en la zona\ndisparo toque cada 0.5\ndisparar 4"
+  },
+  {
+   "id": "jessie_zona_2",
+   "name": "Jessie · Hiper torreta",
+   "script": "# hiper + torreta + orbes\ndisparo toque cada 0.5\nhiper\nsúper apuntado arriba\ndisparar 3"
+  },
+  {
+   "id": "jessie_zona_3",
+   "name": "Jessie · Onda lenta",
+   "script": "# gadget para ralentizar y rematar\ndisparo toque cada 0.5\ngadget\ndisparar 2\nesperar 0.4"
+  },
+  {
+   "id": "jessie_zona_4",
+   "name": "Jessie · Paso lateral",
+   "script": "# se mueve a los lados dentro de la zona\ndisparo toque cada 0.5\nmover derecha 0.5 disparando\nmover izquierda 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "jessie_zona_5",
+   "name": "Jessie · Torreta y tiro",
+   "script": "# torreta al frente y repliegue breve\ndisparo toque cada 0.5\nsúper apuntado arriba\ndisparar 2\nmover abajo 0.4\nmover arriba 0.4\nparar"
+  },
+  {
+   "id": "emz_balon_1",
+   "name": "Emz · Rocío cercano",
+   "script": "# tres rociadas cortas\ndisparo toque cada 0.5\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "emz_balon_2",
+   "name": "Emz · Nube y avance",
+   "script": "# hiper, súper y presión hacia delante; regresa\ndisparo toque cada 0.5\nhiper\nsúper auto\nmover arriba 0.6 disparando\nparar\ndisparar 2\nmover abajo 0.6\nparar"
+  },
+  {
+   "id": "emz_balon_3",
+   "name": "Emz · Empuje",
+   "script": "# empuja con gadget y remata\ndisparo toque cada 0.5\ngadget\ndisparar 3\nesperar 0.4"
+  },
+  {
+   "id": "emz_balon_4",
+   "name": "Emz · Zigzag",
+   "script": "# zigzag lateral rociando\ndisparo toque cada 0.5\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "emz_balon_5",
+   "name": "Emz · Presión",
+   "script": "# avanza un poco, rocía y regresa\ndisparo toque cada 0.5\nmover arriba 0.4\nparar\ndisparar 3\nmover abajo 0.4\nparar"
+  },
+  {
+   "id": "emz_zona_1",
+   "name": "Emz · Zona fija",
+   "script": "# rocía sin moverse\ndisparo toque cada 0.5\ndisparar 4"
+  },
+  {
+   "id": "emz_zona_2",
+   "name": "Emz · Nube",
+   "script": "# súper y rociadas\ndisparo toque cada 0.5\nsúper auto\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "emz_zona_3",
+   "name": "Emz · Gadget y paso",
+   "script": "# gadget, rocío y paso lateral que vuelve\ndisparo toque cada 0.5\ngadget\ndisparar 2\nmover derecha 0.4\nmover izquierda 0.4\nparar"
+  },
+  {
+   "id": "emz_zona_4",
+   "name": "Emz · Hiper nube",
+   "script": "# hiper, súper y ráfaga\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "emz_zona_5",
+   "name": "Emz · Barrido",
+   "script": "# barre izquierda-derecha rociando\ndisparo toque cada 0.5\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "wendy_duo_1",
+   "name": "Wendy · Soplido",
+   "script": "# tres ráfagas con escudo propio\ndisparo toque cada 0.5\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "wendy_duo_2",
+   "name": "Wendy · Turbina",
+   "script": "# turbina y ráfagas\ndisparo toque cada 0.5\nsúper auto\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "wendy_duo_3",
+   "name": "Wendy · Granada",
+   "script": "# gadget y ráfaga de rematar\ndisparo toque cada 0.5\ngadget\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "wendy_duo_4",
+   "name": "Wendy · Tira y retira",
+   "script": "# dispara, retrocede, dispara y regresa\ndisparo toque cada 0.5\ndisparar 2\nmover abajo 0.6\nparar\ndisparar 1\nmover arriba 0.6\nparar"
+  },
+  {
+   "id": "wendy_duo_5",
+   "name": "Wendy · Hiper turbina",
+   "script": "# hiper, turbina reforzada y ráfaga\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 2\nesperar 0.3"
+  },
+  {
+   "id": "wendy_zona_1",
+   "name": "Wendy · Ráfaga zona",
+   "script": "# ráfagas desde la zona\ndisparo toque cada 0.5\ndisparar 4"
+  },
+  {
+   "id": "wendy_zona_2",
+   "name": "Wendy · Turbina zona",
+   "script": "# súper y ráfagas\ndisparo toque cada 0.5\nsúper auto\ndisparar 3\nesperar 0.3"
+  },
+  {
+   "id": "wendy_zona_3",
+   "name": "Wendy · Hiper",
+   "script": "# hiper, súper y ráfaga\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "wendy_zona_4",
+   "name": "Wendy · Granada",
+   "script": "# gadget, ráfaga y paso lateral\ndisparo toque cada 0.5\ngadget\ndisparar 2\nmover derecha 0.4\nmover izquierda 0.4\nparar"
+  },
+  {
+   "id": "wendy_zona_5",
+   "name": "Wendy · Paso lateral",
+   "script": "# se mueve a los lados disparando\ndisparo toque cada 0.5\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "nita_zona_1",
+   "name": "Nita · Oso al frente",
+   "script": "# oso adelante y ráfaga\ndisparo toque cada 0.5\nsúper apuntado arriba\ndisparar 3"
+  },
+  {
+   "id": "nita_zona_2",
+   "name": "Nita · Zarpazo",
+   "script": "# gadget del oso y ráfaga\ndisparo toque cada 0.5\ngadget\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "nita_zona_3",
+   "name": "Nita · Avance corto",
+   "script": "# avanza disparando y regresa\ndisparo toque cada 0.5\nmover arriba 0.4 disparando\nparar\ndisparar 2\nmover abajo 0.4\nparar"
+  },
+  {
+   "id": "nita_zona_4",
+   "name": "Nita · Hiper oso",
+   "script": "# hiper y oso grande, ráfaga\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "nita_zona_5",
+   "name": "Nita · Zigzag",
+   "script": "# zigzag lateral\ndisparo toque cada 0.5\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\nparar\ndisparar 2"
+  },
+  {
+   "id": "nita_atraco_1",
+   "name": "Nita · Oso a la caja",
+   "script": "# oso hacia delante y ráfaga\ndisparo toque cada 0.5\nsúper apuntado arriba\ndisparar 3"
+  },
+  {
+   "id": "nita_atraco_2",
+   "name": "Nita · Empuje",
+   "script": "# avanza disparando y regresa\ndisparo toque cada 0.5\nmover arriba 0.6 disparando\nparar\ndisparar 2\nmover abajo 0.6\nparar"
+  },
+  {
+   "id": "nita_atraco_3",
+   "name": "Nita · Aturdir",
+   "script": "# aturde con el oso y dispara\ndisparo toque cada 0.5\ngadget\ndisparar 3\nesperar 0.2"
+  },
+  {
+   "id": "nita_atraco_4",
+   "name": "Nita · Hiper oso",
+   "script": "# hiper y oso grande\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 3"
+  },
+  {
+   "id": "nita_atraco_5",
+   "name": "Nita · Tira y retira",
+   "script": "# dispara, retrocede, dispara y regresa\ndisparo apuntado cada 0.6 arriba\ndisparar 2 apuntado arriba\nmover abajo 0.4\nparar\ndisparar 1 apuntado arriba\nmover arriba 0.4\nparar"
+  }
+ ],
+ "sets": [
+  {
+   "id": "rico_balon_brawl",
+   "brawler": "Rico",
+   "mode": "Balón Brawl",
+   "slots": [
+    "rico_balon_1",
+    "rico_balon_2",
+    "rico_balon_3",
+    "rico_balon_4",
+    "rico_balon_5"
+   ]
+  },
+  {
+   "id": "rico_atrapagemas",
+   "brawler": "Rico",
+   "mode": "Atrapagemas",
+   "slots": [
+    "rico_gemas_1",
+    "rico_gemas_2",
+    "rico_gemas_3",
+    "rico_gemas_4",
+    "rico_gemas_5"
+   ]
+  },
+  {
+   "id": "poco_zona_restringida",
+   "brawler": "Poco",
+   "mode": "Zona restringida",
+   "slots": [
+    "poco_zona_1",
+    "poco_zona_2",
+    "poco_zona_3",
+    "poco_zona_4",
+    "poco_zona_5"
+   ]
+  },
+  {
+   "id": "poco_supervivencia",
+   "brawler": "Poco",
+   "mode": "Supervivencia",
+   "slots": [
+    "poco_superv_1",
+    "poco_superv_2",
+    "poco_superv_3",
+    "poco_superv_4",
+    "poco_superv_5"
+   ]
+  },
+  {
+   "id": "shade_balon_brawl",
+   "brawler": "Shade",
+   "mode": "Balón Brawl",
+   "slots": [
+    "shade_balon_1",
+    "shade_balon_2",
+    "shade_balon_3",
+    "shade_balon_4",
+    "shade_balon_5"
+   ]
+  },
+  {
+   "id": "shade_atraco",
+   "brawler": "Shade",
+   "mode": "Atraco",
+   "slots": [
+    "shade_atraco_1",
+    "shade_atraco_2",
+    "shade_atraco_3",
+    "shade_atraco_4",
+    "shade_atraco_5"
+   ]
+  },
+  {
+   "id": "el_primo_balon_brawl",
+   "brawler": "El Primo",
+   "mode": "Balón Brawl",
+   "slots": [
+    "primo_balon_1",
+    "primo_balon_2",
+    "primo_balon_3",
+    "primo_balon_4",
+    "primo_balon_5"
+   ]
+  },
+  {
+   "id": "el_primo_noqueo",
+   "brawler": "El Primo",
+   "mode": "Noqueo",
+   "slots": [
+    "primo_noqueo_1",
+    "primo_noqueo_2",
+    "primo_noqueo_3",
+    "primo_noqueo_4",
+    "primo_noqueo_5"
+   ]
+  },
+  {
+   "id": "cordelius_supervivencia",
+   "brawler": "Cordelius",
+   "mode": "Supervivencia",
+   "slots": [
+    "cordelius_superv_1",
+    "cordelius_superv_2",
+    "cordelius_superv_3",
+    "cordelius_superv_4",
+    "cordelius_superv_5"
+   ]
+  },
+  {
+   "id": "cordelius_balon_brawl",
+   "brawler": "Cordelius",
+   "mode": "Balón Brawl",
+   "slots": [
+    "cordelius_balon_1",
+    "cordelius_balon_2",
+    "cordelius_balon_3",
+    "cordelius_balon_4",
+    "cordelius_balon_5"
+   ]
+  },
+  {
+   "id": "charlie_atrapagemas",
+   "brawler": "Charlie",
+   "mode": "Atrapagemas",
+   "slots": [
+    "charlie_atrapagemas_1",
+    "charlie_atrapagemas_2",
+    "charlie_atrapagemas_3",
+    "charlie_atrapagemas_4",
+    "charlie_atrapagemas_5"
+   ]
+  },
+  {
+   "id": "charlie_caza_estelar",
+   "brawler": "Charlie",
+   "mode": "Caza estelar",
+   "slots": [
+    "charlie_cazaestelar_1",
+    "charlie_cazaestelar_2",
+    "charlie_cazaestelar_3",
+    "charlie_cazaestelar_4",
+    "charlie_cazaestelar_5"
+   ]
+  },
+  {
+   "id": "starr_nova_balon_brawl",
+   "brawler": "Starr Nova",
+   "mode": "Balón Brawl",
+   "slots": [
+    "starr_nova_balon_1",
+    "starr_nova_balon_2",
+    "starr_nova_balon_3",
+    "starr_nova_balon_4",
+    "starr_nova_balon_5"
+   ]
+  },
+  {
+   "id": "starr_nova_noqueo",
+   "brawler": "Starr Nova",
+   "mode": "Noqueo",
+   "slots": [
+    "starr_nova_noqueo_1",
+    "starr_nova_noqueo_2",
+    "starr_nova_noqueo_3",
+    "starr_nova_noqueo_4",
+    "starr_nova_noqueo_5"
+   ]
+  },
+  {
+   "id": "fang_noqueo",
+   "brawler": "Fang",
+   "mode": "Noqueo",
+   "slots": [
+    "fang_noqueo_1",
+    "fang_noqueo_2",
+    "fang_noqueo_3",
+    "fang_noqueo_4",
+    "fang_noqueo_5"
+   ]
+  },
+  {
+   "id": "fang_balon_brawl",
+   "brawler": "Fang",
+   "mode": "Balón Brawl",
+   "slots": [
+    "fang_balon_1",
+    "fang_balon_2",
+    "fang_balon_3",
+    "fang_balon_4",
+    "fang_balon_5"
+   ]
+  },
+  {
+   "id": "buzz_supervivencia",
+   "brawler": "Buzz",
+   "mode": "Supervivencia",
+   "slots": [
+    "buzz_supervivencia_1",
+    "buzz_supervivencia_2",
+    "buzz_supervivencia_3",
+    "buzz_supervivencia_4",
+    "buzz_supervivencia_5"
+   ]
+  },
+  {
+   "id": "buzz_balon_brawl",
+   "brawler": "Buzz",
+   "mode": "Balón Brawl",
+   "slots": [
+    "buzz_balon_1",
+    "buzz_balon_2",
+    "buzz_balon_3",
+    "buzz_balon_4",
+    "buzz_balon_5"
+   ]
+  },
+  {
+   "id": "larry___lawrie_balon_brawl",
+   "brawler": "Larry & Lawrie",
+   "mode": "Balón Brawl",
+   "slots": [
+    "larry_balon_1",
+    "larry_balon_2",
+    "larry_balon_3",
+    "larry_balon_4",
+    "larry_balon_5"
+   ]
+  },
+  {
+   "id": "larry___lawrie_zona_restringida",
+   "brawler": "Larry & Lawrie",
+   "mode": "Zona restringida",
+   "slots": [
+    "larry_zona_1",
+    "larry_zona_2",
+    "larry_zona_3",
+    "larry_zona_4",
+    "larry_zona_5"
+   ]
+  },
+  {
+   "id": "jessie_atraco",
+   "brawler": "Jessie",
+   "mode": "Atraco",
+   "slots": [
+    "jessie_atraco_1",
+    "jessie_atraco_2",
+    "jessie_atraco_3",
+    "jessie_atraco_4",
+    "jessie_atraco_5"
+   ]
+  },
+  {
+   "id": "jessie_zona_restringida",
+   "brawler": "Jessie",
+   "mode": "Zona restringida",
+   "slots": [
+    "jessie_zona_1",
+    "jessie_zona_2",
+    "jessie_zona_3",
+    "jessie_zona_4",
+    "jessie_zona_5"
+   ]
+  },
+  {
+   "id": "emz_balon_brawl",
+   "brawler": "Emz",
+   "mode": "Balón Brawl",
+   "slots": [
+    "emz_balon_1",
+    "emz_balon_2",
+    "emz_balon_3",
+    "emz_balon_4",
+    "emz_balon_5"
+   ]
+  },
+  {
+   "id": "emz_zona_restringida",
+   "brawler": "Emz",
+   "mode": "Zona restringida",
+   "slots": [
+    "emz_zona_1",
+    "emz_zona_2",
+    "emz_zona_3",
+    "emz_zona_4",
+    "emz_zona_5"
+   ]
+  },
+  {
+   "id": "wendy_supervivencia_duo",
+   "brawler": "Wendy",
+   "mode": "Supervivencia dúo",
+   "slots": [
+    "wendy_duo_1",
+    "wendy_duo_2",
+    "wendy_duo_3",
+    "wendy_duo_4",
+    "wendy_duo_5"
+   ]
+  },
+  {
+   "id": "wendy_zona_restringida",
+   "brawler": "Wendy",
+   "mode": "Zona restringida",
+   "slots": [
+    "wendy_zona_1",
+    "wendy_zona_2",
+    "wendy_zona_3",
+    "wendy_zona_4",
+    "wendy_zona_5"
+   ]
+  },
+  {
+   "id": "nita_zona_restringida",
+   "brawler": "Nita",
+   "mode": "Zona restringida",
+   "slots": [
+    "nita_zona_1",
+    "nita_zona_2",
+    "nita_zona_3",
+    "nita_zona_4",
+    "nita_zona_5"
+   ]
+  },
+  {
+   "id": "nita_atraco",
+   "brawler": "Nita",
+   "mode": "Atraco",
+   "slots": [
+    "nita_atraco_1",
+    "nita_atraco_2",
+    "nita_atraco_3",
+    "nita_atraco_4",
+    "nita_atraco_5"
+   ]
+  }
+ ]
+}

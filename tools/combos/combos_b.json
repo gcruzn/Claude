@@ -1,0 +1,82 @@
+{"brawlers":[
+{"nombre":"Charlie","ficha":"Controladora mítica. Ataque: yoyó de alcance 9 tiles (largo), 1 sola munición que se recarga cuando el yoyó vuelve; cadencia 0,5 s; daño en ida y vuelta; el toque auto-apuntado es más fiable que apuntado (wiki). Súper: capullo (alcance 9) que inmoviliza 5 s al enemigo (no puede moverse, curarse ni atacar); suelta gemas en Atrapagemas. Gadgets: Arañas (20 s, 3 arañas) y Personal Space (15 s, capullo propio y cura 50%). Hipercarga Pestilence: el súper invoca 3 arañas aunque falle. Fuente: https://brawlstars.fandom.com/wiki/Charlie. Modos elegidos: SeeMeta no lista Caza estelar en su panel (solo Basket Brawl 60,5%, Gem Grab 51,0%, Brawl Hockey 53,4%); Caza estelar 50,6% viene de un snippet de búsqueda de SeeMeta (sept 2026), NO verificado en la página.","modos":[
+{"modo":"Atrapagemas","winrate":"51,0% panel Charlie, SeeMeta (51,8% en snippet de sept) (https://seemeta.com/en/brawl-stars/brawlers/charlie)","combos":"Inferido de la wiki (no se leyó guía Sportskeeda/Noff.gg): súper al portador de gemas para que las suelte, luego yoyó mientras está atrapado; Arañas para sacar enemigos de arbustos; Personal Space como cura; hiper antes del súper para soltar arañas. Orden típico: hiper > súper > yoyó x2 > gadget.","patrones":[
+{"id":"charlie_atrapagemas_1","nombre":"Charlie · Yoyó firme","script":"# yoyó continuo a distancia, 1,8 s\ndisparo toque cada 0.6\ndisparar 3"},
+{"id":"charlie_atrapagemas_2","nombre":"Charlie · Zigzag","script":"# esquiva lateral disparando, 1,6 s, vuelve al punto\ndisparo toque cada 0.6\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\ndisparar 1"},
+{"id":"charlie_atrapagemas_3","nombre":"Charlie · Capullo","script":"# súper al más cercano y remate, 2,1 s\ndisparo toque cada 0.6\ndisparar 1\nsúper auto\ndisparar 2"},
+{"id":"charlie_atrapagemas_4","nombre":"Charlie · Arañas","script":"# gadget arañas y presión, 2,2 s\ndisparo toque cada 0.6\ngadget\ndisparar 2\nmover arriba-izquierda 0.4\nmover abajo-derecha 0.4"},
+{"id":"charlie_atrapagemas_5","nombre":"Charlie · Retirada","script":"# disparar y retroceder, vuelve al punto, 2,6 s\ndisparo toque cada 0.6\ndisparar 1\nmover abajo 0.6 disparando\nesperar 0.2\ndisparar 1\nmover arriba 0.6"}
+]},
+{"modo":"Caza estelar","winrate":"50,6% (snippet de búsqueda SeeMeta sept 2026, no verificado en página; https://seemeta.com/en/brawl-stars/brawlers/charlie)","combos":"Inferido de la wiki: poke a 9 tiles con el yoyó, súper para anular una carga enemiga o aislar a un objetivo, Arañas para tanquear disparos de un solo objetivo. Orden: yoyó x2 > súper > yoyó > gadget.","patrones":[
+{"id":"charlie_cazaestelar_1","nombre":"Charlie · Poke largo","script":"# hostigar a máximo alcance, 2,4 s\ndisparo toque cada 0.6\ndisparar 4"},
+{"id":"charlie_cazaestelar_2","nombre":"Charlie · Paso lateral","script":"# strafe derecha-izquierda, 1,8 s\ndisparo toque cada 0.6\nmover derecha 0.6 disparando\nmover izquierda 0.6 disparando\ndisparar 1"},
+{"id":"charlie_cazaestelar_3","nombre":"Charlie · Súper y yoyó","script":"# súper y yoyó sobre el atrapado, 2,1 s\ndisparo toque cada 0.6\nsúper auto\ndisparar 3"},
+{"id":"charlie_cazaestelar_4","nombre":"Charlie · Escudo arañas","script":"# arañas de señuelo, 2,6 s\ndisparo toque cada 0.6\ngadget\ndisparar 3\nmover abajo 0.3\nmover arriba 0.3"},
+{"id":"charlie_cazaestelar_5","nombre":"Charlie · Hostigar atrás","script":"# retrocede disparando y regresa, 2,2 s\ndisparo toque cada 0.6\nmover abajo 0.5 disparando\ndisparar 2\nmover arriba 0.5 disparando"}
+]}
+]},
+{"nombre":"Starr Nova","ficha":"Asesina mítica, 3700 HP base, velocidad muy rápida. Ataque: 2 chispas perforantes, alcance 5,67 tiles, recarga 1,6 s, muy anchas; toque auto sirve. Súper: dash (4,33 tiles) que transforma 7 s; forma espada: arco 135 grados, alcance 3,67, cadencia 0,7 s, cura 30% del daño; se vuelve a usar para renovar. Gadgets: Floaty Time (20 s, cristal que permite volar sobre obstáculos) y Shining Starr of Friendship and Justice (20 s, proyectil que daña/cura y reactivar teletransporta). Hiper: invulnerable durante el dash y munición casi ilimitada en espada. Fuente: https://brawlstars.fandom.com/wiki/Starr_Nova. NO VERIFICADO: SeeMeta muestra variantes (Brawl Ball 5v5, Wipeout) no idénticas a Balón Brawl 3v3 y Noqueo; no se leyó guía de combos.","modos":[
+{"modo":"Balón Brawl","winrate":"59,1% (variante Brawl Ball 5v5, SeeMeta: https://seemeta.com/en/brawl-stars/brawlers/starr-nova)","combos":"Inferido de la wiki: súper para entrar con velocidad y pasar a espada, que cura y tiene alcance instantáneo; Floaty Time para sobrevolar paredes con el equipo; hiper para dash invulnerable al arco. Orden: gadget/hiper > súper > espada continua.","patrones":[
+{"id":"starr_nova_balon_1","nombre":"Nova · Dash y tajo","script":"# súper y espada, 2,3 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 4"},
+{"id":"starr_nova_balon_2","nombre":"Nova · Avance cortes","script":"# avance intencional disparando, 1,6 s\ndisparo toque cada 0.5\nmover arriba 0.6 disparando\ndisparar 2"},
+{"id":"starr_nova_balon_3","nombre":"Nova · Chispas","script":"# tres tandas de chispas, 1,5 s\ndisparo toque cada 0.5\ndisparar 3"},
+{"id":"starr_nova_balon_4","nombre":"Nova · Gadget y giro","script":"# gadget y vaivén, vuelve al punto, 2,0 s\ndisparo toque cada 0.5\ngadget\ndisparar 2\nmover arriba-derecha 0.4\nmover abajo-izquierda 0.4"},
+{"id":"starr_nova_balon_5","nombre":"Nova · Hiper dash","script":"# hiper, súper y espada ilimitada, 2,55 s\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 4"}
+]},
+{"modo":"Noqueo","winrate":"60,3% (variante Wipeout, SeeMeta; Noqueo exacto no listado: https://seemeta.com/en/brawl-stars/brawlers/starr-nova)","combos":"Inferido de la wiki: chispas para castigar desde 5,67 tiles; súper cuando el enemigo está a menos de 4 tiles para que la espada cure; segunda pulsación del gadget Shining Starr para teletransportarse al proyectil y salir. Orden: chispas > súper > espada x4 > gadget para escapar.","patrones":[
+{"id":"starr_nova_noqueo_1","nombre":"Nova · Dos oleadas","script":"# chispas a media distancia, 1,5 s\ndisparo toque cada 0.5\ndisparar 3"},
+{"id":"starr_nova_noqueo_2","nombre":"Nova · Zigzag","script":"# esquiva lateral, 1,8 s, vuelve al punto\ndisparo toque cada 0.5\nmover izquierda 0.4 disparando\nmover derecha 0.4 disparando\ndisparar 2"},
+{"id":"starr_nova_noqueo_3","nombre":"Nova · Dash y tajo","script":"# súper y espada, 2,3 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 4"},
+{"id":"starr_nova_noqueo_4","nombre":"Nova · Curar y salir","script":"# disparos, retroceso y regreso, 2,5 s\ndisparo toque cada 0.5\ndisparar 2\nmover abajo 0.5\nmover arriba 0.5\ndisparar 1"},
+{"id":"starr_nova_noqueo_5","nombre":"Nova · Gadget teletransporte","script":"# gadget, reactivar para teletransportar, 2,2 s\ndisparo toque cada 0.5\ngadget\nesperar 0.3\ngadget\ndisparar 3"}
+]}
+]},
+{"nombre":"Fang","ficha":"Asesino mítico, 4800 HP base. Ataque: patada de alcance corto (2,67 tiles) y daño alto; si falla vuela el zapato hasta 9,33 tiles con 25% del daño; recarga 1 s; toque auto sirve. Súper: salto de 10 tiles que rebota hasta 4 enemigos en radio 7 tiles. Gadgets: Corn-Fu (15 s, palomitas alrededor) y Roundhouse Kick (15 s, giro que aturde 0,5 s en 2,33 tiles). Hiper Dragon Kick: súper atraviesa paredes y suelta palomitas. Fuente: https://brawlstars.fandom.com/wiki/Fang. NO VERIFICADO: win rate de Balón Brawl (SeeMeta lo omite del panel; solo Brawl Hockey 48,3% como referencia) y combos de guías.","modos":[
+{"modo":"Noqueo","winrate":"48,6% panel SeeMeta, tier B (https://seemeta.com/en/brawl-stars/brawlers/fang)","combos":"Inferido de la wiki: súper para cerrar la distancia y encadenar rebotes, patada a quemarropa, Roundhouse para aturdir si hay varios cerca. Orden: súper > patadas x2-3 > gadget; hiper antes del súper para cruzar paredes.","patrones":[
+{"id":"fang_noqueo_1","nombre":"Fang · Patada corta","script":"# avanza, patea y vuelve, 2,3 s\ndisparo toque cada 0.5\nmover arriba 0.4\ndisparar 3\nmover abajo 0.4"},
+{"id":"fang_noqueo_2","nombre":"Fang · Salto","script":"# súper, patadas y retirada, 2,4 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 3\nmover abajo 0.6"},
+{"id":"fang_noqueo_3","nombre":"Fang · Zigzag","script":"# esquiva lateral disparando, 1,8 s\ndisparo toque cada 0.5\nmover izquierda 0.4 disparando\nmover derecha 0.4 disparando\ndisparar 2"},
+{"id":"fang_noqueo_4","nombre":"Fang · Giro","script":"# gadget giro y patadas, 1,8 s\ndisparo toque cada 0.5\ngadget\ndisparar 2\nmover arriba 0.3\nmover abajo 0.3"},
+{"id":"fang_noqueo_5","nombre":"Fang · Hiper kick","script":"# hiper, súper y salida, 2,05 s\ndisparo toque cada 0.5\nhiper\nsúper auto\ndisparar 2\nmover abajo 0.5"}
+]},
+{"modo":"Balón Brawl","winrate":"no listado; referencia Brawl Hockey 48,3% (https://seemeta.com/en/brawl-stars/brawlers/fang)","combos":"Inferido de la wiki: súper para meterse a la línea rival y patada para empujar el balón (tiene alcance corto); Corn-Fu para despejar el área. Orden: súper > patadas > gadget.","patrones":[
+{"id":"fang_balon_1","nombre":"Fang · Empuje","script":"# avance intencional pateando, 1,8 s\ndisparo toque cada 0.5\nmover arriba 0.8 disparando\ndisparar 2"},
+{"id":"fang_balon_2","nombre":"Fang · Patada fuerte","script":"# patadas seguidas, 2,0 s\ndisparo toque cada 0.5\ndisparar 4"},
+{"id":"fang_balon_3","nombre":"Fang · Súper balón","script":"# súper y patadas, 1,6 s\ndisparo toque cada 0.5\nsúper auto\ndisparar 2\nesperar 0.3"},
+{"id":"fang_balon_4","nombre":"Fang · Palomitas","script":"# gadget Corn-Fu y vaivén, 2,0 s\ndisparo toque cada 0.5\ngadget\nmover arriba-izquierda 0.4\nmover abajo-derecha 0.4\ndisparar 2"},
+{"id":"fang_balon_5","nombre":"Fang · Cruce","script":"# cruce diagonal y vuelta, 2,0 s\ndisparo toque cada 0.5\nmover arriba-derecha 0.5 disparando\ndisparar 2\nmover abajo-izquierda 0.5"}
+]}
+]},
+{"nombre":"Buzz","ficha":"Asesino mítico, 5000 HP base. Ataque: 5 ondas de silbato, alcance 2,67 tiles, recarga 1 s, tarda 0,9 s en descargarse; toque auto sirve. Rasgo: carga el súper al estar a 6 tiles de enemigos. Súper: boya de 10 tiles que se engancha a enemigo/pared y aturde 0,6-1,5 s según distancia. Gadgets: Reserve Buoy (18 s, súper instantáneo sin aturdimiento) y X-Ray-Shades (20 s, ver arbustos 12 s). Hiper Buzzwatch: el súper se recarga al golpear una pared. Fuente: https://brawlstars.fandom.com/wiki/Buzz. SeeMeta: Buzz tier C 46,6%. NO VERIFICADO: Balón Brawl (solo Brawl Hockey 49,5% como referencia) y combos de guías.","modos":[
+{"modo":"Supervivencia","winrate":"40,4% Solo Showdown, tier A dentro de modos de trofeos (https://seemeta.com/en/brawl-stars/brawlers/buzz)","combos":"Inferido de la wiki: esperar a cargar el súper por el rasgo; boya para engancharse y aturdir; silbato a quemarropa; Reserve Buoy para tener otro enganche. Orden: súper > silbato x2-3; con hiper se encadena el segundo súper si se golpea pared.","patrones":[
+{"id":"buzz_supervivencia_1","nombre":"Buzz · Silbato","script":"# acercarse, silbar y volver, 2,6 s\ndisparo toque cada 0.6\nmover arriba 0.4\ndisparar 3\nmover abajo 0.4"},
+{"id":"buzz_supervivencia_2","nombre":"Buzz · Torpedo","script":"# boya y silbido, 2,1 s\ndisparo toque cada 0.6\nsúper auto\ndisparar 3"},
+{"id":"buzz_supervivencia_3","nombre":"Buzz · Rodeo","script":"# esquiva lateral, 2,2 s\ndisparo toque cada 0.6\nmover izquierda 0.5 disparando\nmover derecha 0.5 disparando\ndisparar 2"},
+{"id":"buzz_supervivencia_4","nombre":"Buzz · Boya extra","script":"# Reserve Buoy y súper, 2,3 s\ndisparo toque cada 0.6\ngadget\nsúper auto\ndisparar 3"},
+{"id":"buzz_supervivencia_5","nombre":"Buzz · Hiper doble","script":"# hiper y dos súper, 2,05 s\ndisparo toque cada 0.6\nhiper\nsúper auto\nsúper auto\ndisparar 2"}
+]},
+{"modo":"Balón Brawl","winrate":"no listado; referencia Brawl Hockey 49,5% (https://seemeta.com/en/brawl-stars/brawlers/buzz)","combos":"Inferido de la wiki: súper para engancharse a un rival o al muro cercano y aturdir al portador; silbato en corto. Orden: gadget > súper > silbato.","patrones":[
+{"id":"buzz_balon_1","nombre":"Buzz · Embestida","script":"# boya y avance, 2,5 s\ndisparo toque cada 0.6\nsúper auto\nmover arriba 0.4 disparando\ndisparar 3"},
+{"id":"buzz_balon_2","nombre":"Buzz · Silbidos","script":"# silbidos seguidos, 1,8 s\ndisparo toque cada 0.6\ndisparar 3"},
+{"id":"buzz_balon_3","nombre":"Buzz · Cerca y lejos","script":"# entra y sale, vuelve al punto, 2,2 s\ndisparo toque cada 0.6\nmover arriba 0.5 disparando\ndisparar 2\nmover abajo 0.5"},
+{"id":"buzz_balon_4","nombre":"Buzz · Boya aturde","script":"# gadget, súper, silbido, 1,7 s\ndisparo toque cada 0.6\ngadget\nsúper auto\ndisparar 2"},
+{"id":"buzz_balon_5","nombre":"Buzz · Hiper pared","script":"# hiper y doble boya, 2,35 s\ndisparo toque cada 0.6\nhiper\nsúper auto\nmover arriba 0.3\nsúper auto\ndisparar 2"}
+]}
+]},
+{"nombre":"Larry & Lawrie","ficha":"Artillero épico, 3000 HP base. Ataque: lanza tickets de alcance 7,33 tiles que explotan dos veces (radio 1,5 y 2,67), recarga lenta 2,2 s, proyectil lento; sobre obstáculos; toque auto sirve. Súper: invoca a Lawrie (3300 HP, dispara 2 oleadas de 3 y 5 tapones, alcance 6,67). Gadgets: Order: Swap (12 s, intercambian armas) y Order: Fall Back (17 s, dash cruzado y cura 25%). Hiper The Three-Bot Problem: segundo Lawrie con 2000 HP extra. Fuente: https://brawlstars.fandom.com/wiki/Larry_%26_Lawrie. SeeMeta tier B 50,0% (uso 0,1%). NO VERIFICADO: combos de guías.","modos":[
+{"modo":"Balón Brawl","winrate":"54,5% Brawl Ball (62,4% en 5v5), SeeMeta (https://seemeta.com/en/brawl-stars/brawlers/larry-lawrie)","combos":"Inferido de la wiki: lanzar tickets sobre el muro hacia la defensa rival, Lawrie para presionar y escoltar, Order: Fall Back para reposicionar y curarse. Orden: súper > tickets x2 > gadget; hiper antes del súper para dos Lawries.","patrones":[
+{"id":"larry_balon_1","nombre":"Larry · Bombardeo","script":"# tickets de largo alcance, 2,4 s\ndisparo toque cada 0.8\ndisparar 3"},
+{"id":"larry_balon_2","nombre":"Larry · Gemelo","script":"# invoca a Lawrie y dispara, 1,9 s\ndisparo toque cada 0.8\nsúper auto\ndisparar 2"},
+{"id":"larry_balon_3","nombre":"Larry · Cambio","script":"# gadget y vaivén, 2,6 s\ndisparo toque cada 0.8\ngadget\ndisparar 2\nmover izquierda 0.4\nmover derecha 0.4"},
+{"id":"larry_balon_4","nombre":"Larry · Paso atrás","script":"# tiro y repliegue, vuelve al punto, 2,6 s\ndisparo toque cada 0.8\ndisparar 1\nmover abajo 0.5\ndisparar 1\nmover arriba 0.5"},
+{"id":"larry_balon_5","nombre":"Larry · Doble Lawrie","script":"# hiper, súper y tickets, 2,15 s\ndisparo toque cada 0.8\nhiper\nsúper auto\ndisparar 2"}
+]},
+{"modo":"Zona restringida","winrate":"50,2% Hot Zone, tier B, SeeMeta (https://seemeta.com/en/brawl-stars/brawlers/larry-lawrie)","combos":"Inferido de la wiki (que recomienda Hot Zone y Gem Grab por el control de área): tickets sobre la zona, Lawrie como guardia, Swap para refrescar munición de Lawrie. Orden: súper > tickets x2 > gadget.","patrones":[
+{"id":"larry_zona_1","nombre":"Larry · Cobertura","script":"# artillería continua, 2,4 s\ndisparo toque cada 0.8\ndisparar 3"},
+{"id":"larry_zona_2","nombre":"Larry · Guardia","script":"# Lawrie y tickets, 2,4 s\ndisparo toque cada 0.8\nsúper auto\nesperar 0.5\ndisparar 2"},
+{"id":"larry_zona_3","nombre":"Larry · Lateral","script":"# strafe corto, 1,8 s\ndisparo toque cada 0.8\nmover derecha 0.5 disparando\nmover izquierda 0.5 disparando\ndisparar 1"},
+{"id":"larry_zona_4","nombre":"Larry · Relevo","script":"# gadget y tickets, 2,0 s\ndisparo toque cada 0.8\ngadget\ndisparar 2\nesperar 0.2"},
+{"id":"larry_zona_5","nombre":"Larry · Hiper zona","script":"# hiper, súper y vaivén, 2,15 s\ndisparo toque cada 0.8\nhiper\nsúper auto\ndisparar 1\nmover abajo 0.4\nmover arriba 0.4"}
+]}
+]}
+]}

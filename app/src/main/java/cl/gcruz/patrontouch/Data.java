@@ -105,7 +105,9 @@ public class Data {
             d.seed();
             d.save();
         }
-        if (d.applySeeds()) d.save();
+        boolean changed = d.applySeeds();
+        for (String f : new String[]{"brawlers1.json"}) changed |= d.applyAssetSeed(ctx, f);
+        if (changed) d.save();
         return d;
     }
 
@@ -458,6 +460,46 @@ public class Data {
         }
         if (!done) b.append(line).append('\n');
         return b.toString().replaceAll("\\n+$", "");
+    }
+
+    /**
+     * Lote en assets/&lt;archivo&gt;: {"lote": id, "patterns": [{id, name, script}], "sets": [{id, brawler,
+     * mode, slots: [ids]}]}. Se aplica una sola vez; solo agrega patrones y sets que falten por id.
+     */
+    boolean applyAssetSeed(Context ctx, String file) {
+        try (java.io.InputStream in = ctx.getAssets().open(file)) {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+            JSONObject o = new JSONObject(out.toString("UTF-8"));
+            String lote = o.getString("lote");
+            if (seeds.contains(lote)) return false;
+            JSONArray ps = o.getJSONArray("patterns");
+            for (int i = 0; i < ps.length(); i++) {
+                JSONObject p = ps.getJSONObject(i);
+                if (pattern(p.getString("id")) == null) addPattern(p.getString("id"), p.getString("name"), p.getString("script"));
+            }
+            JSONArray ss = o.getJSONArray("sets");
+            for (int i = 0; i < ss.length(); i++) {
+                JSONObject s = ss.getJSONObject(i);
+                if (set(s.getString("id")) != null) continue;
+                PadSet set = new PadSet();
+                set.id = s.getString("id");
+                set.brawler = s.getString("brawler");
+                set.mode = s.getString("mode");
+                set.name = set.brawler;
+                JSONArray sl = s.getJSONArray("slots");
+                for (int k = 0; k < sl.length() && k < MAX_SLOTS; k++) set.slots.add(sl.getString(k));
+                sets.add(set);
+            }
+            seeds.add(lote);
+            return true;
+        } catch (java.io.FileNotFoundException e) {
+            return false;
+        } catch (Exception e) {
+            android.util.Log.e("PatronTouch", "lote " + file + ": " + e);
+            return false;
+        }
     }
 
     /** Patrones de un set, en orden de botón (se saltan los que ya no existen). */
