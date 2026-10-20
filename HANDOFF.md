@@ -238,3 +238,13 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
 - **Disparo automático con el joystick en manos de Gonzalo: NO sirve en el S26.** Con su dedo en el
   joystick, 20 toques inyectados (cada 0,5 s) no hicieron daño (muñecos a 1500 todo el rato) y Android
   no reportó cancelación: el juego los ignora. Su movimiento sí siguió normal. Alternativa: BlueStacks.
+- **Aleatorio (v4.5.0–4.5.1):** `mover aleatorio` / `mover opuesto` (el patrón se recompila en cada
+  vuelta). Set «General · Aleatorio», 1 botón «Ráfagas»: 6 tramos al azar, ráfagas de 3 disparos a
+  0,15 s, gadget al inicio, hiper + súper a la mitad (~5,4 s por vuelta). Probado en Terrenos: se mueve
+  en direcciones distintas, conecta ráfagas y sale el súper.
+- **Límite de strokes (v4.5.1):** Android acepta 20 strokes por gesto y lanzar el siguiente cancela el
+  que corre; con 23 toques el joystick se perdía a los 4,6 s. `Player.buildChunks` ahora parte los
+  toques largos en el corte (re-apoyan en el centro y retoman en 60 ms). El log sigue mostrando
+  «cancelado (reemplazado)» justo en el corte, y en el video el brawler sigue moviéndose.
+- **ADB por puerto fijo:** `adb tcpip 5555` + `adb connect 192.168.100.119:5555`; no se cae cuando
+  Samsung apaga la depuración inalámbrica (~30 min). Se pierde al reiniciar el celular.
