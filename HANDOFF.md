@@ -248,3 +248,16 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
   «cancelado (reemplazado)» justo en el corte, y en el video el brawler sigue moviéndose.
 - **ADB por puerto fijo:** `adb tcpip 5555` + `adb connect 192.168.100.119:5555`; no se cae cuando
   Samsung apaga la depuración inalámbrica (~30 min). Se pierde al reiniciar el celular.
+
+### S Pen (v4.6.0 → v4.7.3, 20-oct)
+
+- Observar el lápiz por accesibilidad (setObservedMotionEventSources) le quitó el S Pen al juego en el
+  S26: DESACTIVADO (v4.6.1).
+- **Puente por ADB:** `nohup setsid nc -L -s 127.0.0.1 -p 7787 getevent -l /dev/input/event12 &`
+  (event12 = sec_e-pen). El servicio se conecta al socket: pausa el patrón con el lápiz abajo, guarda
+  la dirección del arrastre y reanuda cuando el lápiz SALE DE RANGO (`BTN_DIGI UP` en el S26; tope
+  1,5 s). Mientras el lápiz flota cerca, Android rechaza los toques inyectados (palma), por eso no se
+  reanuda al levantarlo. Medido: reanuda 0,1–0,15 s después de levantar (antes 1,5 s).
+- Lenguaje: `mover dirigido` (última dirección del lápiz ±45° al azar) y `mover ultima` (exacta).
+  Set Aleatorio: 1 Corta (ráfaga hacia la última dirección + habilidades, ~1,7 s), 2 Ráfagas, 3 Dirigido.
+- El puente y el puerto 5555 se pierden si se cae ADB (Bloqueador automático): relanzar ambos.
