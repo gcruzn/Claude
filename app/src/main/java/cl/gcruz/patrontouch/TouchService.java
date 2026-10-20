@@ -165,7 +165,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 // se reanuda al salir del rango; si no llega ese aviso, a los 1,5 s igual.
                 main.postDelayed(penHoverTimeout, 1500);
             }
-        } else if (code.equals("BTN_TOOL_PEN")) {
+        } else if (code.equals("BTN_TOOL_PEN") || code.equals("BTN_DIGI")) { // en el S26 se llama BTN_DIGI
+            android.util.Log.i(TAG, "lápiz " + (val.equals("DOWN") ? "entra en rango" : "sale de rango"));
             if (val.equals("UP")) {
                 android.util.Log.i(TAG, "lápiz fuera de rango");
                 main.post(() -> {
