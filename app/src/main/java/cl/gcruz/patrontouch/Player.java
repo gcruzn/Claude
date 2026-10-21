@@ -191,6 +191,19 @@ public class Player {
                 }
             }
         }
+        // 20-oct, video de Corta con el dedo real: si el joystick se vuelve a apoyar en el mismo
+        // instante en que sale un disparo, el juego ignora el joystick hasta el tramo siguiente
+        // (~0,5 s quieto). El borde se adelanta para que ningún toque empiece cerca de él.
+        for (boolean moved = true; moved && e - a > 2 * BORDER_GAP_MS; ) {
+            moved = false;
+            for (Pattern.Touch t : pattern.touches) {
+                long td = t.down();
+                if (td > e - BORDER_GAP_MS && td < e + BORDER_GAP_MS && td > a) {
+                    e = td - BORDER_GAP_MS;
+                    moved = true;
+                }
+            }
+        }
         GestureDescription.Builder b = new GestureDescription.Builder();
         int n = 0;
         for (Pattern.Touch t : pattern.touches) {
@@ -215,6 +228,7 @@ public class Player {
     }
 
     private static final long REPRESS_MS = 40;
+    private static final long BORDER_GAP_MS = 120;
 
     /** Continuación de un dedo largo desde sa: apoya en su punto inicial y en REPRESS_MS vuelve a donde iba. */
     static Pattern.Touch repress(Pattern.Touch t, long sa, long se) {
