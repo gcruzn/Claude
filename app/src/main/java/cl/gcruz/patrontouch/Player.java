@@ -44,7 +44,9 @@ public class Player {
      * espera a que acabe el tramo en curso (todo dedo termina en UP).
      */
     /** Largo de cada tramo; ajustable por ADB («tune slice») para medir. */
-    static volatile long SLICE_MS = 600;
+    // 20-oct, medido sin tocar (mover 1,2 s): 600, 300, 200, 150, 100 y 80 ms avanzan lo mismo
+    // (120–150 px); el re-apoyo del joystick no frena. 100 ms: al tocar, suelta en máx. 0,1 s.
+    static volatile long SLICE_MS = 100;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -187,26 +189,17 @@ public class Player {
             return;
         }
         long e = a + SLICE_MS;
+        // Los toques cortos (disparos, súper apuntado: hasta SHORT_TOUCH_MS) no se parten: si cruzan el borde, o empiezan hasta BORDER_GAP_MS
+        // después de él, el tramo se alarga hasta que terminen. 20-oct, video de Corta: si el
+        // joystick se vuelve a apoyar en el mismo instante en que sale un disparo, el juego ignora
+        // el joystick hasta el tramo siguiente.
         for (boolean grew = true; grew; ) {
             grew = false;
             for (Pattern.Touch t : pattern.touches) {
                 long td = t.down(), tu = Math.max(t.up(), td + 1);
-                if (tu - td <= SLICE_MS && td < e && tu > e) {
+                if (tu - td <= SHORT_TOUCH_MS && td < e + BORDER_GAP_MS && tu > e && td >= a) {
                     e = tu;
                     grew = true;
-                }
-            }
-        }
-        // 20-oct, video de Corta con el dedo real: si el joystick se vuelve a apoyar en el mismo
-        // instante en que sale un disparo, el juego ignora el joystick hasta el tramo siguiente
-        // (~0,5 s quieto). El borde se adelanta para que ningún toque empiece cerca de él.
-        for (boolean moved = true; moved && e - a > 2 * BORDER_GAP_MS; ) {
-            moved = false;
-            for (Pattern.Touch t : pattern.touches) {
-                long td = t.down();
-                if (td > e - BORDER_GAP_MS && td < e + BORDER_GAP_MS && td > a) {
-                    e = td - BORDER_GAP_MS;
-                    moved = true;
                 }
             }
         }
@@ -234,7 +227,9 @@ public class Player {
     }
 
     private static final long REPRESS_MS = 40;
-    private static final long BORDER_GAP_MS = 120;
+    private static final long BORDER_GAP_MS = 60;
+    /** Más largo que esto se parte en tramos (el joystick); más corto va entero (toques, apuntados). */
+    private static final long SHORT_TOUCH_MS = 800;
 
     /** Continuación de un dedo largo desde sa: apoya en su punto inicial y en REPRESS_MS vuelve a donde iba. */
     static Pattern.Touch repress(Pattern.Touch t, long sa, long se) {

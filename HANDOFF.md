@@ -287,7 +287,7 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
   «Verifier on 0 : {DeviceId(-1): {1}}»). Desde ahí Android descarta TODO toque inyectado (también
   `adb shell input`) hasta reiniciar el celular. Chequeo rápido: `dumpsys input | grep Verifier`
   debe dar `{}` con el patrón detenido.
-- **v5.0.2:** el reproductor nunca lanza un gesto con otro en curso: tramos de 600 ms (v5.0.3; 300 ms frenaba el avance), cada uno un
+- **v5.0.2:** el reproductor nunca lanza un gesto con otro en curso: tramos de 100 ms (v5.0.8; medido: 80–600 ms avanzan igual), cada uno un
   gesto completo (todo dedo en UP), el siguiente al terminar el anterior; detener espera el tramo en
   curso. El joystick que cruza un borde vuelve a apoyar en el centro y en 40 ms retoma su posición.
   `continueStroke` NO sirve en el S26: Android cancelaba cada continuación (v5.0.0/5.0.1), también
