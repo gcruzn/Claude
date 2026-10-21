@@ -201,10 +201,9 @@ public class Player {
      */
     private static List<Chunk> buildChunks(Pattern p) {
         int maxStrokes = GestureDescription.getMaxStrokeCount();
-        // Gestos de máx. 1,5 s: si Android descarta uno (p. ej. llega justo cuando el dedo real se
-        // levanta), el siguiente entra rápido en vez de perder la vuelta entera (20-oct).
-        long maxDur = Math.min(1500, GestureDescription.getMaxGestureDuration() - 500);
-        long hardMax = GestureDescription.getMaxGestureDuration() - 500;
+        // 20-oct: cortar cada 1,5 s (v4.9.1) dejó al brawler sin moverse y con tiros solo en un tramo
+        // de cada vuelta (medido en Terrenos sin tocar): cada corte vuelve a apoyar el joystick.
+        long maxDur = GestureDescription.getMaxGestureDuration() - 500;
         List<Pattern.Touch> sorted = new ArrayList<>(p.touches);
         sorted.sort((a, b) -> Long.compare(a.down(), b.down()));
 
@@ -214,8 +213,7 @@ public class Player {
             if (cur == null) {
                 cur = newChunk(t.down());
                 out.add(cur);
-            } else if (cur.touches.size() + 1 > maxStrokes || t.down() - cur.start >= maxDur
-                    || t.up() - cur.start > hardMax) {
+            } else if (cur.touches.size() + 1 > maxStrokes || t.up() - cur.start > maxDur) {
                 long cut = t.down();
                 Chunk next = newChunk(cut);
                 for (int i = 0; i < cur.touches.size(); i++) {
