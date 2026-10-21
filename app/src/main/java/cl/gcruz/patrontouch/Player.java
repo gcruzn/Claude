@@ -9,10 +9,7 @@ import android.os.Looper;
 import android.os.SystemClock;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Reproduce un Pattern con dispatchGesture.
@@ -43,13 +40,15 @@ public class Player {
      * patrón y hasta los de adb, hasta reiniciar. Pasaba al lanzar un gesto mientras otro seguía
      * corriendo (Android cancela el anterior): al cortar en bloques, al apoyar el dedo real, al
      * reanudar. Por eso ahora NUNCA se lanza un gesto con otro en curso: la vuelta se reproduce en
-     * tramos de SLICE_MS encadenados con continueStroke (cada tramo sale cuando terminó el anterior)
-     * y detener espera a que acabe el tramo en curso y levanta cada dedo con un UP limpio.
+     * tramos de SLICE_MS, cada uno un gesto completo que sale cuando terminó el anterior, y detener
+     * espera a que acabe el tramo en curso (todo dedo termina en UP).
      */
-    private static final long SLICE_MS = 100;
+    private static final long SLICE_MS = 300;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** Aparte: stop() vacía `handler` y no debe perder el aviso de fin de un gesto en curso. */
+    private final Handler gestureHandler = new Handler(Looper.getMainLooper());
     private final Listener listener;
 
     private Pattern pattern;
@@ -62,10 +61,7 @@ public class Player {
 
     /** Hay un gesto nuestro en curso: no se puede lanzar otro sin cancelarlo. */
     private boolean inFlight;
-    /** Dedos que siguen abajo al final del último tramo (stroke a continuar y punto donde quedó). */
-    private final Map<Pattern.Touch, StrokeDescription> held = new LinkedHashMap<>();
-    private final Map<Pattern.Touch, float[]> heldAt = new HashMap<>();
-    /** Lo que espera a que termine el gesto en curso (levantar dedos, arrancar otra vuelta). */
+    /** Lo que espera a que termine el gesto en curso (arrancar otra vuelta). */
     private final List<Runnable> afterFlight = new ArrayList<>();
     private long slice;       // inicio del tramo en curso, en ms de la vuelta
 
@@ -113,19 +109,17 @@ public class Player {
         stop(null, false);
     }
 
-    private void stop(String reason, boolean announce) {
+    private void stop(String reason, boolean byUser) {
         boolean was = playing;
         playing = false;
         session++;
         handler.removeCallbacksAndMessages(null);
         afterFlight.clear();
-        whenIdle(this::liftHeld);
         if (was || reason != null) listener.onPlayerState(false, reason == null ? "Detenido" : reason);
     }
 
-    /** Los dedos ya se levantan al detener; queda por compatibilidad con Escape. */
+    /** Nada que soltar: cada tramo termina con todos sus dedos arriba. Queda por compatibilidad con Escape. */
     public void releaseNow() {
-        if (!playing) whenIdle(this::liftHeld);
     }
 
     /** Corre r ahora si no hay gesto en curso, o apenas termine el que hay. */
@@ -141,21 +135,6 @@ public class Player {
         for (Runnable r : rs) whenIdle(r);
     }
 
-    /** Levanta (UP) cada dedo que quedó abajo, en el mismo punto donde estaba. */
-    private void liftHeld() {
-        if (held.isEmpty()) return;
-        GestureDescription.Builder b = new GestureDescription.Builder();
-        for (Map.Entry<Pattern.Touch, StrokeDescription> e : held.entrySet()) {
-            float[] at = heldAt.get(e.getKey());
-            Path path = new Path();
-            path.moveTo(c(at[0]), c(at[1]));
-            b.addStroke(e.getValue().continueStroke(path, 0, 1, false));
-        }
-        held.clear();
-        heldAt.clear();
-        send(b.build(), null);
-    }
-
     private void send(GestureDescription g, Runnable onDone) {
         inFlight = true;
         boolean ok = service.dispatchGesture(g, new AccessibilityService.GestureResultCallback() {
@@ -168,16 +147,12 @@ public class Player {
             @Override
             public void onCancelled(GestureDescription d) {
                 android.util.Log.w("PatronTouch", "gesto cancelado por Android");
-                held.clear();
-                heldAt.clear();
                 flightDone();
                 if (playing) stop("Interrumpido (un toque u otra app de accesibilidad cortó el gesto)");
             }
-        }, handler);
+        }, gestureHandler);
         if (!ok) {
             inFlight = false;
-            held.clear();
-            heldAt.clear();
             if (playing) stop("Android rechazó el gesto");
         }
     }
@@ -191,53 +166,70 @@ public class Player {
         sendSlice(s);
     }
 
-    /** Tramo [slice, slice + SLICE_MS) de la vuelta; al terminar sale el siguiente. */
+    /**
+     * Tramo [slice, slice + SLICE_MS) de la vuelta; al terminar sale el siguiente. Cada tramo es un
+     * gesto completo: todo dedo termina en UP. continueStroke no sirvió: Android cancelaba cada
+     * continuación en el S26 (v5.0.0 y v5.0.1). El dedo largo (joystick) que cruza el borde vuelve a
+     * apoyar en su punto inicial y en REPRESS_MS retoma su posición, como al empezar un movimiento;
+     * los toques cortos que cruzan el borde no se parten: el tramo se alarga hasta que terminen.
+     */
     private void sendSlice(final int s) {
         if (!playing || s != session) return;
-        long a = slice, e = a + SLICE_MS;
+        long a = slice;
         if (a >= pattern.duration) {
             endRepetition(s);
             return;
         }
+        long e = a + SLICE_MS;
+        for (boolean grew = true; grew; ) {
+            grew = false;
+            for (Pattern.Touch t : pattern.touches) {
+                long td = t.down(), tu = Math.max(t.up(), td + 1);
+                if (tu - td <= SLICE_MS && td < e && tu > e) {
+                    e = tu;
+                    grew = true;
+                }
+            }
+        }
         GestureDescription.Builder b = new GestureDescription.Builder();
-        Map<Pattern.Touch, StrokeDescription> nextHeld = new LinkedHashMap<>();
-        Map<Pattern.Touch, float[]> nextAt = new HashMap<>();
         int n = 0;
         for (Pattern.Touch t : pattern.touches) {
             long td = t.down(), tu = Math.max(t.up(), td + 1);
             if (tu <= a || td >= e) continue;
             long sa = Math.max(td, a), se = Math.min(tu, e);
-            boolean cont = tu > e;
-            StrokeDescription prev = held.get(t);
-            Pattern.Touch part = sub(t, sa, se);
-            if (prev != null) {
-                // Android solo acepta continuar si el tramo parte EXACTAMENTE (float) donde terminó.
-                float[] h = heldAt.get(t);
-                part.pts.set(0, new Pattern.Point(sa, h[0], h[1]));
-            }
-            long dur = Math.max(1, se - sa);
-            Path path = timedPath(part);
-            StrokeDescription sd = prev != null
-                    ? prev.continueStroke(path, sa - a, dur, cont)
-                    : new StrokeDescription(path, sa - a, dur, cont);
-            b.addStroke(sd);
-            n++;
-            if (cont) {
-                nextHeld.put(t, sd);
-                nextAt.put(t, endPoint(path, dur));
+            Pattern.Touch part = td < a ? repress(t, sa, se) : sub(t, sa, se);
+            try {
+                b.addStroke(new StrokeDescription(timedPath(part), sa - a, Math.max(1, se - sa)));
+                n++;
+            } catch (IllegalArgumentException ignored) {
             }
         }
         slice = e;
-        held.clear();
-        heldAt.clear();
-        held.putAll(nextHeld);
-        heldAt.putAll(nextAt);
+        final long next = e;
         if (n == 0) {
             // Tramo vacío (una espera): se respeta el tiempo sin inyectar nada.
-            handler.postAtTime(() -> sendSlice(s), repStartUptime + e);
+            handler.postAtTime(() -> sendSlice(s), repStartUptime + next);
             return;
         }
         send(b.build(), () -> sendSlice(s));
+    }
+
+    private static final long REPRESS_MS = 40;
+
+    /** Continuación de un dedo largo desde sa: apoya en su punto inicial y en REPRESS_MS vuelve a donde iba. */
+    static Pattern.Touch repress(Pattern.Touch t, long sa, long se) {
+        Pattern.Touch r = new Pattern.Touch();
+        Pattern.Point first = t.pts.get(0);
+        r.pts.add(new Pattern.Point(sa, first.x, first.y));
+        long re = Math.min(sa + REPRESS_MS, se);
+        float[] back = t.at(re);
+        r.pts.add(new Pattern.Point(re, back[0], back[1]));
+        for (Pattern.Point q : t.pts) if (q.t > re && q.t < se) r.pts.add(q);
+        if (se > re) {
+            float[] end = t.at(se);
+            r.pts.add(new Pattern.Point(se, end[0], end[1]));
+        }
+        return r;
     }
 
     private void endRepetition(int s) {
@@ -254,30 +246,7 @@ public class Player {
         }
     }
 
-    /**
-     * Punto donde Android deja el dedo al final del stroke, con su misma aritmética
-     * (StrokeDescription.getPosition: largo/duración × duración sobre PathMeasure). Un punto
-     * calculado de otra forma difiere en decimales y Android cancela la continuación (20-oct).
-     */
-    static float[] endPoint(Path path, long dur) {
-        android.graphics.PathMeasure pm = new android.graphics.PathMeasure(path, false);
-        float len = 0;
-        do {
-            len += pm.getLength();
-        } while (pm.nextContour());
-        float[] pos = new float[2];
-        if (len == 0) {
-            pm.setPath(path, false);
-            pm.getPosTan(0, pos, null);
-            return pos;
-        }
-        float conv = len / dur;
-        pm.setPath(path, false);
-        pm.getPosTan(dur * conv, pos, null);
-        return pos;
-    }
-
-    /** El toque t recortado a [a, e], con extremos interpolados exactos (continueStroke exige continuidad). */
+    /** El toque t recortado a [a, e], con los extremos interpolados. */
     static Pattern.Touch sub(Pattern.Touch t, long a, long e) {
         Pattern.Touch r = new Pattern.Touch();
         float[] p0 = t.at(a), p1 = t.at(e);
