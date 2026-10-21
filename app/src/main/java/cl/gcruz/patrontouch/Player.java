@@ -44,9 +44,10 @@ public class Player {
      * espera a que acabe el tramo en curso (todo dedo termina en UP).
      */
     /** Largo de cada tramo; ajustable por ADB («tune slice») para medir. */
-    // 21-oct: con 100 ms Gonzalo recupera bien el joystick pero nota un «cortito» (en video la
-    // velocidad por cuadro salta 1–4 px vs 5–6 con 600 ms); 150 ms como punto medio.
-    static volatile long SLICE_MS = 150;
+    // 21-oct: tramos cortos (100–150 ms) re-apoyaban el joystick tan seguido que el movimiento
+    // salía a saltos y las formas no servían (Gonzalo). Ahora un tramo = la vuelta entera; soltar
+    // rápido al tocar lo da el corte seguro de stopByUserTouch, no el largo del tramo.
+    static volatile long SLICE_MS = 60_000;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -218,6 +219,28 @@ public class Player {
                 if (tu - td <= SHORT_TOUCH_MS && td < e + BORDER_GAP_MS && tu > e && td >= a) {
                     e = tu;
                     grew = true;
+                }
+            }
+        }
+        // Android admite getMaxStrokeCount() dedos por gesto (20 en el S26): si hay más, el tramo
+        // termina antes del primero que no cabe (el joystick se re-apoya ahí una vez).
+        int max = GestureDescription.getMaxStrokeCount();
+        List<Long> starts = new ArrayList<>();
+        for (Pattern.Touch t : pattern.touches) {
+            long td = t.down(), tu = Math.max(t.up(), td + 1);
+            if (tu > a && td < e) starts.add(Math.max(td, a));
+        }
+        if (starts.size() > max) {
+            java.util.Collections.sort(starts);
+            e = Math.max(a + 1, starts.get(max) - BORDER_GAP_MS);
+            for (boolean moved = true; moved; ) {   // y sin partir un toque corto
+                moved = false;
+                for (Pattern.Touch t : pattern.touches) {
+                    long td = t.down(), tu = Math.max(t.up(), td + 1);
+                    if (tu - td <= SHORT_TOUCH_MS && td < e && tu > e && td > a) {
+                        e = td;
+                        moved = true;
+                    }
                 }
             }
         }
