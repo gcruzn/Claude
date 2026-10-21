@@ -265,7 +265,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
                     main.post(this::penDown);
                 } else {
                     android.util.Log.i(TAG, "dedo levantado");
-                    main.postDelayed(fingerResume, 60);
+                    main.post(fingerResume); // sin espera: el dedo no flota ni rebota como el lápiz
                 }
                 break;
             }

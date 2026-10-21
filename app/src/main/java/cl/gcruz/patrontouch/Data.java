@@ -309,7 +309,34 @@ public class Data {
             seeds.add("corta2");
             changed = true;
         }
-        if (!seeds.contains("dirigido1")) {
+        if (!seeds.contains("agresiva1")) {
+            // 20-oct, pedido de Gonzalo: Corta más agresiva. En la grabación con Nita el primer
+            // disparo salía a 0,1–0,3 s, pero la ráfaga de 3 en 0,3 s gastaba la munición y el resto
+            // del ciclo eran habilidades (el gadget de Nita ni siquiera aplica). Ahora: 1 disparo al
+            // instante y luego 1 cada 0,4 s mientras se mueve; habilidades al final de la vuelta.
+            // Se quitan Ráfagas y Dirigido del set y se borran.
+            PatternDef c = pattern("ale_corta");
+            if (c != null) {
+                c.name = "Aleatorio · Corta";
+                c.script = "# Disparo al instante hacia tu última dirección y luego 1 cada 0,4 s; habilidades al final (~3,6 s)\n"
+                        + "disparo toque cada 0.4\n"
+                        + "mover ultima\ndisparar 3\n"
+                        + "mover dirigido\ndisparar 3\n"
+                        + "mover dirigido\ndisparar 2\n"
+                        + "gadget\nhiper\nsúper auto\nparar";
+            }
+            PadSet s = set("aleatorio");
+            for (String id : new String[]{"ale_rafagas", "ale_dirigido"}) {
+                if (s != null) s.slots.remove(id);
+                boolean used = false;
+                for (PadSet o : sets) if (o.slots.contains(id)) used = true;
+                PatternDef p = pattern(id);
+                if (!used && p != null) patterns.remove(p);
+            }
+            seeds.add("agresiva1");
+            changed = true;
+        }
+        if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
             if (pattern("ale_dirigido") == null) addPattern("ale_dirigido", "Aleatorio · Dirigido",
