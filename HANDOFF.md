@@ -274,3 +274,25 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
 - **v4.7.5:** tocar el botón del patrón con lápiz/dedo lo detiene (antes el puente pausaba primero y
   el toque se leía como «iniciar»).
 - Al reconectar ADB relanzar los DOS puentes (7787 lápiz, 7788 dedo).
+
+### Dedo trabado en Android y reproductor v5 (20-oct)
+
+- **Los números de /dev/input cambian al reiniciar** (tras reiniciar, la pantalla pasó de event7 a
+  event8 y el puente del dedo leía el sensor de luz: la app nunca pausaba). Lanzar los puentes por
+  NOMBRE:
+  `adb shell 'T=$(getevent -pl | grep -B1 "\"sec_touchscreen\"" | head -1 | awk "{print \$4}"); P=$(getevent -pl | grep -B1 "\"sec_e-pen\"" | head -1 | awk "{print \$4}"); nohup setsid nc -L -s 127.0.0.1 -p 7788 getevent -l $T >/dev/null 2>&1 & nohup setsid nc -L -s 127.0.0.1 -p 7787 getevent -l $P >/dev/null 2>&1 &'`
+- **Causa de «se demora / no avanza / no dispara» (v4.9.x):** lanzar un gesto con otro en curso
+  (Android cancela el anterior) dejaba un dedo inyectado apretado en el InputDispatcher
+  (`logcat`: «Invalid DOWN event - pointers already down for device -1»; `dumpsys input`:
+  «Verifier on 0 : {DeviceId(-1): {1}}»). Desde ahí Android descarta TODO toque inyectado (también
+  `adb shell input`) hasta reiniciar el celular. Chequeo rápido: `dumpsys input | grep Verifier`
+  debe dar `{}` con el patrón detenido.
+- **v5.0.2:** el reproductor nunca lanza un gesto con otro en curso: tramos de 300 ms, cada uno un
+  gesto completo (todo dedo en UP), el siguiente al terminar el anterior; detener espera el tramo en
+  curso. El joystick que cruza un borde vuelve a apoyar en el centro y en 40 ms retoma su posición.
+  `continueStroke` NO sirve en el S26: Android cancelaba cada continuación (v5.0.0/5.0.1), también
+  partiendo del punto final exacto. Verificado sin tocar (sin cancelaciones, Verifier `{}`, mueve y
+  dispara) y con el dedo de Gonzalo en «Prueba · Disparo» (9 reanudaciones, 0 inconsistencias).
+- Set **Pruebas** (General): 1 «Prueba · Disparo» (solo 3 tiros), 2 «Prueba · Dirección» (solo
+  mover hacia la última dirección). Para aislar fallas al soltar el dedo.
+- Comando ADB `tune` (resume/hold/ramp) para medir variantes sin recompilar.
