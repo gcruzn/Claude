@@ -44,9 +44,9 @@ public class Player {
      * espera a que acabe el tramo en curso (todo dedo termina en UP).
      */
     /** Largo de cada tramo; ajustable por ADB («tune slice») para medir. */
-    // 20-oct, medido sin tocar (mover 1,2 s): 600, 300, 200, 150, 100 y 80 ms avanzan lo mismo
-    // (120–150 px); el re-apoyo del joystick no frena. 100 ms: al tocar, suelta en máx. 0,1 s.
-    static volatile long SLICE_MS = 100;
+    // 21-oct: con 100 ms Gonzalo recupera bien el joystick pero nota un «cortito» (en video la
+    // velocidad por cuadro salta 1–4 px vs 5–6 con 600 ms); 150 ms como punto medio.
+    static volatile long SLICE_MS = 150;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -189,8 +189,8 @@ public class Player {
             return;
         }
         long e = a + SLICE_MS;
-        // Los toques cortos (disparos, súper apuntado: hasta SHORT_TOUCH_MS) no se parten: si cruzan el borde, o empiezan hasta BORDER_GAP_MS
-        // después de él, el tramo se alarga hasta que terminen. 20-oct, video de Corta: si el
+        // Los toques cortos (disparos, súper apuntado: hasta SHORT_TOUCH_MS) no se parten: si cruzan
+        // el borde, o empiezan hasta BORDER_GAP_MS después de él, el tramo se alarga hasta que terminen. 20-oct, video de Corta: si el
         // joystick se vuelve a apoyar en el mismo instante en que sale un disparo, el juego ignora
         // el joystick hasta el tramo siguiente.
         for (boolean grew = true; grew; ) {
@@ -209,6 +209,11 @@ public class Player {
             long td = t.down(), tu = Math.max(t.up(), td + 1);
             if (tu <= a || td >= e) continue;
             long sa = Math.max(td, a), se = Math.min(tu, e);
+            // El dedo largo (joystick) nunca pasa de a + SLICE_MS aunque el tramo se alargue por un
+            // toque corto: 21-oct, con gadget/híper/súper el tramo se estiraba, el joystick virtual
+            // seguía apretado y el arrastre de Gonzalo a veces no tomaba.
+            if (tu - td > SHORT_TOUCH_MS) se = Math.min(se, a + SLICE_MS);
+            if (se <= sa) continue;
             Pattern.Touch part = td < a ? repress(t, sa, se) : sub(t, sa, se);
             try {
                 b.addStroke(new StrokeDescription(timedPath(part), sa - a, Math.max(1, se - sa)));
