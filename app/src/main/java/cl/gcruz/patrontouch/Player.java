@@ -59,8 +59,8 @@ public class Player {
     private int session;      // invalida callbacks viejos al detener
     private long repStartUptime;
 
-    /** Hay un gesto nuestro en curso: no se puede lanzar otro sin cancelarlo. */
-    private boolean inFlight;
+    /** Gestos nuestros en curso: mientras haya alguno, lanzar otro lo cancela. */
+    private int inFlight;
     /** Lo que espera a que termine el gesto en curso (arrancar otra vuelta). */
     private final List<Runnable> afterFlight = new ArrayList<>();
     private long slice;       // inicio del tramo en curso, en ms de la vuelta
@@ -104,9 +104,21 @@ public class Player {
         stop(reason, true);
     }
 
-    /** Igual que stop: los dedos virtuales siempre se levantan con un UP limpio (ver SLICE_MS). */
+    /**
+     * El dedo o el lápiz real tocó: hay que soltar el joystick YA (esperar el tramo dejaba al juego
+     * atendiendo al dedo virtual hasta 0,6 s y Gonzalo tenía que retomar el control varias veces).
+     * Es el único caso en que se corta un gesto a la mitad: un toque mínimo en la zona invisible
+     * del panel lo reemplaza (como en v4.8.1).
+     */
     public void stopByUserTouch() {
+        boolean cut = inFlight > 0;
         stop(null, false);
+        if (cut) {
+            float[] pt = listener.releasePoint();
+            Path path = new Path();
+            path.moveTo(Math.max(0, pt[0]), Math.max(0, pt[1]));
+            send(new GestureDescription.Builder().addStroke(new StrokeDescription(path, 0, 1)).build(), null);
+        }
     }
 
     private void stop(String reason, boolean byUser) {
@@ -124,19 +136,20 @@ public class Player {
 
     /** Corre r ahora si no hay gesto en curso, o apenas termine el que hay. */
     private void whenIdle(Runnable r) {
-        if (inFlight) afterFlight.add(r);
+        if (inFlight > 0) afterFlight.add(r);
         else r.run();
     }
 
     private void flightDone() {
-        inFlight = false;
+        inFlight = Math.max(0, inFlight - 1);
+        if (inFlight > 0) return;
         List<Runnable> rs = new ArrayList<>(afterFlight);
         afterFlight.clear();
         for (Runnable r : rs) whenIdle(r);
     }
 
     private void send(GestureDescription g, Runnable onDone) {
-        inFlight = true;
+        inFlight++;
         boolean ok = service.dispatchGesture(g, new AccessibilityService.GestureResultCallback() {
             @Override
             public void onCompleted(GestureDescription d) {
@@ -152,7 +165,7 @@ public class Player {
             }
         }, gestureHandler);
         if (!ok) {
-            inFlight = false;
+            inFlight = Math.max(0, inFlight - 1);
             if (playing) stop("Android rechazó el gesto");
         }
     }
