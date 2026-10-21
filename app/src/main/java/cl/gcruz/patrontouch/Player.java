@@ -209,15 +209,22 @@ public class Player {
             long sa = Math.max(td, a), se = Math.min(tu, e);
             boolean cont = tu > e;
             StrokeDescription prev = held.get(t);
-            Path path = timedPath(sub(t, sa, se));
+            Pattern.Touch part = sub(t, sa, se);
+            if (prev != null) {
+                // Android solo acepta continuar si el tramo parte EXACTAMENTE (float) donde terminó.
+                float[] h = heldAt.get(t);
+                part.pts.set(0, new Pattern.Point(sa, h[0], h[1]));
+            }
+            long dur = Math.max(1, se - sa);
+            Path path = timedPath(part);
             StrokeDescription sd = prev != null
-                    ? prev.continueStroke(path, sa - a, Math.max(1, se - sa), cont)
-                    : new StrokeDescription(path, sa - a, Math.max(1, se - sa), cont);
+                    ? prev.continueStroke(path, sa - a, dur, cont)
+                    : new StrokeDescription(path, sa - a, dur, cont);
             b.addStroke(sd);
             n++;
             if (cont) {
                 nextHeld.put(t, sd);
-                nextAt.put(t, t.at(se));
+                nextAt.put(t, endPoint(path, dur));
             }
         }
         slice = e;
@@ -245,6 +252,29 @@ public class Player {
         } else {
             stop("Listo: " + rep + " repeticiones");
         }
+    }
+
+    /**
+     * Punto donde Android deja el dedo al final del stroke, con su misma aritmética
+     * (StrokeDescription.getPosition: largo/duración × duración sobre PathMeasure). Un punto
+     * calculado de otra forma difiere en decimales y Android cancela la continuación (20-oct).
+     */
+    static float[] endPoint(Path path, long dur) {
+        android.graphics.PathMeasure pm = new android.graphics.PathMeasure(path, false);
+        float len = 0;
+        do {
+            len += pm.getLength();
+        } while (pm.nextContour());
+        float[] pos = new float[2];
+        if (len == 0) {
+            pm.setPath(path, false);
+            pm.getPosTan(0, pos, null);
+            return pos;
+        }
+        float conv = len / dur;
+        pm.setPath(path, false);
+        pm.getPosTan(dur * conv, pos, null);
+        return pos;
     }
 
     /** El toque t recortado a [a, e], con extremos interpolados exactos (continueStroke exige continuidad). */
