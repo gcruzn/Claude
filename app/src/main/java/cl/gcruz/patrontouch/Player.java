@@ -64,6 +64,9 @@ public class Player {
 
     /** Gestos nuestros en curso: mientras haya alguno, lanzar otro lo cancela. */
     private int inFlight;
+    /** Toques cortos del tramo en curso ([desde, hasta] en ms del tramo) y cuándo salió. */
+    private List<long[]> sliceShorts = new ArrayList<>();
+    private long sliceSentAt;
     /** Lo que espera a que termine el gesto en curso (arrancar otra vuelta). */
     private final List<Runnable> afterFlight = new ArrayList<>();
     private long slice;       // inicio del tramo en curso, en ms de la vuelta
@@ -108,12 +111,27 @@ public class Player {
     }
 
     /**
-     * Igual que stop. NO se corta el gesto en curso: v5.0.6 lo cortaba al tocar y Android rechazó
-     * la cancelación con el dedo real abajo («Got ACTION_CANCEL, but the pointers don't match»,
-     * 21 eventos en 75 s): el dedo inyectado quedaba apretado. El tramo en curso termina solo.
+     * El dedo o el lápiz real tocó. Cortar el gesto en curso suelta el joystick al instante, que es
+     * lo que permite que el juego tome el dedo de Gonzalo (v4.8.1, v5.0.6: «funciona mejor»). Pero
+     * con el dedo real abajo Android rechazó la cancelación cuando había DOS dedos inyectados
+     * abajo o el joystick no era el dedo 0 («Got ACTION_CANCEL, but the pointers don't match»,
+     * v5.0.6) y el dedo inyectado quedaba trabado hasta reiniciar. Por eso solo se corta si en
+     * este instante no hay ningún toque corto (disparo, habilidad) abajo; si lo hay, el tramo
+     * termina solo (≤ SLICE_MS).
      */
     public void stopByUserTouch() {
+        long now = SystemClock.uptimeMillis() - sliceSentAt;
+        boolean shortDown = false;
+        for (long[] w : sliceShorts) if (now >= w[0] - 15 && now <= w[1] + 15) shortDown = true;
+        boolean cut = inFlight > 0 && !shortDown;
         stop(null, false);
+        if (cut) {
+            float[] pt = listener.releasePoint();
+            Path path = new Path();
+            path.moveTo(Math.max(0, pt[0]), Math.max(0, pt[1]));
+            send(new GestureDescription.Builder().addStroke(new StrokeDescription(path, 0, 1)).build(), null);
+        }
+        android.util.Log.i("PatronTouch", cut ? "corte inmediato (solo joystick abajo)" : "sin corte: espera el tramo");
     }
 
     private void stop(String reason, boolean byUser) {
@@ -205,7 +223,13 @@ public class Player {
         }
         GestureDescription.Builder b = new GestureDescription.Builder();
         int n = 0;
-        for (Pattern.Touch t : pattern.touches) {
+        // El joystick (toque largo) va primero: así es el dedo 0. Cortarlo con solo él abajo es lo
+        // único que Android acepta con el dedo real en pantalla (ver stopByUserTouch).
+        List<Pattern.Touch> order = new ArrayList<>();
+        for (Pattern.Touch t : pattern.touches) if (t.up() - t.down() > SHORT_TOUCH_MS) order.add(t);
+        for (Pattern.Touch t : pattern.touches) if (t.up() - t.down() <= SHORT_TOUCH_MS) order.add(t);
+        List<long[]> shorts = new ArrayList<>();
+        for (Pattern.Touch t : order) {
             long td = t.down(), tu = Math.max(t.up(), td + 1);
             if (tu <= a || td >= e) continue;
             long sa = Math.max(td, a), se = Math.min(tu, e);
@@ -218,9 +242,12 @@ public class Player {
             try {
                 b.addStroke(new StrokeDescription(timedPath(part), sa - a, Math.max(1, se - sa)));
                 n++;
+                if (tu - td <= SHORT_TOUCH_MS) shorts.add(new long[]{sa - a, se - a});
             } catch (IllegalArgumentException ignored) {
             }
         }
+        sliceShorts = shorts;
+        sliceSentAt = SystemClock.uptimeMillis();
         slice = e;
         final long next = e;
         if (n == 0) {
