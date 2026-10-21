@@ -600,7 +600,7 @@ public class Script {
     public static volatile String steerDir = null;
 
     /** Arranque del joystick (ms quieto en el centro y ms hasta el borde); ajustable por ADB «tune». */
-    public static volatile int joyHoldMs = 0, joyRampMs = 60;
+    public static volatile int joyHoldMs = 0, joyRampMs = 20;
 
     /** «mover dirigido»: la última dirección del lápiz o 45° hacia un lado u otro, al azar. Sin dato, al azar. */
     static String steered() {

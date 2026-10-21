@@ -275,7 +275,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     /** Espera entre levantar el dedo y reanudar; ajustable por ADB («tune») para medir variantes. */
-    static volatile int resumeDelayMs = 80;
+    // 20-oct, medido con el dedo en «Prueba · Dirección»: 80 → 0 ms y rampa 60 → 20 ms bajó el
+    // arranque de 0,20 a 0,17 s y la velocidad ya no cae a cero al soltar.
+    static volatile int resumeDelayMs = 0;
+
+    /** Pausa entre vueltas del bucle (antes 120 ms: el brawler se notaba detenerse en cada vuelta). */
+    static final long LOOP_PAUSE_MS = 15;
 
     private final Runnable fingerResume = () -> { if (!fingerDown && !penTouching) penUp(); };
 
@@ -1007,7 +1012,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         activeIdx = RANDOM;
         activeMode = MODE_LOOP;
         android.util.Log.i(TAG, "random en «" + data.active().title() + "» entre " + compiled.size() + " patrones");
-        player.start(compiled.get(last[0]), 0, 120, next);
+        player.start(compiled.get(last[0]), 0, LOOP_PAUSE_MS, next);
     }
 
     /** Compila un patrón con su propio tipo de disparo; null (y aviso) si tiene errores o no toca nada. */
@@ -1039,7 +1044,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         // «mover aleatorio»: cada vuelta se vuelve a compilar para que el recorrido cambie.
         java.util.function.Supplier<Pattern> next = Script.isRandom(Script.parse(script).steps)
                 ? () -> compileDef(name, script, false) : null;
-        player.start(p, reps, mode == MODE_LOOP ? 120 : 0, next);
+        player.start(p, reps, mode == MODE_LOOP ? LOOP_PAUSE_MS : 0, next);
     }
 
     private TextView buttonFor(int idx) {

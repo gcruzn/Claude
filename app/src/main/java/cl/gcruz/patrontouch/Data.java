@@ -359,6 +359,26 @@ public class Data {
             seeds.add("pruebas1");
             changed = true;
         }
+        if (!seeds.contains("pruebas2")) {
+            // 20-oct: Corta como botón 3 de Pruebas, para probarla sin cambiar de set. Medido en video:
+            // al soltar el dedo ya no hay corte; el que se sentía era el «parar» y la espera al final
+            // de cada vuelta. Dirección y Corta ya no sueltan el joystick entre vueltas.
+            PatternDef m = pattern("prueba_mover");
+            if (m != null) m.script = "# Solo se mueve hacia tu última dirección, sin disparar ni soltar el joystick\n"
+                    + "mover ultima 2";
+            PatternDef c = pattern("ale_corta");
+            if (c != null) c.script = "# Disparo al instante hacia tu última dirección y luego 1 cada 0,4 s; habilidades al final (~3,6 s)\n"
+                    + "disparo toque cada 0.4\n"
+                    + "mover ultima\ndisparar 3\n"
+                    + "mover dirigido\ndisparar 3\n"
+                    + "mover dirigido\ndisparar 2\n"
+                    + "gadget\nhiper\nsúper auto";
+            PadSet s = set("pruebas");
+            if (s != null && pattern("ale_corta") != null && !s.slots.contains("ale_corta")
+                    && s.slots.size() < MAX_SLOTS) s.slots.add("ale_corta");
+            seeds.add("pruebas2");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
