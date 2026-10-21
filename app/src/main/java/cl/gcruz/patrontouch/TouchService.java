@@ -339,30 +339,37 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (penTouching) return;
         if (penResume != null && !player.isPlaying()) {
             android.util.Log.i(TAG, "lápiz arriba: reanuda hacia " + Script.steerDir);
-            // 20-oct (Gonzalo): la 1.ª vuelta tras soltar partía desde donde quedó su joystick y no
-            // avanzaba; la 2.ª, que viene tras un toque soltado, sí partía del centro. Se imita ese
-            // paso: un toque corto en el centro del joystick y, al terminar, la vuelta del patrón.
+            // 20-oct, prueba aislada «solo mover» tras soltar el dedo: el joystick inyectado se ignoró
+            // 3,75 s seguidos; en Corta volvía recién tras los toques de súper/gadget/híper, que suman
+            // dedos simultáneos. El juego deja el joystick tomado por un dedo fantasma hasta que ese
+            // número de dedo vuelve a apoyarse y soltarse. Se apoyan 5 dedos juntos 120 ms (centro del
+            // joystick + zona invisible del panel) y, al terminar, sale la vuelta.
             float[] joy = cal.get("joy");
             final Runnable resume = penResume;
             if (joy != null) {
-                Path path = new Path();
-                path.moveTo(joy[0], joy[1]);
-                // v4.9.4 lo lanzaba 40 ms y arrancaba la vuelta a los 60 ms: la vuelta cancelaba el toque
-                // y la 1.ª seguía sin avanzar. Ahora se espera a que el toque termine de verdad.
+                float[] rp = releasePoint();
+                GestureDescription.Builder b = new GestureDescription.Builder();
+                Path j = new Path();
+                j.moveTo(joy[0], joy[1]);
+                b.addStroke(new GestureDescription.StrokeDescription(j, 0, 120));
+                for (int k = 0; k < 4; k++) {
+                    Path q = new Path();
+                    q.moveTo(Math.max(0, rp[0] + (k - 1.5f) * 6), Math.max(0, rp[1]));
+                    b.addStroke(new GestureDescription.StrokeDescription(q, 0, 120));
+                }
                 final Runnable go = () -> { if (!penTouching && !fingerDown && !player.isPlaying()) resume.run(); };
-                dispatchGesture(new GestureDescription.Builder()
-                        .addStroke(new GestureDescription.StrokeDescription(path, 0, 120)).build(),
+                dispatchGesture(b.build(),
                         new GestureResultCallback() {
                             @Override
                             public void onCompleted(GestureDescription g) {
                                 android.util.Log.i(TAG, "toque de joystick previo: completo");
-                                main.postDelayed(go, 50);
+                                main.postDelayed(go, 30);
                             }
 
                             @Override
                             public void onCancelled(GestureDescription g) {
                                 android.util.Log.w(TAG, "toque de joystick previo: cancelado");
-                                main.postDelayed(go, 50);
+                                main.postDelayed(go, 30);
                             }
                         }, main);
             } else {
