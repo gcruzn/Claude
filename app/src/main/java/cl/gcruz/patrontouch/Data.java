@@ -393,6 +393,19 @@ public class Data {
             seeds.add("pruebas3");
             changed = true;
         }
+        if (!seeds.contains("pruebas4")) {
+            // 21-oct, pedido de Gonzalo: Corta 2, en línea recta hacia la última dirección, disparos de
+            // a 2 y tras cada par híper y súper auto. Botón 5 de Pruebas.
+            if (pattern("ale_corta2") == null) addPattern("ale_corta2", "Aleatorio · Corta 2",
+                    "# Recto hacia tu última dirección; 2 disparos + híper + súper, 3 veces; gadget al final (~3,8 s)\n"
+                            + "disparo toque cada 0.4\nmover ultima\n"
+                            + "disparar 2\nhiper\nsúper auto\n" + "disparar 2\nhiper\nsúper auto\n" + "disparar 2\nhiper\nsúper auto\n"
+                            + "gadget");
+            PadSet s = set("pruebas");
+            if (s != null && !s.slots.contains("ale_corta2") && s.slots.size() < MAX_SLOTS) s.slots.add("ale_corta2");
+            seeds.add("pruebas4");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
