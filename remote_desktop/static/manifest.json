@@ -1,0 +1,12 @@
+{
+  "name": "Mi Escritorio Remoto",
+  "short_name": "Escritorio",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#111418",
+  "theme_color": "#111418",
+  "icons": [
+    {"src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}

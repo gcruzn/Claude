@@ -2,6 +2,9 @@
 
 A simple Python application.
 
+Incluye **Mi Escritorio Remoto**: controla tu PC desde el celular.
+Ver [remote_desktop/README.md](remote_desktop/README.md).
+
 ## Setup
 
 ```bash
@@ -23,5 +26,5 @@ pytest tests/
 ## Lint
 
 ```bash
-flake8 app.py tests/
+flake8
 ```

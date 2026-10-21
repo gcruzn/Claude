@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#111418">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Mi Escritorio Remoto</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section id="login" class="screen">
+    <form id="login-form" class="card">
+      <img src="/static/icon.svg" alt="" width="56" height="56">
+      <h1>Mi Escritorio Remoto</h1>
+      <p class="muted">Conéctate al PC de tu casa</p>
+      <input id="password" type="password" autocomplete="current-password"
+             placeholder="Contraseña" required>
+      <button type="submit">Conectar</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <section id="viewer" class="screen hidden">
+    <div id="stage">
+      <div id="surface">
+        <canvas id="screen"></canvas>
+        <div id="cursor"></div>
+      </div>
+      <div id="status">Conectando…</div>
+    </div>
+
+    <div id="keybar" class="hidden">
+      <div class="typing">
+        <input id="typing" type="text" autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false" enterkeyhint="send"
+               placeholder="Escribe aquí: se teclea en el PC">
+      </div>
+      <div class="keys">
+        <button data-key="esc">Esc</button>
+        <button data-key="tab">Tab</button>
+        <button data-key="backspace">⌫</button>
+        <button data-key="enter">↵</button>
+        <button data-key="delete">Supr</button>
+        <button data-key="left">←</button>
+        <button data-key="up">↑</button>
+        <button data-key="down">↓</button>
+        <button data-key="right">→</button>
+        <button data-combo="ctrl,c">Ctrl+C</button>
+        <button data-combo="ctrl,v">Ctrl+V</button>
+        <button data-combo="ctrl,z">Ctrl+Z</button>
+        <button data-combo="ctrl,a">Ctrl+A</button>
+        <button data-combo="alt,tab">Alt+Tab</button>
+        <button data-combo="alt,f4">Alt+F4</button>
+        <button data-key="cmd">Win</button>
+        <button data-combo="cmd,d">Win+D</button>
+        <button data-key="f5">F5</button>
+      </div>
+    </div>
+
+    <nav id="toolbar">
+      <button id="mode" title="Modo de toque">🖱️ Clic</button>
+      <button id="kbd" title="Teclado">⌨️</button>
+      <button id="zoom-reset" title="Restablecer zoom">1:1</button>
+      <select id="quality" title="Calidad">
+        <option value="35,8">Baja</option>
+        <option value="60,10" selected>Media</option>
+        <option value="80,15">Alta</option>
+      </select>
+      <button id="logout" title="Salir">⏻</button>
+    </nav>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
