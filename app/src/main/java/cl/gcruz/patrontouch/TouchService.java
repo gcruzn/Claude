@@ -250,6 +250,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
                     f[1] = f[3];
                     float[] p = panelToScreen(f[0], f[1]), joy = cal.get("joy");
                     if (joy != null && Math.hypot(p[0] - joy[0], p[1] - joy[1]) < cal.joyRadius() * 2.2f) f[4] = 1;
+                    if (f[4] == 1) fingerStill = true;
                     android.util.Log.i(TAG, "dedo abajo en " + Math.round(p[0]) + "," + Math.round(p[1])
                             + (f[4] == 1 ? " (joystick)" : ""));
                 }
@@ -282,6 +283,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
     /** Pausa entre vueltas del bucle (antes 120 ms: el brawler se notaba detenerse en cada vuelta). */
     static final long LOOP_PAUSE_MS = 15;
 
+    /**
+     * El dedo apoyó en el joystick y se levantó sin arrastrar (21-oct, pedido de Gonzalo): al
+     * soltar se gira en el sitio («Circular · En el sitio») en vez de seguir la dirección. El
+     * patrón del botón queda guardado: el próximo arrastre vuelve a él.
+     */
+    private boolean fingerStill;
+
     private final Runnable fingerResume = () -> { if (!fingerDown && !penTouching) penUp(); };
 
     private void fingerDir(float[] f) {
@@ -291,6 +299,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         double ang = (Math.toDegrees(Math.atan2(-sy, sx)) + 360) % 360;
         String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
         String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
+        fingerStill = false;
         if (!d.equals(Script.steerDir)) android.util.Log.i(TAG, "dedo hacia " + d);
         Script.steerDir = d;
     }
@@ -341,6 +350,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private void penUp() {
         if (penTouching) return;
         if (penResume != null && !player.isPlaying()) {
+            Data.PatternDef circle = fingerStill ? data.pattern("cir_sitio") : null;
+            fingerStill = false;
+            if (circle != null) {
+                android.util.Log.i(TAG, "dedo quieto: gira en el sitio");
+                runScript(circle.name, circle.script, 0, penPausedIdx, MODE_LOOP);
+                return;
+            }
             android.util.Log.i(TAG, "lápiz arriba: reanuda hacia " + Script.steerDir);
             penResume.run();
         }
