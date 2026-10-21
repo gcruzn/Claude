@@ -43,7 +43,8 @@ public class Player {
      * tramos de SLICE_MS, cada uno un gesto completo que sale cuando terminó el anterior, y detener
      * espera a que acabe el tramo en curso (todo dedo termina en UP).
      */
-    private static final long SLICE_MS = 600;
+    /** Largo de cada tramo; ajustable por ADB («tune slice») para medir. */
+    static volatile long SLICE_MS = 600;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -105,20 +106,12 @@ public class Player {
     }
 
     /**
-     * El dedo o el lápiz real tocó: hay que soltar el joystick YA (esperar el tramo dejaba al juego
-     * atendiendo al dedo virtual hasta 0,6 s y Gonzalo tenía que retomar el control varias veces).
-     * Es el único caso en que se corta un gesto a la mitad: un toque mínimo en la zona invisible
-     * del panel lo reemplaza (como en v4.8.1).
+     * Igual que stop. NO se corta el gesto en curso: v5.0.6 lo cortaba al tocar y Android rechazó
+     * la cancelación con el dedo real abajo («Got ACTION_CANCEL, but the pointers don't match»,
+     * 21 eventos en 75 s): el dedo inyectado quedaba apretado. El tramo en curso termina solo.
      */
     public void stopByUserTouch() {
-        boolean cut = inFlight > 0;
         stop(null, false);
-        if (cut) {
-            float[] pt = listener.releasePoint();
-            Path path = new Path();
-            path.moveTo(Math.max(0, pt[0]), Math.max(0, pt[1]));
-            send(new GestureDescription.Builder().addStroke(new StrokeDescription(path, 0, 1)).build(), null);
-        }
     }
 
     private void stop(String reason, boolean byUser) {
