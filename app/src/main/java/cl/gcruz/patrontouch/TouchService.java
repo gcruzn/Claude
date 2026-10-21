@@ -265,7 +265,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
                     main.post(this::penDown);
                 } else {
                     android.util.Log.i(TAG, "dedo levantado");
-                    main.post(fingerResume); // sin espera: el dedo no flota ni rebota como el lápiz
+                    // 80 ms: con 0 ms el toque inyectado llegaba antes de que el juego procesara el
+                    // UP real, Android lo descartaba y se perdía el gesto entero (20-oct, v4.9.0).
+                    main.postDelayed(fingerResume, 80);
                 }
                 break;
             }
