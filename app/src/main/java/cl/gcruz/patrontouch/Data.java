@@ -379,6 +379,20 @@ public class Data {
             seeds.add("pruebas2");
             changed = true;
         }
+        if (!seeds.contains("pruebas3")) {
+            // 21-oct, pedido de Gonzalo: Edgar según los videos pro (tramos cortos de 0,5 s con giros
+            // variados, golpe seguido, salto al final). Botón 4 de Pruebas.
+            if (pattern("edgar_pro") == null) addPattern("edgar_pro", "Edgar · Pro",
+                    "# Tramos de 0,5 s hacia tu última dirección con giros de ±45°, golpe cada 0,3 s; gadget, híper y salto (súper auto) cada vuelta (~2,2 s)\n"
+                            + "disparo toque cada 0.3\n"
+                            + "mover ultima 0.5 disparando\nmover dirigido 0.5 disparando\n"
+                            + "mover ultima 0.5 disparando\nmover dirigido 0.5 disparando\n"
+                            + "gadget\nhiper\nsúper auto");
+            PadSet s = set("pruebas");
+            if (s != null && !s.slots.contains("edgar_pro") && s.slots.size() < MAX_SLOTS) s.slots.add("edgar_pro");
+            seeds.add("pruebas3");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
