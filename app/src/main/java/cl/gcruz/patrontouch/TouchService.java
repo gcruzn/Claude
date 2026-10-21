@@ -347,9 +347,24 @@ public class TouchService extends AccessibilityService implements Player.Listene
             if (joy != null) {
                 Path path = new Path();
                 path.moveTo(joy[0], joy[1]);
+                // v4.9.4 lo lanzaba 40 ms y arrancaba la vuelta a los 60 ms: la vuelta cancelaba el toque
+                // y la 1.ª seguía sin avanzar. Ahora se espera a que el toque termine de verdad.
+                final Runnable go = () -> { if (!penTouching && !fingerDown && !player.isPlaying()) resume.run(); };
                 dispatchGesture(new GestureDescription.Builder()
-                        .addStroke(new GestureDescription.StrokeDescription(path, 0, 40)).build(), null, null);
-                main.postDelayed(() -> { if (!penTouching && !fingerDown && !player.isPlaying()) resume.run(); }, 60);
+                        .addStroke(new GestureDescription.StrokeDescription(path, 0, 120)).build(),
+                        new GestureResultCallback() {
+                            @Override
+                            public void onCompleted(GestureDescription g) {
+                                android.util.Log.i(TAG, "toque de joystick previo: completo");
+                                main.postDelayed(go, 50);
+                            }
+
+                            @Override
+                            public void onCancelled(GestureDescription g) {
+                                android.util.Log.w(TAG, "toque de joystick previo: cancelado");
+                                main.postDelayed(go, 50);
+                            }
+                        }, main);
             } else {
                 resume.run();
             }
