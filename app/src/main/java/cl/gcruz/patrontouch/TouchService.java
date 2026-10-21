@@ -1,12 +1,14 @@
 package cl.gcruz.patrontouch;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.graphics.Typeface;
@@ -337,7 +339,20 @@ public class TouchService extends AccessibilityService implements Player.Listene
         if (penTouching) return;
         if (penResume != null && !player.isPlaying()) {
             android.util.Log.i(TAG, "lápiz arriba: reanuda hacia " + Script.steerDir);
-            penResume.run();
+            // 20-oct (Gonzalo): la 1.ª vuelta tras soltar partía desde donde quedó su joystick y no
+            // avanzaba; la 2.ª, que viene tras un toque soltado, sí partía del centro. Se imita ese
+            // paso: un toque corto en el centro del joystick y, al terminar, la vuelta del patrón.
+            float[] joy = cal.get("joy");
+            final Runnable resume = penResume;
+            if (joy != null) {
+                Path path = new Path();
+                path.moveTo(joy[0], joy[1]);
+                dispatchGesture(new GestureDescription.Builder()
+                        .addStroke(new GestureDescription.StrokeDescription(path, 0, 40)).build(), null, null);
+                main.postDelayed(() -> { if (!penTouching && !fingerDown && !player.isPlaying()) resume.run(); }, 60);
+            } else {
+                resume.run();
+            }
         }
     }
 
