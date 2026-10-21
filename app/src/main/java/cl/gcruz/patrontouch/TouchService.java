@@ -267,12 +267,15 @@ public class TouchService extends AccessibilityService implements Player.Listene
                     android.util.Log.i(TAG, "dedo levantado");
                     // 80 ms: con 0 ms el toque inyectado llegaba antes de que el juego procesara el
                     // UP real, Android lo descartaba y se perdía el gesto entero (20-oct, v4.9.0).
-                    main.postDelayed(fingerResume, 80);
+                    main.postDelayed(fingerResume, resumeDelayMs);
                 }
                 break;
             }
         }
     }
+
+    /** Espera entre levantar el dedo y reanudar; ajustable por ADB («tune») para medir variantes. */
+    static volatile int resumeDelayMs = 80;
 
     private final Runnable fingerResume = () -> { if (!fingerDown && !penTouching) penUp(); };
 
@@ -430,6 +433,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
             case "stop":
                 penResume = null;
                 player.stop("Detenido por ADB");
+                break;
+            case "tune":
+                resumeDelayMs = i.getIntExtra("resume", resumeDelayMs);
+                Script.joyHoldMs = i.getIntExtra("hold", Script.joyHoldMs);
+                Script.joyRampMs = i.getIntExtra("ramp", Script.joyRampMs);
+                android.util.Log.i(TAG, "tune resume=" + resumeDelayMs + " hold=" + Script.joyHoldMs + " ramp=" + Script.joyRampMs);
                 break;
             case "escape":
                 if (i.getBooleanExtra("on", !escapeOn()) != escapeOn()) toggleEscape();

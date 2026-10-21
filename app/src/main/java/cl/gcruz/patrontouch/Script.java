@@ -499,15 +499,18 @@ public class Script {
                         s = r;
                     }
                     float[] target = offset(joy, s.dir, cal.joyRadius());
+                    long ramp = 60;
                     if (js == null) {
                         js = new Pattern.Touch();
                         js.pts.add(new Pattern.Point(t, joy[0], joy[1]));
-                        jsLast = t;
+                        jsLast = t + joyHoldMs;
+                        if (joyHoldMs > 0) js.pts.add(new Pattern.Point(jsLast, joy[0], joy[1]));
+                        ramp = joyRampMs;
                     } else {
                         jsLast = Math.max(jsLast, t);
                         js.pts.add(new Pattern.Point(jsLast, jsPos[0], jsPos[1]));
                     }
-                    jsLast = jsLast + 60;
+                    jsLast = jsLast + ramp;
                     js.pts.add(new Pattern.Point(jsLast, target[0], target[1]));
                     jsPos = target;
                     curDir = s.dir;
@@ -595,6 +598,9 @@ public class Script {
 
     /** Última dirección en que Gonzalo movió el joystick con el S Pen (la pone TouchService). */
     public static volatile String steerDir = null;
+
+    /** Arranque del joystick (ms quieto en el centro y ms hasta el borde); ajustable por ADB «tune». */
+    public static volatile int joyHoldMs = 0, joyRampMs = 60;
 
     /** «mover dirigido»: la última dirección del lápiz o 45° hacia un lado u otro, al azar. Sin dato, al azar. */
     static String steered() {
