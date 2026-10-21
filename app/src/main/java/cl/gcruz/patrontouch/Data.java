@@ -336,6 +336,29 @@ public class Data {
             seeds.add("agresiva1");
             changed = true;
         }
+        if (!seeds.contains("pruebas1")) {
+            // 20-oct, pedido de Gonzalo: patrones aislados para probar por separado qué falla al
+            // soltar el dedo (el disparo o la dirección). Set propio y activo.
+            if (pattern("prueba_disparo") == null) addPattern("prueba_disparo", "Prueba · Disparo",
+                    "# Solo dispara, sin moverse: 3 tiros, 1 cada 0,4 s\n"
+                            + "disparo toque cada 0.4\ndisparar 3\nesperar 0.3");
+            if (pattern("prueba_mover") == null) addPattern("prueba_mover", "Prueba · Dirección",
+                    "# Solo se mueve hacia tu última dirección, sin disparar\n"
+                            + "mover ultima 1.5\nparar\nesperar 0.3");
+            if (set("pruebas") == null) {
+                PadSet s = new PadSet();
+                s.id = "pruebas";
+                s.brawler = "General";
+                s.mode = "Pruebas";
+                s.name = "Pruebas";
+                s.slots.add("prueba_disparo");
+                s.slots.add("prueba_mover");
+                sets.add(s);
+            }
+            activeSet = "pruebas";
+            seeds.add("pruebas1");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
