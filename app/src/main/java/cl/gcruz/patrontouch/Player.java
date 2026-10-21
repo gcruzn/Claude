@@ -43,7 +43,7 @@ public class Player {
      * tramos de SLICE_MS, cada uno un gesto completo que sale cuando terminó el anterior, y detener
      * espera a que acabe el tramo en curso (todo dedo termina en UP).
      */
-    private static final long SLICE_MS = 300;
+    private static final long SLICE_MS = 600;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
