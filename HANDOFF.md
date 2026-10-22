@@ -306,3 +306,9 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
 - El reproductor sigue en un gesto continuo por vuelta, sin lanzar un gesto con otro en curso.
 - ADB por Tailscale cuando no están en la misma red: el celular aparece como 100.118.105.84
   (Depuración inalámbrica → `adb connect 100.118.105.84:<puerto>`, luego `tcpip 5555`).
+- **v5.5.0 — Lectura del joystick por captura de pantalla** (CaptureActivity + CaptureService,
+  MediaProjection, servicio en primer plano tipo mediaProjection). Con el patrón apagado mira el
+  entorno del joystick a media resolución ~30 fps: perilla apretada = disco azul sólido (regla
+  b>140, b−r>90, b−g>50; medido 6.000–12.700 px a res. completa vs 100–960 sin tocar, la botonera
+  se excluye). Base = primer cuadro con perilla; dirección = desplazamiento desde la base →
+  Script.steerDir. Con el patrón corriendo no se lee (la perilla visible es la inyectada).

@@ -366,6 +366,24 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     public boolean isPanelVisible() { return panel != null; }
 
+    // ---- para CaptureService (lectura del joystick por captura de pantalla)
+
+    /** El patrón está inyectando: la perilla que se ve en pantalla es la nuestra. */
+    public boolean isInjecting() { return player != null && player.isPlaying(); }
+
+    public float[] joyPoint() { return cal.get("joy"); }
+
+    public float joyRadiusPx() { return cal.joyRadius(); }
+
+    /** Zona de la botonera en pantalla: su azul no es la perilla. */
+    public android.graphics.Rect panelRect() {
+        LinearLayout p = panel;
+        if (p == null || p.getWidth() == 0) return null;
+        int[] loc = new int[2];
+        p.getLocationOnScreen(loc);
+        return new android.graphics.Rect(loc[0], loc[1], loc[0] + p.getWidth(), loc[1] + p.getHeight());
+    }
+
     public Calibration calibration() { return cal; }
 
     /** La app guardó cambios: recargar datos y redibujar la cruceta. */

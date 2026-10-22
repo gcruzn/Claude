@@ -90,6 +90,21 @@ public class MainActivity extends Activity {
         root.addView(card);
         root.addView(ui.space(12));
 
+        // --- Lectura del joystick por captura de pantalla (21-oct)
+        LinearLayout cap = ui.card();
+        boolean on = CaptureService.isRunning();
+        cap.addView(ui.text(on ? "● Mirando tu joystick" : "○ Sin mirar el joystick", 16, on ? VERDE : GRIS, true));
+        cap.addView(ui.text("Con la captura de pantalla la app ve hacia dónde mueves el joystick cuando el patrón "
+                + "está apagado, y «última dirección» / «dirigido» siguen esa dirección. Android pide «Iniciar "
+                + "grabación» cada vez.", 13, GRAFITO, false));
+        cap.addView(ui.button(on ? "Dejar de mirar" : "Mirar mi joystick", on ? GRAFITO : AZUL, v -> {
+            if (CaptureService.isRunning()) stopService(new Intent(this, CaptureService.class));
+            else startActivity(new Intent(this, CaptureActivity.class));
+            sv.postDelayed(this::render, 400);
+        }));
+        root.addView(cap);
+        root.addView(ui.space(12));
+
         renderSet();
         root.addView(ui.space(12));
         renderPatterns();
