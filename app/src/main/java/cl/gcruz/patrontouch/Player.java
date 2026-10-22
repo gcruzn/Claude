@@ -47,7 +47,10 @@ public class Player {
     // 21-oct: tramos cortos (100–150 ms) re-apoyaban el joystick tan seguido que el movimiento
     // salía a saltos y las formas no servían (Gonzalo). Ahora un tramo = la vuelta entera; soltar
     // rápido al tocar lo da el corte seguro de stopByUserTouch, no el largo del tramo.
-    static volatile long SLICE_MS = 60_000;
+    // 22-oct: con un solo gesto por vuelta, si el S Pen se acerca (Android bloquea los toques
+    // inyectados) el juego pierde el apoyo del joystick y no lo retoma hasta la vuelta siguiente
+    // (~4 s). Re-apoyar una vez por segundo: retoma en ≤ 1 s sin los saltos de los tramos cortos.
+    static volatile long SLICE_MS = 1000;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
