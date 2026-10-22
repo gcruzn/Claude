@@ -48,6 +48,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private static final int CORAL = Color.parseColor("#E25E6B");
     private static final int AZUL = Color.parseColor("#406AB4");
     private static final int GRAFITO = Color.parseColor("#454A51");
+    private static final int VERDE_TXT = Color.parseColor("#2E8B3D");
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private WindowManager wm;
@@ -316,7 +317,45 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) { }
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        // 22-oct, pedido de Gonzalo: al abrir Brawl Stars se pide sola la captura del joystick (Android
+        // exige que él toque «Iniciar»). Una vez por visita: si la rechaza, no insiste hasta que
+        // salga del juego y vuelva.
+        if (event == null || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
+        CharSequence pk = event.getPackageName();
+        if (pk == null) return;
+        String pkg = pk.toString();
+        if (GAME.equals(pkg)) {
+            if (!askedThisVisit && prefs.getBoolean("autoCapture", true) && !CaptureService.isRunning()) {
+                askedThisVisit = true;
+                startCapture();
+            }
+        } else if (!pkg.equals(getPackageName()) && !pkg.equals("com.android.systemui") && !pkg.equals("android")) {
+            askedThisVisit = false;
+        }
+    }
+
+    static final String GAME = "com.supercell.brawlstars";
+    private boolean askedThisVisit;
+
+    /** Pide el permiso de captura (diálogo de Android) y arranca la lectura del joystick. */
+    void startCapture() {
+        try {
+            startActivity(new android.content.Intent(this, CaptureActivity.class)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+        } catch (Exception e) {
+            android.util.Log.w(TAG, "captura: " + e);
+        }
+    }
+
+    void toggleCapture() {
+        if (CaptureService.isRunning()) {
+            stopService(new android.content.Intent(this, CaptureService.class));
+            toast("Ya no miro tu joystick");
+        } else {
+            startCapture();
+        }
+    }
 
     @Override
     public void onInterrupt() {
@@ -895,6 +934,39 @@ public class TouchService extends AccessibilityService implements Player.Listene
         LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
         ulp.setMargins(0, dp(8), 0, 0);
         box.addView(use, ulp);
+
+        // Lectura del joystick por captura de pantalla (22-oct): encender/apagar sin salir del juego,
+        // y si se pide sola al abrir Brawl Stars.
+        LinearLayout capRow = new LinearLayout(this);
+        capRow.setOrientation(LinearLayout.HORIZONTAL);
+        capRow.setGravity(Gravity.CENTER);
+        capRow.setPadding(0, dp(8), 0, 0);
+        boolean capOn = CaptureService.isRunning(), auto = prefs.getBoolean("autoCapture", true);
+        String[] capLabels = {capOn ? "👁 Mirando joystick: sí" : "👁 Mirando joystick: no",
+                auto ? "Auto al abrir el juego: sí" : "Auto al abrir el juego: no"};
+        Runnable[] capActs = {this::toggleCapture,
+                () -> { prefs.edit().putBoolean("autoCapture", !auto).apply(); toast(!auto ? "Se pedirá al abrir Brawl Stars" : "Ya no se pide solo"); }};
+        for (int i = 0; i < 2; i++) {
+            final Runnable a = capActs[i];
+            TextView c = new TextView(this);
+            c.setText(capLabels[i]);
+            c.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            c.setTextColor(i == 0 && capOn ? VERDE_TXT : GRAFITO);
+            c.setGravity(Gravity.CENTER);
+            c.setPadding(dp(6), dp(8), dp(6), dp(8));
+            GradientDrawable cb = new GradientDrawable();
+            cb.setColor(Color.argb(255, 240, 241, 242));
+            cb.setCornerRadius(dp(10));
+            c.setBackground(cb);
+            c.setOnClickListener(v -> {
+                closeMenu();
+                a.run();
+            });
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            clp.setMargins(i == 0 ? 0 : dp(4), 0, i == 0 ? dp(4) : 0, 0);
+            capRow.addView(c, clp);
+        }
+        box.addView(capRow, new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         // Pie: candado · calibrar · cerrar, en una fila.
         LinearLayout foot = new LinearLayout(this);
