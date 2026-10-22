@@ -455,6 +455,26 @@ public class Data {
             seeds.add("pruebas7");
             changed = true;
         }
+        if (!seeds.contains("pruebas8")) {
+            // 22-oct, pedido de Gonzalo: dos botones que se encienden por separado y corren a la vez
+            // (canales, ver TouchService): disparo cada 0,4 s y joystick sostenido hacia la última
+            // dirección.
+            if (pattern("canal_disparo") == null) addPattern("canal_disparo", "Disparo 0,4",
+                    "# Canal: golpe cada 0,4 s (se junta con los otros canales encendidos)\n"
+                            + "cada 0.4 disparar");
+            if (pattern("canal_joystick") == null) addPattern("canal_joystick", "Joystick",
+                    "# Canal: joystick sostenido hacia tu última dirección\n"
+                            + "mover ultima 3");
+            PadSet s = set("pruebas");
+            if (s != null) {
+                s.slots.clear();
+                s.slots.add("canal_disparo");
+                s.slots.add("canal_joystick");
+                activeSet = "pruebas";
+            }
+            seeds.add("pruebas8");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.

@@ -775,11 +775,16 @@ public class TouchService extends AccessibilityService implements Player.Listene
         return (v, e) -> {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    if (isChannel(i)) return true;   // canal: se alterna al soltar, sin tocar el gesto en curso
                     touchStopOnly = player.isPlaying() && activeIdx == i;
                     if (player.isPlaying()) player.stopByUserTouch();
                     ((GradientDrawable) v.getBackground()).setColor(activeColor(MODE_LOOP));
                     return true;
                 case MotionEvent.ACTION_UP:
+                    if (isChannel(i)) {
+                        toggleChannel(i);
+                        return true;
+                    }
                     if (touchStopOnly) {
                         penResume = null; // detenido a propósito: el lápiz ya no lo reanuda
                         paintIdle();
@@ -796,8 +801,63 @@ public class TouchService extends AccessibilityService implements Player.Listene
         };
     }
 
+    // ---------------------------------------------------------------- canales (22-oct)
+
+    /**
+     * Pedido de Gonzalo: botones que se encienden y apagan por separado y corren a la vez, como
+     * multitouch (p. ej. «Disparo cada 0,4 s» y «Joystick sostenido»). Android solo admite un gesto
+     * inyectado a la vez (uno nuevo cancela al anterior, y eso trababa los dedos), así que los canales
+     * encendidos se juntan en un solo patrón y cada cambio entra en el tramo siguiente, sin cortar.
+     * Un patrón es canal si su id empieza con «canal_».
+     */
+    private final java.util.TreeSet<Integer> channels = new java.util.TreeSet<>();
+
+    private boolean isChannel(int i) {
+        List<Data.PatternDef> pats = data.slotPatterns(data.active());
+        return i >= 0 && i < pats.size() && pats.get(i).id.startsWith("canal_");
+    }
+
+    private void toggleChannel(int i) {
+        if (!channels.remove(i)) channels.add(i);
+        applyChannels();
+    }
+
+    private void applyChannels() {
+        List<Data.PatternDef> pats = data.slotPatterns(data.active());
+        StringBuilder moves = new StringBuilder(), every = new StringBuilder(), name = new StringBuilder();
+        for (int i : channels) {
+            if (i >= pats.size()) continue;
+            Data.PatternDef d = pats.get(i);
+            name.append(name.length() > 0 ? " + " : "").append(d.name);
+            for (String line : d.script.split("\n")) {
+                String l = line.trim();
+                if (l.isEmpty() || l.startsWith("#")) continue;
+                (l.startsWith("cada ") ? every : moves).append(l).append('\n');
+            }
+        }
+        if (name.length() == 0) {
+            lastRun = null;
+            player.stop(null);
+            paintChannels();
+            return;
+        }
+        // Sin canal que dé la duración (joystick), la vuelta es una espera de 3 s.
+        String script = (moves.length() > 0 ? moves.toString() : "esperar 3\n") + every;
+        lastRun = this::applyChannels;
+        runScript(name.toString(), script, 0, -1, MODE_LOOP);
+        paintChannels();
+    }
+
+    private void paintChannels() {
+        for (int i : channels) {
+            TextView b = buttonFor(i);
+            if (b != null) ((GradientDrawable) b.getBackground()).setColor(activeColor(MODE_LOOP));
+        }
+    }
+
     private void startSlot(int i) {
         lastRun = () -> startSlot(i);
+        channels.clear();
         penResume = null;
         List<Data.PatternDef> pats = data.slotPatterns(data.active());
         if (i == RANDOM) {
@@ -1028,6 +1088,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         paintIdle();
         TextView b = buttonFor(activeIdx);
         if (playing && b != null) ((GradientDrawable) b.getBackground()).setColor(activeColor(activeMode));
+        if (playing) paintChannels();
         if (!playing) {
             activeIdx = -1;
             if (status != null && !status.startsWith("Listo") && !status.equals("Detenido")) toast(status);
