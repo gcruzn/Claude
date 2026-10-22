@@ -915,6 +915,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     private void runScript(String name, String script, int reps, int idx, int mode) {
+        // 22-oct: tras reinstalar, la captura queda apagada y el pedido al abrir el juego no salta si
+        // Gonzalo ya está dentro: también se pide al encender un patrón (una vez por visita).
+        if (!askedThisVisit && prefs.getBoolean("autoCapture", true) && !CaptureService.isRunning()) {
+            askedThisVisit = true;
+            startCapture();
+        }
         if (player.isPlaying()) player.stop(null);
         Pattern p = compileDef(name, script, true);
         if (p == null) {
