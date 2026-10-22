@@ -19,8 +19,8 @@ import android.os.SystemClock;
 final class AutoController {
 
     static final String[] SHAPES = {"recta", "zigzag", "círculo", "cuadrado", "triángulo", "óvalo", "rect. horizontal", "rect. vertical"};
-    static final String[] SHOTS = {"de a 1", "ráfaga", "de a 2", "de a 3", "sin disparo", "mantener cerca"};
-    static final String[] SUPERS = {"con enemigo", "automático", "nunca"};
+    static final String[] SHOTS = {"de a 1", "ráfaga", "de a 2", "de a 3", "sin disparo", "mantener cerca", "cuerpo a cuerpo"};
+    static final String[] SUPERS = {"con enemigo", "automático", "nunca", "con enemigo (toque)"};
     static final int[] RANGES = {350, 500, 650, 800, 1000};
     static final String[] ABILITIES = {"con enemigo", "cada 4 s", "nunca", "con vida baja"};
     static final String[] PROFILES = {"General", "Nita", "Edgar", "Gigi", "Amber", "Nori"};
@@ -41,9 +41,11 @@ final class AutoController {
      *    recta al enemigo, «mantener cerca», súper (portal de ida y vuelta) a 650.
      *  - Amber: lanzallamas de largo alcance con mucha munición y poca movilidad: zigzag al
      *    enemigo, ráfaga, súper (frasco) a 650, distancia larga, huye con vida baja.
-     *  - Nori: corte cuerpo a cuerpo al tocar, súper en área que crece con los peces, gadget que
-     *    cura comiendo peces: zigzag al enemigo, ráfaga, súper a 350, distancia corta, gadget con
-     *    vida baja.
+     *  - Nori, grabado jugando con Gonzalo (22-oct, 68 toques): joystick sostenido sin parar (43 s),
+     *    ataque en ráfagas de 5–8 toques de 0,11–0,27 s cada ~0,17 s, ataque mantenido 1,6–4,3 s
+     *    apuntando (caña), súper con un toque simple (auto-apuntado), gadget al inicio. Perfil:
+     *    recta hacia el lápiz, «cuerpo a cuerpo» (golpes rápidos cerca, caña a media distancia),
+     *    súper con toque cuando hay enemigo a 350, gadget (sushi) con vida baja.
      */
     static final int[][] PRESETS = {
             //  forma rumbo disparo súper alcance distancia huir habilidades
@@ -52,7 +54,7 @@ final class AutoController {
             {1, 1, 1, 0, 1, 0, 0, 0},   // Edgar
             {0, 1, 5, 0, 2, 0, 0, 0},   // Gigi
             {1, 1, 1, 0, 2, 3, 1, 0},   // Amber
-            {1, 1, 1, 0, 0, 1, 1, 3},   // Nori
+            {0, 0, 6, 3, 0, 0, 0, 3},   // Nori (de su partida grabada, ver abajo)
     };
 
     static String[] values(String key) {
@@ -123,6 +125,13 @@ final class AutoController {
     AutoController(TouchService svc, Player player, SharedPreferences prefs, Handler main) {
         this.svc = svc;
         this.player = player;
+        // 22-oct: el perfil de Nori se rehízo con su partida grabada; se borran los ajustes guardados
+        // del perfil anterior para que tome los valores nuevos.
+        if (!prefs.getBoolean("auto_nori_v2", false)) {
+            SharedPreferences.Editor ed = prefs.edit();
+            for (String k : KEYS) ed.remove("auto.Nori." + k);
+            ed.putBoolean("auto_nori_v2", true).apply();
+        }
         this.prefs = prefs;
         this.main = main;
     }
@@ -223,7 +232,7 @@ final class AutoController {
         Sit st = sit();
         int shot = get("shot");
         int taps = 0;
-        long hold = 0;
+        long hold = 0, aimHold = 0;
         // Munición: «de a N» espera a tener N (de a 1: dispara con 2 o más, así nunca queda en cero).
         if (shot == 0 || shot == 2 || shot == 3) {
             float need = shot == 3 ? 2.85f : 1.9f;
@@ -235,11 +244,16 @@ final class AutoController {
             }
         } else if (shot == 5 && st.enemy != null && st.dist < 300 && now - lastShot > 1000) {
             hold = 900;   // Gigi: el giro dura mientras se mantiene apretado
+        } else if (shot == 6 && st.enemy != null) {
+            // Nori (grabado): cerca, golpes rápidos cada ~0,17 s; a media distancia, la caña (ataque
+            // mantenido ~2,5 s apuntando al enemigo, lo tira hacia él).
+            if (st.dist < 350 && now - lastShot > 170) taps = 1;
+            else if (st.dist >= 350 && st.dist <= 750 && now - lastHook > 4000) aimHold = 2500;
         }
         float range = RANGES[get("range")];
         float[] target = st.enemy != null && st.dist <= range ? st.enemy : null;
         int sup = get("super");
-        boolean doSuper = now - lastSuper > 1500 && (sup == 1 || (sup == 0 && target != null));
+        boolean doSuper = now - lastSuper > 1500 && (sup == 1 || ((sup == 0 || sup == 3) && target != null));
         int ab = get("abil");
         boolean near = target != null;
         boolean low = st.health >= 0 && st.health < 0.5f;
@@ -249,7 +263,7 @@ final class AutoController {
         double b = effectiveBase(st);
         boolean turn = running && windowMode != modeOf(st)
                 || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(35) && now - lastTurn > 300);
-        if (taps == 0 && hold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
+        if (taps == 0 && hold == 0 && aimHold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
         if (turn) lastTurn = now;
         Pattern p = window();
         long t = 40;   // después del re-apoyo del joystick (no en el mismo instante: el juego lo ignoraba)
@@ -258,12 +272,28 @@ final class AutoController {
             press(p, "attack", t, hold);
             t += hold + 40;
         }
+        if (aimHold > 0) {   // caña de Nori: mantener el ataque arrastrado hacia el enemigo
+            float[] ab = svc.calib().get("attack");
+            if (ab != null) {
+                double ang = Math.atan2(st.enemy[1] - st.py, st.enemy[0] - st.px);
+                float r = svc.calib().aimRadius() * 1.5f;
+                float ex = ab[0] + (float) (r * Math.cos(ang)), ey = ab[1] + (float) (r * Math.sin(ang));
+                Pattern.Touch x = new Pattern.Touch();
+                x.pts.add(new Pattern.Point(t, ab[0], ab[1]));
+                x.pts.add(new Pattern.Point(t + 150, ex, ey));
+                x.pts.add(new Pattern.Point(t + aimHold, ex, ey));
+                p.touches.add(x);
+                t += aimHold + 40;
+                lastHook = now;
+                android.util.Log.i(TouchService.TAG, "Auto: caña hacia enemigo a " + Math.round(st.dist) + " px");
+            }
+        }
         if (doHyper) { press(p, "hyper", t); t += 120; lastHyper = now; }
         if (doGadget) { press(p, "gadget", t); t += 120; lastGadget = now; }
         if (doSuper) {
             float[] btn = svc.calib().get("super");
             if (btn != null) {
-                if (target != null) {
+                if (target != null && sup != 3) {   // «con enemigo (toque)»: toque simple, el juego apunta
                     double ang = Math.atan2(target[1] - st.py, target[0] - st.px);
                     float r = svc.calib().aimRadius() * 1.8f;
                     float ex = btn[0] + (float) (r * Math.cos(ang)), ey = btn[1] + (float) (r * Math.sin(ang));
@@ -279,13 +309,13 @@ final class AutoController {
                 android.util.Log.i(TouchService.TAG, "Auto: súper" + (target != null ? " hacia enemigo a " + Math.round(st.dist) + " px" : ""));
             }
         }
-        if (taps > 0 || hold > 0) lastShot = now;
+        if (taps > 0 || hold > 0 || aimHold > 0) lastShot = now;
         if (p.touches.isEmpty()) return;
         p.normalize();
         player.replaceNow(p, this::window);
     }
 
-    private long lastTurn;
+    private long lastTurn, lastHook;
 
     private void press(Pattern p, String key, long t) {
         press(p, key, t, 70);
