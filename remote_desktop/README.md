@@ -1,95 +1,121 @@
-# Mi Escritorio Remoto
+# Mi PC
 
-Controla el PC de tu casa desde el navegador del celular. No hay que instalar
-nada en el teléfono: el PC corre un pequeño servidor y el celular abre una
-página web.
+Una sola app en el celular para trabajar con el PC de tu casa desde
+cualquier lugar. Se conecta sola al abrirla y tiene tres pestañas:
 
-```
- Celular (navegador)  ── imagen JPEG ──  PC (servidor Python)
-   toques / teclado   ── WebSocket ──>   mouse y teclado reales
-```
-
-## 1. Instalar en el PC
-
-Necesitas Python 3.10 o superior ([python.org](https://www.python.org/downloads/),
-marca "Add Python to PATH" en Windows).
-
-```bash
-pip install -r remote_desktop/requirements.txt
-```
-
-## 2. Iniciar el servidor
-
-```bash
-python -m remote_desktop.server --password "una-clave-larga-y-unica"
-```
-
-En Windows también puedes editar la contraseña en
-`iniciar_escritorio_remoto.bat` y hacerle doble clic.
-
-Verás algo así:
+- **Claude**: chat con Claude Code corriendo en tu PC, con tus repos,
+  scripts, CLAUDE.md y skills. Ves los pasos que da, los cambios que hace
+  y le das **Permitir / Rechazar** cuando quiere ejecutar algo.
+- **Archivos**: Escritorio y Descargas del PC. Ver, descargar, compartir,
+  subir desde el celular o pedirle a Claude que revise un archivo.
+- **Mi PC**: lista de ventanas abiertas; tocas una y la ves sola, ajustada
+  al ancho del celular. Además: abrir programa, bloquear, volumen y
+  suspender. La pantalla completa queda como último recurso.
 
 ```
-=== Escritorio remoto listo ===
-  Abre en el celular: http://192.168.1.50:8765
+ Celular (app Mi PC) ──HTTPS por Tailscale──> PC de casa (servidor Mi PC)
+                                                 ├─ Claude Code (Agent SDK)
+                                                 ├─ Escritorio y Descargas
+                                                 └─ ventanas, mouse y teclado
 ```
 
-La primera vez Windows pregunta si permite el acceso por red: acepta para
-**redes privadas**.
+## Instalación (una sola vez)
 
-## 3. Conectarte desde el celular
+### En el PC de casa (Windows)
 
-**En la misma red WiFi:** abre en el navegador la dirección que mostró el
-servidor e ingresa la contraseña.
+1. Instala [Python](https://www.python.org/downloads/) (marca **Add
+   Python to PATH**).
+2. Instala [Claude Code](https://claude.com/claude-code), abre una
+   terminal, ejecuta `claude` e inicia sesión con tu cuenta.
+3. Instala [Tailscale](https://tailscale.com/download) e inicia sesión.
+   En el [panel de Tailscale](https://login.tailscale.com/admin/dns) activa
+   **MagicDNS** y **HTTPS Certificates**.
+4. Descarga esta carpeta y haz doble clic en **`instalar_mi_pc.bat`**:
+   - instala lo necesario,
+   - te pide la contraseña para vincular el celular,
+   - deja Mi PC arrancando solo cada vez que inicias Windows,
+   - lo publica en tu red de Tailscale con HTTPS,
+   - abre `config.json` para que agregues tus proyectos (ver abajo).
 
-**Desde fuera de casa (4G, otra WiFi):** la forma recomendada es
-[Tailscale](https://tailscale.com) (gratis para uso personal):
+Mientras Mi PC está abierto, Windows no suspende el PC (la pantalla sí
+puede apagarse). El PC debe quedar encendido y con tu sesión iniciada.
 
-1. Instala Tailscale en el PC y en el celular, con la misma cuenta.
-2. En el celular abre `http://NOMBRE-DEL-PC:8765` (o la IP `100.x.x.x` que
-   muestra Tailscale para el PC).
+### En el celular (Android)
 
-Así el PC no queda expuesto en internet y el tráfico va cifrado. **No abras
-el puerto 8765 en el router**: sin HTTPS la contraseña y la imagen viajarían
-sin cifrar.
+1. Instala **Tailscale** desde Play Store e inicia sesión con la misma
+   cuenta.
+2. En Android: **Ajustes › Redes › VPN › Tailscale › VPN siempre activa**.
+   Así no tienes que volver a abrir Tailscale nunca.
+3. En Chrome abre `https://NOMBRE-DEL-PC.TU-RED.ts.net` (la dirección
+   exacta aparece en la app de Tailscale, en tu PC).
+4. Ingresa la contraseña: el celular queda vinculado.
+5. Menú de Chrome › **Instalar app**. Desde ahí, Mi PC es un ícono más:
+   lo abres y entra solo.
 
-**Tip:** en el menú del navegador elige "Agregar a pantalla de inicio" y
-queda como una app más, a pantalla completa.
+## config.json
 
-## Cómo se usa
+Está en `%APPDATA%\MiPC\config.json`:
 
-| Gesto | Acción en el PC |
-|---|---|
-| Tocar | Clic izquierdo (dos toques rápidos = doble clic) |
-| Mantener presionado | Clic derecho |
-| Arrastrar un dedo | Arrastrar (seleccionar, mover ventanas) |
-| Pellizcar con dos dedos | Zoom de la imagen (botón **1:1** lo restablece) |
-| Botón **🖱️ Clic / ↕️ Rueda** | En modo Rueda, arrastrar = rueda del mouse |
-| Botón **⌨️** | Abre el teclado y la barra de teclas especiales |
-| **Baja / Media / Alta** | Calidad de imagen (baja = más fluido en 4G) |
-| **⏻** | Cerrar sesión |
+```json
+{
+  "folders": {
+    "Escritorio": "C:/Users/tu/Desktop",
+    "Descargas": "C:/Users/tu/Downloads"
+  },
+  "projects": {
+    "claude": "C:/Users/tu/repos/claude",
+    "scripts": "C:/Users/tu/repos/scripts"
+  },
+  "uploads": "C:/Users/tu/Downloads/MiPC"
+}
+```
 
-## Opciones del servidor
+- `folders`: lo único que se ve en la pestaña Archivos.
+- `projects`: las carpetas donde puede trabajar Claude (el selector de
+  arriba en la pestaña Claude). Claude también puede leer Escritorio y
+  Descargas para revisar archivos que le pidas.
+- `uploads`: dónde quedan los archivos que adjuntas en el chat.
 
-| Opción | Para qué |
-|---|---|
-| `--password` | Contraseña (mín. 8 caracteres). También `RD_PASSWORD`. Si falta, se genera una y se muestra en pantalla |
-| `--port 8765` | Puerto |
-| `--monitor 2` | Transmitir otro monitor |
-| `--max-width 1280` | Resolución enviada; bájala (p. ej. 960) si va lento |
-| `--cert` / `--key` | Activar HTTPS con tu propio certificado |
+Después de editarlo, ejecuta **`reiniciar_mi_pc.bat`**.
 
 ## Seguridad
 
-- Contraseña obligatoria; tras 5 intentos fallidos esa IP queda bloqueada 5 min.
-- Sesiones con token que expira a las 12 h; "⏻" lo invalida.
-- Una sola sesión a la vez: si alguien más se conecta, la anterior se corta.
-- Usa una contraseña larga y única, y prefiere Tailscale para acceso externo.
+- Solo se puede entrar desde tus equipos de Tailscale: el servidor
+  escucha únicamente dentro del PC y Tailscale lo publica cifrado.
+- Vincular un celular requiere la contraseña; tras 5 intentos fallidos se
+  bloquea 5 minutos. En el PC se guardan solo hashes, nunca la contraseña
+  ni los tokens.
+- Claude pide permiso en el celular antes de ejecutar comandos o editar
+  archivos (según tu configuración de permisos de Claude Code).
+- Para desvincular todos los celulares:
+  `.venv\Scripts\python -m remote_desktop.server --revoke-devices`
+
+Claude usa el login de tu suscripción que ya tienes en el PC. Según las
+condiciones de Anthropic eso está pensado para tu uso personal; si otra
+persona usara la app, habría que configurar una API key.
+
+## Problemas comunes
+
+| Síntoma | Qué revisar |
+|---|---|
+| "No se pudo conectar" | PC encendido, Tailscale conectado en ambos, `tailscale serve status` muestra el puerto 8765 |
+| Claude responde con error | En el PC ejecuta `claude` y revisa que la sesión siga iniciada |
+| No aparecen proyectos | Faltan en `projects` de config.json; reinicia con `reiniciar_mi_pc.bat` |
+| Una ventana se ve mal ajustada | Algunas apps no se achican; usa "Pantalla completa" en Mi PC |
+| Registro de errores | `%APPDATA%\MiPC\mi_pc.log` |
 
 ## Limitaciones
 
-- Sin audio ni transferencia de archivos.
-- Ctrl+Alt+Supr y la pantalla de bloqueo/UAC de Windows no se pueden
-  controlar (Windows lo impide a programas normales). Desactiva el bloqueo
-  automático si necesitas usarlo mucho rato.
-- El servidor debe estar corriendo con tu sesión de Windows iniciada.
+- Ctrl+Alt+Supr, la pantalla de bloqueo y las ventanas de administrador
+  (UAC) de Windows no se pueden controlar a distancia.
+- Si el PC se suspende o apaga, la app no puede despertarlo.
+- Sin audio.
+
+## Para desarrollar
+
+```bash
+pip install -r requirements.txt
+pytest
+flake8
+python -m remote_desktop.server --host 0.0.0.0   # probar en la red local
+```

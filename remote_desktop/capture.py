@@ -29,12 +29,18 @@ class ScreenCapture:
                 f"monitor {monitor_index} no existe (hay {len(monitors) - 1})"
             )
         self.monitor = dict(monitors[monitor_index])
+        self.region = self.monitor
         self.max_width = max_width
+        self._last_raw = None
+
+    def set_region(self, rect=None):
+        """Captura solo ese rectángulo (una ventana) o, con None, el monitor."""
+        self.region = dict(rect) if rect else self.monitor
         self._last_raw = None
 
     def grab(self, quality, force=False):
         """Devuelve un JPEG, o None si la pantalla no cambió."""
-        shot = self._sct.grab(self.monitor)
+        shot = self._sct.grab(self.region)
         raw = shot.rgb
         if not force and raw == self._last_raw:
             return None

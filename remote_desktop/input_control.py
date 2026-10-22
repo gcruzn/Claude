@@ -4,10 +4,11 @@ from remote_desktop.protocol import to_screen
 
 
 class InputController:
-    def __init__(self, monitor):
+    def __init__(self, region):
+        """region: función que devuelve el rectángulo que se está mostrando."""
         from pynput import keyboard, mouse
 
-        self._monitor = monitor
+        self._region = region
         self._mouse = mouse.Controller()
         self._keyboard = keyboard.Controller()
         self._buttons = {
@@ -25,7 +26,7 @@ class InputController:
     def handle(self, event):
         kind = event["t"]
         if kind == "move":
-            self._mouse.position = to_screen(event["x"], event["y"], self._monitor)
+            self._mouse.position = to_screen(event["x"], event["y"], self._region())
         elif kind == "down":
             self._mouse.press(self._buttons[event["b"]])
         elif kind == "up":

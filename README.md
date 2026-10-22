@@ -2,8 +2,9 @@
 
 A simple Python application.
 
-Incluye **Mi Escritorio Remoto**: controla tu PC desde el celular.
-Ver [remote_desktop/README.md](remote_desktop/README.md).
+Incluye **Mi PC**: trabaja con el PC de tu casa (Claude Code, archivos y
+ventanas) desde una sola app en el celular. Ver
+[remote_desktop/README.md](remote_desktop/README.md).
 
 ## Setup
 

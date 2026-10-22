@@ -2,78 +2,173 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#111418">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0f1216">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Mi Escritorio Remoto</title>
+  <title>Mi PC</title>
   <link rel="manifest" href="/static/manifest.json">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <section id="login" class="screen">
-    <form id="login-form" class="card">
-      <img src="/static/icon.svg" alt="" width="56" height="56">
-      <h1>Mi Escritorio Remoto</h1>
-      <p class="muted">Conéctate al PC de tu casa</p>
-      <input id="password" type="password" autocomplete="current-password"
-             placeholder="Contraseña" required>
-      <button type="submit">Conectar</button>
-      <p id="login-error" class="error" role="alert"></p>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+      <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+      <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+      <symbol id="i-mouse" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v4"/></symbol>
+      <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
+      <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+    </defs>
+  </svg>
+
+  <section id="splash" class="screen center">
+    <div class="logo"><svg class="ic lg"><use href="#i-monitor"/></svg></div>
+    <h1>Mi PC</h1>
+    <p id="splash-text" class="muted">Conectando a tu PC…</p>
+    <div id="splash-bar" class="bar"><span></span></div>
+    <button id="splash-retry" class="btn primary hidden">Reintentar</button>
+  </section>
+
+  <section id="pair" class="screen center hidden">
+    <form id="pair-form" class="card">
+      <div class="logo"><svg class="ic lg"><use href="#i-monitor"/></svg></div>
+      <h1>Vincular este celular</h1>
+      <p class="muted">Solo la primera vez. Después la app entra sola.</p>
+      <label for="pair-password">Contraseña de Mi PC</label>
+      <input id="pair-password" type="password" autocomplete="current-password" required>
+      <button type="submit" class="btn primary">Vincular</button>
+      <p id="pair-error" class="error" role="alert"></p>
     </form>
   </section>
 
-  <section id="viewer" class="screen hidden">
-    <div id="stage">
-      <div id="surface">
-        <canvas id="screen"></canvas>
-        <div id="cursor"></div>
+  <section id="app" class="screen hidden">
+    <header class="top">
+      <span id="dot" class="dot"></span>
+      <div class="grow">
+        <div id="top-title" class="title">Claude</div>
+        <div id="top-sub" class="sub">conectado</div>
       </div>
-      <div id="status">Conectando…</div>
+      <button id="project-btn" class="chip mono" aria-label="Cambiar proyecto">
+        <span id="project-name">—</span><svg class="ic sm"><use href="#i-down"/></svg>
+      </button>
+      <button id="files-refresh" class="icon-btn hidden" aria-label="Actualizar"><svg class="ic"><use href="#i-refresh"/></svg></button>
+      <button id="pc-refresh" class="icon-btn hidden" aria-label="Actualizar"><svg class="ic"><use href="#i-refresh"/></svg></button>
+    </header>
+
+    <main id="tab-claude" class="tab">
+      <div id="chat" class="chat" aria-live="polite"></div>
+    </main>
+
+    <main id="tab-files" class="tab hidden">
+      <div class="crumbbar">
+        <button id="files-up" class="icon-btn hidden" aria-label="Carpeta anterior"><svg class="ic"><use href="#i-back"/></svg></button>
+        <div class="grow">
+          <div id="files-crumbs" class="sub ellipsis"></div>
+          <div id="files-title" class="title">Carpetas</div>
+        </div>
+      </div>
+      <ul id="files-list" class="list"></ul>
+      <div class="pad">
+        <label id="files-upload-label" class="btn primary block hidden">
+          <svg class="ic"><use href="#i-upload"/></svg> Subir desde el celular aquí
+          <input id="files-upload" type="file" multiple hidden>
+        </label>
+      </div>
+    </main>
+
+    <main id="tab-pc" class="tab hidden">
+      <div class="pad stack">
+        <p id="pc-hint" class="muted small">Ventanas abiertas. Toca una para verla sola y ajustada al celular.</p>
+        <ul id="windows-list" class="cards"></ul>
+        <button id="pc-full" class="btn block">Ver pantalla completa</button>
+        <p class="muted small">Acciones rápidas</p>
+        <div class="grid2">
+          <button class="btn" data-pc="apps">Abrir programa</button>
+          <button class="btn" data-pc="lock">Bloquear PC</button>
+          <button class="btn" data-pc="volume">Volumen</button>
+          <button class="btn" data-pc="sleep">Suspender</button>
+        </div>
+      </div>
+    </main>
+
+    <div id="composer" class="composer">
+      <label class="icon-btn" aria-label="Adjuntar archivo del celular">
+        <svg class="ic"><use href="#i-plus"/></svg>
+        <input id="attach" type="file" multiple hidden>
+      </label>
+      <textarea id="prompt" rows="1" placeholder="Pídele algo a Claude en tu PC…" aria-label="Mensaje para Claude"></textarea>
+      <button id="send" class="icon-btn primary" aria-label="Enviar"><svg class="ic"><use href="#i-send"/></svg></button>
+      <button id="stop" class="icon-btn danger hidden" aria-label="Detener"><svg class="ic"><use href="#i-stop"/></svg></button>
     </div>
 
-    <div id="keybar" class="hidden">
-      <div class="typing">
-        <input id="typing" type="text" autocomplete="off" autocorrect="off"
-               autocapitalize="off" spellcheck="false" enterkeyhint="send"
-               placeholder="Escribe aquí: se teclea en el PC">
-      </div>
-      <div class="keys">
-        <button data-key="esc">Esc</button>
-        <button data-key="tab">Tab</button>
-        <button data-key="backspace">⌫</button>
-        <button data-key="enter">↵</button>
-        <button data-key="delete">Supr</button>
-        <button data-key="left">←</button>
-        <button data-key="up">↑</button>
-        <button data-key="down">↓</button>
-        <button data-key="right">→</button>
-        <button data-combo="ctrl,c">Ctrl+C</button>
-        <button data-combo="ctrl,v">Ctrl+V</button>
-        <button data-combo="ctrl,z">Ctrl+Z</button>
-        <button data-combo="ctrl,a">Ctrl+A</button>
-        <button data-combo="alt,tab">Alt+Tab</button>
-        <button data-combo="alt,f4">Alt+F4</button>
-        <button data-key="cmd">Win</button>
-        <button data-combo="cmd,d">Win+D</button>
-        <button data-key="f5">F5</button>
-      </div>
-    </div>
-
-    <nav id="toolbar">
-      <button id="mode" title="Modo de toque">🖱️ Clic</button>
-      <button id="kbd" title="Teclado">⌨️</button>
-      <button id="zoom-reset" title="Restablecer zoom">1:1</button>
-      <select id="quality" title="Calidad">
-        <option value="35,8">Baja</option>
-        <option value="60,10" selected>Media</option>
-        <option value="80,15">Alta</option>
-      </select>
-      <button id="logout" title="Salir">⏻</button>
+    <nav class="tabs">
+      <button data-tab="claude" class="active"><svg class="ic"><use href="#i-chat"/></svg><span>Claude</span></button>
+      <button data-tab="files"><svg class="ic"><use href="#i-folder"/></svg><span>Archivos</span></button>
+      <button data-tab="pc"><svg class="ic"><use href="#i-monitor"/></svg><span>Mi PC</span></button>
     </nav>
   </section>
+
+  <section id="viewer" class="screen hidden">
+    <header class="top">
+      <button id="viewer-back" class="icon-btn" aria-label="Volver"><svg class="ic"><use href="#i-back"/></svg></button>
+      <div class="grow">
+        <div id="viewer-title" class="title">Pantalla</div>
+        <div id="viewer-sub" class="sub">Conectando…</div>
+      </div>
+      <button id="viewer-quality" class="chip">Media</button>
+    </header>
+    <div id="stage">
+      <div id="surface"><canvas id="screen"></canvas><div id="cursor"></div></div>
+    </div>
+    <div id="keybar" class="hidden">
+      <input id="typing" type="text" autocomplete="off" autocorrect="off" autocapitalize="off"
+             spellcheck="false" enterkeyhint="send" placeholder="Lo que escribas se teclea en el PC">
+      <div class="keys">
+        <button data-key="esc">Esc</button><button data-key="tab">Tab</button>
+        <button data-key="backspace">⌫</button><button data-key="enter">Enter</button>
+        <button data-key="left">←</button><button data-key="up">↑</button>
+        <button data-key="down">↓</button><button data-key="right">→</button>
+        <button data-combo="ctrl,c">Ctrl+C</button><button data-combo="ctrl,v">Ctrl+V</button>
+        <button data-combo="ctrl,z">Ctrl+Z</button><button data-combo="ctrl,s">Ctrl+S</button>
+        <button data-combo="alt,tab">Alt+Tab</button><button data-key="cmd">Win</button>
+        <button data-key="delete">Supr</button><button data-key="f5">F5</button>
+      </div>
+    </div>
+    <div class="viewer-bar">
+      <button id="viewer-mode" class="btn"><svg class="ic"><use href="#i-mouse"/></svg><span>Clic</span></button>
+      <button id="viewer-kbd" class="btn"><svg class="ic"><use href="#i-keyboard"/></svg><span>Teclado</span></button>
+      <button id="viewer-zoom" class="btn"><svg class="ic"><use href="#i-zoom"/></svg><span>1:1</span></button>
+      <button id="viewer-close" class="btn"><svg class="ic"><use href="#i-x"/></svg><span>Cerrar</span></button>
+    </div>
+  </section>
+
+  <div id="sheet" class="overlay hidden" role="dialog" aria-modal="true">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="grow">
+          <div id="sheet-title" class="title wrap"></div>
+          <div id="sheet-sub" class="sub"></div>
+        </div>
+        <button id="sheet-close" class="icon-btn" aria-label="Cerrar"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div id="sheet-body" class="sheet-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status"></div>
 
   <script src="/static/app.js"></script>
 </body>
