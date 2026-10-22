@@ -439,6 +439,22 @@ public class Data {
             seeds.add("pruebas6");
             changed = true;
         }
+        if (!seeds.contains("pruebas7")) {
+            // 22-oct, pedido de Gonzalo: Pruebas con un solo patrón, golpe y avance hacia la última
+            // dirección, para medir qué tan fluido retoma esas dos acciones al levantar el lápiz.
+            if (pattern("golpe_avance") == null) addPattern("golpe_avance", "Golpe + avance",
+                    "# Avanza hacia tu última dirección y golpea cada 0,11 s; nada más\n"
+                            + "mover ultima 3\n"
+                            + "cada 0.11 disparar");
+            PadSet s = set("pruebas");
+            if (s != null) {
+                s.slots.clear();
+                s.slots.add("golpe_avance");
+                activeSet = "pruebas";
+            }
+            seeds.add("pruebas7");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
