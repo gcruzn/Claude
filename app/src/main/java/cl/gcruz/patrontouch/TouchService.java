@@ -374,6 +374,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     public float[] joyPoint() { return cal.get("joy"); }
 
+    /** La captura vio que Gonzalo tomó otra dirección con el lápiz: la vuelta se rehace hacia ella. */
+    public void steerChanged() { main.post(() -> player.restartLapSoon()); }
+
     public float joyRadiusPx() { return cal.joyRadius(); }
 
     /** Zona de la botonera en pantalla: su azul no es la perilla. */

@@ -203,8 +203,26 @@ public class Player {
      * apoyar en su punto inicial y en REPRESS_MS retoma su posición, como al empezar un movimiento;
      * los toques cortos que cruzan el borde no se parten: el tramo se alarga hasta que terminen.
      */
+    private volatile boolean restartLap;
+
+    /**
+     * Rehace la vuelta en el próximo tramo (sin cortar el gesto en curso), con el patrón que entregue
+     * `next` (se recompila: toma la última dirección nueva). 22-oct: antes la dirección nueva del
+     * lápiz recién se aplicaba en la vuelta siguiente (hasta ~3 s).
+     */
+    public void restartLapSoon() {
+        if (playing && next != null) restartLap = true;
+    }
+
     private void sendSlice(final int s) {
         if (!playing || s != session) return;
+        if (restartLap) {
+            restartLap = false;
+            Pattern n = next.get();
+            if (n != null && !n.touches.isEmpty() && n.duration > 0) pattern = n;
+            beginRepetition(s);
+            return;
+        }
         long a = slice;
         if (a >= pattern.duration) {
             endRepetition(s);

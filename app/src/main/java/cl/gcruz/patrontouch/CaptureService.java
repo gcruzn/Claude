@@ -180,11 +180,6 @@ public class CaptureService extends Service {
             }
         }
         if (n >= PRESSED_PX) knobSeenAt = SystemClock.uptimeMillis();
-        if (injecting) {
-            pressed = false;
-            baseX = -1;
-            return;
-        }
         if (n < PRESSED_PX) {
             if (pressed) android.util.Log.i(TouchService.TAG, "perilla suelta (dirección guardada: " + Script.steerDir + ")");
             pressed = false;
@@ -203,8 +198,27 @@ public class CaptureService extends Service {
         double ang = (Math.toDegrees(Math.atan2(dy, dx)) + 360) % 360;
         String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
         String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
+        if (injecting) {
+            // 22-oct: con el patrón corriendo la perilla puede ser la nuestra o la del lápiz de
+            // Gonzalo (con el lápiz cerca Android bloquea lo inyectado). Si apunta a más de 45° de la
+            // dirección que lleva el patrón, es la de él: se adopta y el patrón cambia de rumbo ya.
+            if (Script.steerDir != null && octants(d, Script.steerDir) < 2) return;
+            android.util.Log.i(TouchService.TAG, "lápiz hacia " + d + " (el patrón iba " + Script.steerDir + ")");
+            Script.steerDir = d;
+            svc.steerChanged();
+            return;
+        }
         if (!d.equals(Script.steerDir)) android.util.Log.i(TouchService.TAG, "perilla hacia " + d);
         Script.steerDir = d;
+    }
+
+    /** Distancia en octantes (0–4) entre dos direcciones. */
+    private static int octants(String a, String b) {
+        java.util.List<String> r = java.util.Arrays.asList("right", "upright", "up", "upleft", "left", "downleft", "down", "downright");
+        int i = r.indexOf(a), j = r.indexOf(b);
+        if (i < 0 || j < 0) return 4;
+        int k = Math.abs(i - j) % 8;
+        return Math.min(k, 8 - k);
     }
 
     @Override
