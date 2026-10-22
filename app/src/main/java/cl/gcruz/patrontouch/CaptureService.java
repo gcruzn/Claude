@@ -50,6 +50,18 @@ public class CaptureService extends Service {
 
     public static boolean isRunning() { return running; }
 
+    /** Último instante (uptime) en que se vio la perilla apretada, sea la del patrón o la de Gonzalo. */
+    private static volatile long knobSeenAt;
+
+    /**
+     * ¿El juego está mostrando la perilla? Con el patrón corriendo es la del joystick inyectado: si
+     * no se ve, Android lo está bloqueando (S Pen cerca) y el reproductor pasa a tramos cortos para
+     * retomar apenas se aleje el lápiz (22-oct).
+     */
+    public static boolean knobVisible(long withinMs) {
+        return running && SystemClock.uptimeMillis() - knobSeenAt <= withinMs;
+    }
+
     private MediaProjection projection;
     private VirtualDisplay display;
     private ImageReader reader;
@@ -143,11 +155,7 @@ public class CaptureService extends Service {
     private void analyze(Image img) {
         TouchService svc = TouchService.get();
         if (svc == null) return;
-        if (svc.isInjecting()) {   // la perilla que se ve es la nuestra
-            pressed = false;
-            baseX = -1;
-            return;
-        }
+        boolean injecting = svc.isInjecting();   // entonces la perilla que se ve es la nuestra
         float[] joy = svc.joyPoint();
         if (joy == null) return;
         Rect panel = svc.panelRect();
@@ -170,6 +178,12 @@ public class CaptureService extends Service {
                     sy += y;
                 }
             }
+        }
+        if (n >= PRESSED_PX) knobSeenAt = SystemClock.uptimeMillis();
+        if (injecting) {
+            pressed = false;
+            baseX = -1;
+            return;
         }
         if (n < PRESSED_PX) {
             if (pressed) android.util.Log.i(TouchService.TAG, "perilla suelta (dirección guardada: " + Script.steerDir + ")");

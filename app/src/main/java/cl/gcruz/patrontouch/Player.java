@@ -215,7 +215,8 @@ public class Player {
         // independientes se retoma en el siguiente. Sin joystick, cada toque es su propio gesto.
         boolean hasLong = false;
         for (Pattern.Touch t : pattern.touches) if (t.up() - t.down() > SHORT_TOUCH_MS) hasLong = true;
-        long e = hasLong ? a + SLICE_MS : a + 1;
+        long len = hasLong ? jointSlice() : 1;
+        long e = a + len;
         // Los toques cortos (disparos, súper apuntado: hasta SHORT_TOUCH_MS) no se parten: si cruzan
         // el borde, o empiezan hasta BORDER_GAP_MS después de él, el tramo se alarga hasta que terminen. 20-oct, video de Corta: si el
         // joystick se vuelve a apoyar en el mismo instante en que sale un disparo, el juego ignora
@@ -267,7 +268,7 @@ public class Player {
             // El dedo largo (joystick) nunca pasa de a + SLICE_MS aunque el tramo se alargue por un
             // toque corto: 21-oct, con gadget/híper/súper el tramo se estiraba, el joystick virtual
             // seguía apretado y el arrastre de Gonzalo a veces no tomaba.
-            if (tu - td > SHORT_TOUCH_MS) se = Math.min(se, a + SLICE_MS);
+            if (tu - td > SHORT_TOUCH_MS) se = Math.min(se, a + len);
             if (se <= sa) continue;
             Pattern.Touch part = td < a ? repress(t, sa, se) : sub(t, sa, se);
             try {
@@ -291,6 +292,24 @@ public class Player {
         }
         send(b.build(), () -> sendSlice(s));
     }
+
+    /**
+     * Largo del tramo con joystick. Medido 22-oct: re-apoyar cada 0,11 s deja al brawler ~45 % más
+     * lento (cada re-apoyo pierde ~45 ms de avance), así que no se re-apoya seguido por las dudas.
+     * Con la lectura de pantalla activa: si la perilla del joystick inyectado se ve, tramos de
+     * LONG_SLICE_MS (~7 % menos velocidad); si no se ve, Android lo está bloqueando (S Pen cerca)
+     * y se prueba con tramos de PROBE_SLICE_MS hasta que vuelva a entrar. Sin captura, SLICE_MS.
+     */
+    private long jointSlice() {
+        if (!CaptureService.isRunning()) return SLICE_MS;
+        if (SystemClock.uptimeMillis() - repStartUptime < 300) return LONG_SLICE_MS; // la perilla aún no aparece
+        return CaptureService.knobVisible(150) ? LONG_SLICE_MS : PROBE_SLICE_MS;
+    }
+
+    // 600 ms y no más: el bloqueo del lápiz se nota recién al terminar el tramo en curso (cortarlo
+    // a la mitad es lo que trababa Android). Con el lápiz cerca más de 0,6 s, al alejarlo ya se
+    // está probando cada 0,1 s.
+    static volatile long LONG_SLICE_MS = 600, PROBE_SLICE_MS = 100;
 
     /** ms del centro del joystick a su posición al re-apoyar; ajustable por ADB («tune repress»). */
     static volatile long REPRESS_MS = 40;
