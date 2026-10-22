@@ -273,13 +273,13 @@ final class AutoController {
             t += hold + 40;
         }
         if (aimHold > 0) {   // caña de Nori: mantener el ataque arrastrado hacia el enemigo
-            float[] ab = svc.calib().get("attack");
-            if (ab != null) {
+            float[] atk = svc.calib().get("attack");
+            if (atk != null) {
                 double ang = Math.atan2(st.enemy[1] - st.py, st.enemy[0] - st.px);
                 float r = svc.calib().aimRadius() * 1.5f;
-                float ex = ab[0] + (float) (r * Math.cos(ang)), ey = ab[1] + (float) (r * Math.sin(ang));
+                float ex = atk[0] + (float) (r * Math.cos(ang)), ey = atk[1] + (float) (r * Math.sin(ang));
                 Pattern.Touch x = new Pattern.Touch();
-                x.pts.add(new Pattern.Point(t, ab[0], ab[1]));
+                x.pts.add(new Pattern.Point(t, atk[0], atk[1]));
                 x.pts.add(new Pattern.Point(t + 150, ex, ey));
                 x.pts.add(new Pattern.Point(t + aimHold, ex, ey));
                 p.touches.add(x);
