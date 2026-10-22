@@ -420,6 +420,25 @@ public class Data {
             seeds.add("pruebas5");
             changed = true;
         }
+        if (!seeds.contains("pruebas6")) {
+            // 22-oct: Auto-tap al estilo del Auto Clicker de Gonzalo (toques sueltos de 10 ms): ataque
+            // cada 0,11 s, híper + súper cada 1,2 s, gadget cada 3,6 s, sin mover (mueve él con el
+            // lápiz). Reemplaza a «Prueba · Disparo» en el botón 1 (el set ya tiene 6).
+            if (pattern("autotap") == null) addPattern("autotap", "Auto-tap",
+                    "# Solo toques sueltos, sin mover: ataque cada 0,11 s, híper + súper cada 1,2 s, gadget cada 3,6 s\n"
+                            + "esperar 3.6\n"
+                            + "cada 0.11 disparar\n"
+                            + "cada 1.2 hiper super\n"
+                            + "cada 3.6 gadget");
+            PadSet s = set("pruebas");
+            if (s != null && !s.slots.contains("autotap")) {
+                int i = s.slots.indexOf("prueba_disparo");
+                if (i >= 0) s.slots.set(i, "autotap");
+                else if (s.slots.size() < MAX_SLOTS) s.slots.add("autotap");
+            }
+            seeds.add("pruebas6");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.

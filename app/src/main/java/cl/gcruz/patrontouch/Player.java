@@ -49,8 +49,8 @@ public class Player {
     // rápido al tocar lo da el corte seguro de stopByUserTouch, no el largo del tramo.
     // 22-oct: con un solo gesto por vuelta, si el S Pen se acerca (Android bloquea los toques
     // inyectados) el juego pierde el apoyo del joystick y no lo retoma hasta la vuelta siguiente
-    // (~4 s). Re-apoyar una vez por segundo: retoma en ≤ 1 s sin los saltos de los tramos cortos.
-    static volatile long SLICE_MS = 1000;
+    // (~4 s). Re-apoyar cada 0,5 s: retoma en ≤ 0,5 s sin los saltos de los tramos de 0,15 s.
+    static volatile long SLICE_MS = 500;
 
     private final AccessibilityService service;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -210,7 +210,12 @@ public class Player {
             endRepetition(s);
             return;
         }
-        long e = a + SLICE_MS;
+        // 22-oct, Auto Clicker de Gonzalo (medido: toques de 10 ms, uno por gesto, cada ~110 ms):
+        // con el S Pen cerca Android bloquea lo inyectado y se pierde el gesto entero; con gestos
+        // independientes se retoma en el siguiente. Sin joystick, cada toque es su propio gesto.
+        boolean hasLong = false;
+        for (Pattern.Touch t : pattern.touches) if (t.up() - t.down() > SHORT_TOUCH_MS) hasLong = true;
+        long e = hasLong ? a + SLICE_MS : a + 1;
         // Los toques cortos (disparos, súper apuntado: hasta SHORT_TOUCH_MS) no se parten: si cruzan
         // el borde, o empiezan hasta BORDER_GAP_MS después de él, el tramo se alarga hasta que terminen. 20-oct, video de Corta: si el
         // joystick se vuelve a apoyar en el mismo instante en que sale un disparo, el juego ignora
@@ -277,8 +282,11 @@ public class Player {
         slice = e;
         final long next = e;
         if (n == 0) {
-            // Tramo vacío (una espera): se respeta el tiempo sin inyectar nada.
-            handler.postAtTime(() -> sendSlice(s), repStartUptime + next);
+            // Tramo vacío (una espera): se salta al próximo toque sin inyectar nada.
+            long at = pattern.duration;
+            for (Pattern.Touch t : pattern.touches) if (t.down() >= next && t.down() < at) at = t.down();
+            slice = Math.max(next, at);
+            handler.postAtTime(() -> sendSlice(s), repStartUptime + slice);
             return;
         }
         send(b.build(), () -> sendSlice(s));
