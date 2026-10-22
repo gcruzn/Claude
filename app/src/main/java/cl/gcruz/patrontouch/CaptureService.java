@@ -179,7 +179,12 @@ public class CaptureService extends Service {
                 }
             }
         }
-        if (n >= PRESSED_PX) knobSeenAt = SystemClock.uptimeMillis();
+        long now = SystemClock.uptimeMillis();
+        if (n >= PRESSED_PX) knobSeenAt = now;
+        // Con el patrón corriendo, la perilla ausente más de BLOCK_MS = Android bloquea lo inyectado
+        // (lápiz cerca). Solo en ese estado una perilla que aparece es la del lápiz de Gonzalo.
+        if (!injecting) blocked = false;
+        else if (n < PRESSED_PX && now - knobSeenAt > BLOCK_MS) blocked = true;
         if (n < PRESSED_PX) {
             if (pressed) android.util.Log.i(TouchService.TAG, "perilla suelta (dirección guardada: " + Script.steerDir + ")");
             pressed = false;
@@ -206,19 +211,15 @@ public class CaptureService extends Service {
         String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
         String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
         if (injecting) {
-            // 22-oct: con el patrón corriendo la perilla puede ser la nuestra o la del lápiz de
-            // Gonzalo (con el lápiz cerca Android bloquea lo inyectado). La nuestra sale desde su
-            // apoyo hacia el rumbo del patrón; si sale a más de 45° de ese rumbo y se sostiene
-            // ADOPT_FRAMES cuadros, es la del lápiz.
-            if (Script.steerDir != null && octants(d, Script.steerDir) < 2) { foreign = 0; return; }
-            if (SystemClock.uptimeMillis() - adoptedAt < 400) return;   // el patrón recién cambió de rumbo
+            // 22-oct (v5.9.3): adivinar cuadro a cuadro de quién era la perilla cambiaba el rumbo solo,
+            // con el lápiz lejos (Gonzalo). Ahora solo se lee en estado «bloqueado»: ahí el patrón no
+            // llega al juego y la perilla visible es la del lápiz. Al retomar, la perilla del patrón
+            // apunta al rumbo ya adoptado y no cambia nada.
+            if (d.equals(Script.steerDir)) { blocked = false; foreign = 0; return; }   // el patrón retomó
+            if (!blocked) return;
             if (!d.equals(foreignDir)) { foreignDir = d; foreign = 0; }
-            // Un giro al opuesto exacto exige el doble de cuadros: es lo que fabricaba un re-apoyo
-            // medido desde una base vieja (v5.8.0).
-            int need = Script.steerDir != null && octants(d, Script.steerDir) == 4 ? 2 * ADOPT_FRAMES : ADOPT_FRAMES;
-            if (++foreign < need) return;
+            if (++foreign < ADOPT_FRAMES) return;
             foreign = 0;
-            adoptedAt = SystemClock.uptimeMillis();
             android.util.Log.i(TouchService.TAG, "lápiz hacia " + d + " (el patrón iba " + Script.steerDir + ")");
             Script.steerDir = d;
             svc.steerChanged();
@@ -231,7 +232,8 @@ public class CaptureService extends Service {
     private static final int ADOPT_FRAMES = 3;
     private static final float JUMP_PX = 35;          // salto entre cuadros (media res.) = apoyo nuevo
     private float lastKx, lastKy;
-    private long adoptedAt;
+    private static final long BLOCK_MS = 150;
+    private boolean blocked;
     private int foreign;
     private String foreignDir;
 
