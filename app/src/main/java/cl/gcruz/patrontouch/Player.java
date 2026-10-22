@@ -321,8 +321,15 @@ public class Player {
     private long jointSlice() {
         if (!CaptureService.isRunning()) return SLICE_MS;
         if (SystemClock.uptimeMillis() - repStartUptime < 300) return LONG_SLICE_MS; // la perilla aún no aparece
-        return CaptureService.knobVisible(150) ? LONG_SLICE_MS : PROBE_SLICE_MS;
+        boolean probe = !CaptureService.knobVisible(150);
+        if (probe != probing) {
+            probing = probe;
+            android.util.Log.i("PatronTouch", probe ? "tramos cortos: no se ve la perilla del patrón" : "tramos largos: perilla visible");
+        }
+        return probe ? PROBE_SLICE_MS : LONG_SLICE_MS;
     }
+
+    private boolean probing;
 
     // 600 ms y no más: el bloqueo del lápiz se nota recién al terminar el tramo en curso (cortarlo
     // a la mitad es lo que trababa Android). Con el lápiz cerca más de 0,6 s, al alejarlo ya se
