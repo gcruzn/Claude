@@ -323,3 +323,6 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
   seguro; arrastre → Script.steerDir; fuera de rango → retoma al instante. Con Shizuku activo, un
   gesto por vuelta (sin re-apoyos) y la pantalla no se usa con el patrón corriendo.
 - Shizuku se inicia tras cada reinicio desde su propia app (Depuración inalámbrica, sin PC).
+- **Validado por Gonzalo (22-oct, v6.1.0): «funciona genial»** con Disparo 0,4 + Joystick y el lápiz.
+  Arranque de Shizuku sin pasar por su app (con ADB conectado):
+  `adb shell 'P=$(pm path --user 0 moe.shizuku.privileged.api | head -1 | sed "s/package://"); $(dirname $P)/lib/arm64/libshizuku.so'`
