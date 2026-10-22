@@ -54,6 +54,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private WindowManager wm;
     private SharedPreferences prefs;
     private Player player;
+    private AutoController auto;
     private Calibration cal;
     private Data data;
 
@@ -71,6 +72,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         data = Data.load(this);
         Point s = screenSize();
         cal = new Calibration(this, s.x, s.y);
+        auto = new AutoController(this, player, prefs, main);
         showPanel();
         registerDebug();
         observePen();
@@ -111,8 +113,14 @@ public class TouchService extends AccessibilityService implements Player.Listene
             if (down) {
                 penDownX = penCurX;
                 penDownY = penCurY;
+                penDragged = false;
                 main.post(this::penNear);
             } else {
+                // Tocar el joystick sin arrastrar = «centro»: el Auto dibuja la forma en el sitio.
+                if (!penDragged && penInJoystick(penDownX, penDownY)) {
+                    Script.steerDir = "center";
+                    android.util.Log.i(TAG, "lápiz: toque en el centro del joystick");
+                }
                 penDownX = -1;
                 penUpAt = SystemClock.uptimeMillis();
                 // Si no llega el aviso de «fuera de rango», se retoma igual a los 1,5 s.
@@ -147,12 +155,36 @@ public class TouchService extends AccessibilityService implements Player.Listene
         double ang = (Math.toDegrees(Math.atan2(-sy, sx)) + 360) % 360;
         String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
         String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
+        penDragged = true;
         if (!d.equals(Script.steerDir)) android.util.Log.i(TAG, "lápiz hacia " + d);
         Script.steerDir = d;
     }
 
+    private boolean penDragged;
+
+    /** ¿El punto del lápiz (coordenadas del digitalizador: x 0–7330 corto, y 0–15881 largo) cae en el joystick? */
+    private boolean penInJoystick(int px, int py) {
+        float[] joy = cal.get("joy");
+        if (joy == null || px < 0 || py < 0) return false;
+        Point s = screenSize();
+        int pw = Math.min(s.x, s.y), ph = Math.max(s.x, s.y);
+        float nx = px / 7330f * pw, ny = py / 15881f * ph, sx, sy;
+        switch (wm.getDefaultDisplay().getRotation()) {
+            case android.view.Surface.ROTATION_90: sx = ny; sy = pw - nx; break;
+            case android.view.Surface.ROTATION_270: sx = ph - ny; sy = nx; break;
+            case android.view.Surface.ROTATION_180: sx = pw - nx; sy = ph - ny; break;
+            default: sx = nx; sy = ny;
+        }
+        return Math.hypot(sx - joy[0], sy - joy[1]) < cal.joyRadius() * 2.2f;
+    }
+
     private void penNear() {
         main.removeCallbacks(penHoverTimeout);
+        if (auto != null && auto.running()) {
+            if (!auto.paused()) android.util.Log.i(TAG, "lápiz cerca: Auto en pausa");
+            auto.pause();
+            return;
+        }
         if (player.isPlaying() && lastRun != null) {
             penPausedIdx = activeIdx;
             penResume = lastRun;
@@ -163,6 +195,12 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     private void penAway() {
         if (penTouching) return;
+        if (auto != null && auto.running() && auto.paused()) {
+            android.util.Log.i(TAG, "lápiz lejos: Auto retoma hacia " + Script.steerDir);
+            auto.resume();
+            paintAuto();
+            return;
+        }
         Runnable r = penResume;
         if (r != null && !player.isPlaying()) {
             penResume = null;
@@ -553,6 +591,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
 
     public float[] joyPoint() { return cal.get("joy"); }
 
+    /** La calibración vigente (se reemplaza al recalibrar). */
+    Calibration calib() { return cal; }
+
     /** La captura vio que Gonzalo tomó otra dirección con el lápiz: la vuelta se rehace hacia ella. */
     public void steerChanged() { main.post(() -> player.restartLapSoon()); }
 
@@ -918,12 +959,16 @@ public class TouchService extends AccessibilityService implements Player.Listene
         return (v, e) -> {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    if (isChannel(i)) return true;   // canal: se alterna al soltar, sin tocar el gesto en curso
+                    if (isAuto(i) || isChannel(i)) return true;   // se alterna al soltar, sin tocar el gesto en curso
                     touchStopOnly = (player.isPlaying() && activeIdx == i) || (penResume != null && penPausedIdx == i);
                     if (player.isPlaying()) player.stopByUserTouch();
                     ((GradientDrawable) v.getBackground()).setColor(activeColor(MODE_LOOP));
                     return true;
                 case MotionEvent.ACTION_UP:
+                    if (isAuto(i)) {
+                        toggleAuto(i);
+                        return true;
+                    }
                     if (isChannel(i)) {
                         toggleChannel(i);
                         return true;
@@ -954,6 +999,36 @@ public class TouchService extends AccessibilityService implements Player.Listene
      * Un patrón es canal si su id empieza con «canal_».
      */
     private final java.util.TreeSet<Integer> channels = new java.util.TreeSet<>();
+
+    // ---------------------------------------------------------------- botón Auto (22-oct)
+
+    private int autoIdx = -1;
+
+    private boolean isAuto(int i) {
+        List<Data.PatternDef> pats = data.slotPatterns(data.active());
+        return i >= 0 && i < pats.size() && pats.get(i).id.equals("auto_main");
+    }
+
+    private void toggleAuto(int i) {
+        if (auto.running()) {
+            auto.stop();
+            autoIdx = -1;
+            lastRun = null;
+            paintIdle();
+            return;
+        }
+        channels.clear();
+        if (!CaptureService.isRunning()) startCapture();   // la visión decide disparos y súper
+        autoIdx = i;
+        lastRun = null;
+        auto.start();
+        paintAuto();
+    }
+
+    private void paintAuto() {
+        TextView b = buttonFor(autoIdx);
+        if (auto != null && auto.running() && b != null) ((GradientDrawable) b.getBackground()).setColor(activeColor(MODE_LOOP));
+    }
 
     private boolean isChannel(int i) {
         List<Data.PatternDef> pats = data.slotPatterns(data.active());
@@ -1144,6 +1219,20 @@ public class TouchService extends AccessibilityService implements Player.Listene
         ulp.setMargins(0, dp(8), 0, 0);
         box.addView(use, ulp);
 
+        // Configuración del botón Auto (22-oct): forma, disparo, súper y habilidades sin salir del juego.
+        TextView cfg = new TextView(this);
+        cfg.setText("⚙ Configurar Auto");
+        cfg.setGravity(Gravity.CENTER);
+        cfg.setTextColor(AZUL);
+        cfg.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        cfg.setTypeface(Typeface.DEFAULT_BOLD);
+        cfg.setPadding(dp(8), dp(10), dp(8), dp(4));
+        cfg.setOnClickListener(v -> {
+            closeMenu();
+            showAutoConfig();
+        });
+        box.addView(cfg, new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT));
+
         // Lectura del joystick por captura de pantalla (22-oct): encender/apagar sin salir del juego,
         // y si se pide sola al abrir Brawl Stars.
         LinearLayout capRow = new LinearLayout(this);
@@ -1209,6 +1298,84 @@ public class TouchService extends AccessibilityService implements Player.Listene
         wm.addView(box, lp);
     }
 
+    /** Ajustes del botón Auto: cada fila cambia al siguiente valor al tocarla. */
+    private void showAutoConfig() {
+        closeMenu();
+        Point scr = screenSize();
+        int width = Math.min(dp(380), (int) (scr.x * 0.9f));
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(12), dp(10), dp(12), dp(6));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.argb(250, 255, 255, 255));
+        bg.setCornerRadius(dp(16));
+        box.setBackground(bg);
+        box.setElevation(dp(8));
+        TextView t = new TextView(this);
+        t.setText("Botón Auto · toca una fila para cambiarla");
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTextColor(GRAFITO);
+        t.setPadding(dp(2), 0, dp(2), dp(6));
+        box.addView(t);
+        String[] keys = {"auto_shape", "auto_shot", "auto_super", "auto_range", "auto_abil"};
+        String[] names = {"Forma", "Disparo", "Súper", "Alcance del súper", "Gadget e híper"};
+        int[] defs = {2, 2, 0, 1, 0};
+        String[][] values = {AutoController.SHAPES, AutoController.SHOTS, AutoController.SUPERS,
+                rangeLabels(), AutoController.ABILITIES};
+        for (int k = 0; k < keys.length; k++) {
+            final int kk = k;
+            TextView row = new TextView(this);
+            row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            row.setTextColor(GRAFITO);
+            row.setPadding(dp(10), dp(10), dp(10), dp(10));
+            GradientDrawable rb = new GradientDrawable();
+            rb.setColor(Color.argb(255, 240, 241, 242));
+            rb.setCornerRadius(dp(10));
+            row.setBackground(rb);
+            Runnable paint = () -> row.setText(names[kk] + ":  " + values[kk][auto.idx(keys[kk], defs[kk], values[kk].length)] + "  ›");
+            paint.run();
+            row.setOnClickListener(v -> {
+                int cur = auto.idx(keys[kk], defs[kk], values[kk].length);
+                prefs.edit().putInt(keys[kk], (cur + 1) % values[kk].length).apply();
+                paint.run();
+            });
+            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
+            rlp.setMargins(0, dp(4), 0, 0);
+            box.addView(row, rlp);
+        }
+        TextView close = new TextView(this);
+        close.setText("Listo");
+        close.setGravity(Gravity.CENTER);
+        close.setTextColor(Color.WHITE);
+        close.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        close.setTypeface(Typeface.DEFAULT_BOLD);
+        close.setPadding(dp(12), dp(10), dp(12), dp(10));
+        GradientDrawable cb = new GradientDrawable();
+        cb.setColor(AZUL);
+        cb.setCornerRadius(dp(12));
+        close.setBackground(cb);
+        close.setOnClickListener(v -> {
+            closeMenu();
+            android.util.Log.i(TAG, "Auto: " + auto.summary());
+        });
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
+        clp.setMargins(0, dp(8), 0, dp(4));
+        box.addView(close, clp);
+        WindowManager.LayoutParams lp = overlayParams(false);
+        lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.gravity = Gravity.CENTER;
+        menuWindow = box;
+        wm.addView(box, lp);
+    }
+
+    private static String[] rangeLabels() {
+        String[] r = new String[AutoController.RANGES.length];
+        for (int i = 0; i < r.length; i++) r[i] = AutoController.RANGES[i] + " px";
+        return r;
+    }
+
     private void closeMenu() {
         if (menuWindow != null && wm != null) try { wm.removeView(menuWindow); } catch (Exception ignored) { }
         menuWindow = null;
@@ -1238,6 +1405,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         TextView b = buttonFor(activeIdx);
         if (playing && b != null) ((GradientDrawable) b.getBackground()).setColor(activeColor(activeMode));
         if (playing) paintChannels();
+        paintAuto();
         if (!playing) {
             activeIdx = -1;
             if (status != null && !status.startsWith("Listo") && !status.equals("Detenido")) toast(status);

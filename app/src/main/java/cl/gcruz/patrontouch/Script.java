@@ -540,6 +540,10 @@ public class Script {
                         }
                         s = r;
                     }
+                    if ("center".equals(s.dir)) {   // el lápiz tocó el centro: sin desplazamiento
+                        t += Math.round(s.secs * 1000);
+                        break;
+                    }
                     float[] target = offset(joy, s.dir, cal.joyRadius());
                     long ramp = 60;
                     if (js == null) {

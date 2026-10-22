@@ -475,6 +475,25 @@ public class Data {
             seeds.add("pruebas8");
             changed = true;
         }
+        if (!seeds.contains("auto1")) {
+            // 22-oct, pedido de Gonzalo: un solo botón «Auto» (forma + disparo según munición + súper con
+            // enemigo al alcance), configurable desde la botonera. El script no se usa: lo maneja
+            // AutoController.
+            if (pattern("auto_main") == null) addPattern("auto_main", "Auto",
+                    "# Botón Auto: se configura desde la botonera (⚙ Configurar Auto)\nesperar 1");
+            if (set("auto") == null) {
+                PadSet s = new PadSet();
+                s.id = "auto";
+                s.brawler = "General";
+                s.mode = "Auto";
+                s.name = "Auto";
+                s.slots.add("auto_main");
+                sets.add(s);
+            }
+            activeSet = "auto";
+            seeds.add("auto1");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.

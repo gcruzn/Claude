@@ -209,6 +209,40 @@ public class Player {
      * los toques cortos que cruzan el borde no se parten: el tramo se alarga hasta que terminen.
      */
     private volatile boolean restartLap;
+    private Pattern pending;
+
+    /**
+     * Cambia YA al patrón `p` (botón Auto: un disparo o el súper decididos por lo que se ve en
+     * pantalla). Corta el gesto en curso solo si en este instante no hay un toque corto abajo (la
+     * única cancelación que Android acepta sin trabar el dedo inyectado); si lo hay, reintenta en
+     * 30 ms. Sin nada sonando, simplemente arranca.
+     */
+    public void replaceNow(Pattern p, java.util.function.Supplier<Pattern> nextSupplier) {
+        if (p == null || p.touches.isEmpty()) return;
+        if (!playing) {
+            start(p, 0, 0, nextSupplier);
+            return;
+        }
+        long now = SystemClock.uptimeMillis() - sliceSentAt;
+        for (long[] w : sliceShorts) {
+            if (now >= w[0] - 15 && now <= w[1] + 15) {
+                handler.postDelayed(() -> replaceNow(p, nextSupplier), 30);
+                return;
+            }
+        }
+        next = nextSupplier;
+        pending = p;
+        restartLap = true;
+        final int s = session;
+        if (inFlight > 0) {
+            expectCancel = true;
+            float[] pt = listener.releasePoint();
+            Path path = new Path();
+            path.moveTo(Math.max(0, pt[0]), Math.max(0, pt[1]));
+            send(new GestureDescription.Builder().addStroke(new StrokeDescription(path, 0, 1)).build(), null);
+        }
+        whenIdle(() -> sendSlice(s));
+    }
 
     /**
      * Rehace la vuelta en el próximo tramo (sin cortar el gesto en curso), con el patrón que entregue
@@ -223,7 +257,8 @@ public class Player {
         if (!playing || s != session) return;
         if (restartLap) {
             restartLap = false;
-            Pattern n = next.get();
+            Pattern n = pending != null ? pending : next.get();
+            pending = null;
             if (n != null && !n.touches.isEmpty() && n.duration > 0) pattern = n;
             beginRepetition(s);
             return;
@@ -398,6 +433,10 @@ public class Player {
         rep++;
         if (next != null && (repeats == 0 || rep < repeats)) {
             Pattern n = next.get();
+            if (n != null && n.touches.isEmpty()) {   // el botón Auto quieto y sin disparos: nada que tocar
+                stop(null);
+                return;
+            }
             if (n != null && !n.touches.isEmpty() && n.duration > 0) pattern = n;
         }
         if (repeats == 0 || rep < repeats) {
