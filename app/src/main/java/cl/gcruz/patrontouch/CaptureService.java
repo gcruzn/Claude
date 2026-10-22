@@ -200,9 +200,18 @@ public class CaptureService extends Service {
         String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
         if (injecting) {
             // 22-oct: con el patrón corriendo la perilla puede ser la nuestra o la del lápiz de
-            // Gonzalo (con el lápiz cerca Android bloquea lo inyectado). Si apunta a más de 45° de la
-            // dirección que lleva el patrón, es la de él: se adopta y el patrón cambia de rumbo ya.
-            if (Script.steerDir != null && octants(d, Script.steerDir) < 2) return;
+            // Gonzalo (con el lápiz cerca Android bloquea lo inyectado). La nuestra siempre se apoya
+            // en el centro calibrado y apunta, DESDE ESE CENTRO, al rumbo del patrón; medirla desde
+            // donde apareció hacía saltar la dirección a su opuesta en cada re-apoyo (v5.8.0). Se toma
+            // como del lápiz solo si desde el centro apunta a más de 45° del rumbo, está bien afuera
+            // del centro y se sostiene ADOPT_FRAMES cuadros seguidos.
+            float jx = kx - cx, jy = cy - ky;
+            if (jx * jx + jy * jy < (2 * MOVE_PX) * (2 * MOVE_PX)) { foreign = 0; return; }
+            String fromCenter = dirOf(jx, jy);
+            if (Script.steerDir != null && octants(fromCenter, Script.steerDir) < 2) { foreign = 0; return; }
+            if (!d.equals(foreignDir)) { foreignDir = d; foreign = 0; }
+            if (++foreign < ADOPT_FRAMES) return;
+            foreign = 0;
             android.util.Log.i(TouchService.TAG, "lápiz hacia " + d + " (el patrón iba " + Script.steerDir + ")");
             Script.steerDir = d;
             svc.steerChanged();
@@ -210,6 +219,16 @@ public class CaptureService extends Service {
         }
         if (!d.equals(Script.steerDir)) android.util.Log.i(TouchService.TAG, "perilla hacia " + d);
         Script.steerDir = d;
+    }
+
+    private static final int ADOPT_FRAMES = 3;
+    private int foreign;
+    private String foreignDir;
+
+    private static String dirOf(float dx, float dy) {
+        double ang = (Math.toDegrees(Math.atan2(dy, dx)) + 360) % 360;
+        String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
+        return dirs[(int) (((ang + 22.5) % 360) / 45)];
     }
 
     /** Distancia en octantes (0–4) entre dos direcciones. */
