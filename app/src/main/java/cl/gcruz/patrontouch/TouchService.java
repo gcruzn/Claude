@@ -1298,53 +1298,47 @@ public class TouchService extends AccessibilityService implements Player.Listene
         wm.addView(box, lp);
     }
 
-    /** Ajustes del botón Auto: cada fila cambia al siguiente valor al tocarla. */
+    /**
+     * Ajustes del botón Auto (22-oct, v6.4.1): en dos columnas para que quepan apaisados sin scroll
+     * (con scroll, al arrastrar se cambiaba un valor sin querer) y cada valor se cambia solo con
+     * sus botones ‹ ›, no tocando la fila.
+     */
     private void showAutoConfig() {
         closeMenu();
         Point scr = screenSize();
-        int width = Math.min(dp(380), (int) (scr.x * 0.9f));
+        int cellW = Math.min(dp(300), (int) (Math.max(scr.x, scr.y) * 0.42f));
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12), dp(10), dp(12), dp(6));
+        box.setPadding(dp(12), dp(8), dp(12), dp(10));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.argb(250, 255, 255, 255));
         bg.setCornerRadius(dp(16));
         box.setBackground(bg);
         box.setElevation(dp(8));
-        TextView t = new TextView(this);
-        t.setText("Botón Auto · toca una fila para cambiarla");
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setTextColor(GRAFITO);
-        t.setPadding(dp(2), 0, dp(2), dp(6));
-        box.addView(t);
-        // Fila de perfil (General, Nita, Edgar, Gigi, Amber, Nori) y, debajo, sus ajustes propios.
+
         List<Runnable> repaint = new ArrayList<>();
-        TextView prof = autoRow(width, box);
-        Runnable paintProf = () -> prof.setText("Perfil:  " + AutoController.PROFILES[auto.profile()] + "  ›");
+        // Cabecera: perfil ‹ › a la izquierda y «Listo» a la derecha.
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView profV = new TextView(this);
+        Runnable paintProf = () -> profV.setText("Perfil: " + AutoController.PROFILES[auto.profile()]);
         paintProf.run();
-        prof.setOnClickListener(v -> {
-            auto.nextProfile();
-            paintProf.run();
-            for (Runnable r : repaint) r.run();
-        });
-        for (String key : AutoController.KEYS) {
-            TextView row = autoRow(width, box);
-            Runnable paint = () -> row.setText(AutoController.label(key) + ":  " + AutoController.values(key)[auto.get(key)] + "  ›");
-            paint.run();
-            repaint.add(paint);
-            row.setOnClickListener(v -> {
-                auto.cycle(key);
-                paint.run();
-            });
-        }
+        profV.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        profV.setTypeface(Typeface.DEFAULT_BOLD);
+        profV.setTextColor(GRAFITO);
+        profV.setGravity(Gravity.CENTER);
+        head.addView(stepButton("‹", () -> { auto.stepProfile(-1); paintProf.run(); for (Runnable r : repaint) r.run(); }));
+        head.addView(profV, new LinearLayout.LayoutParams(dp(170), LinearLayout.LayoutParams.WRAP_CONTENT));
+        head.addView(stepButton("›", () -> { auto.stepProfile(1); paintProf.run(); for (Runnable r : repaint) r.run(); }));
+        head.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
         TextView close = new TextView(this);
         close.setText("Listo");
         close.setGravity(Gravity.CENTER);
         close.setTextColor(Color.WHITE);
         close.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         close.setTypeface(Typeface.DEFAULT_BOLD);
-        close.setPadding(dp(12), dp(10), dp(12), dp(10));
+        close.setPadding(dp(18), dp(8), dp(18), dp(8));
         GradientDrawable cb = new GradientDrawable();
         cb.setColor(AZUL);
         cb.setCornerRadius(dp(12));
@@ -1353,33 +1347,63 @@ public class TouchService extends AccessibilityService implements Player.Listene
             closeMenu();
             android.util.Log.i(TAG, "Auto: " + auto.summary());
         });
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
-        clp.setMargins(0, dp(8), 0, dp(4));
-        box.addView(close, clp);
-        // 10 filas no caben en la altura apaisada: van en un ScrollView de 90 % de alto.
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(box);
+        head.addView(close);
+        box.addView(head, new LinearLayout.LayoutParams(2 * cellW + dp(8), LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        // Cuerpo: las claves en dos columnas.
+        String[] keys = AutoController.KEYS;
+        int rows = (keys.length + 1) / 2;
+        for (int r = 0; r < rows; r++) {
+            LinearLayout line = new LinearLayout(this);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            for (int c = 0; c < 2; c++) {
+                int k = r + c * rows;
+                if (k >= keys.length) break;
+                String key = keys[k];
+                LinearLayout cell = new LinearLayout(this);
+                cell.setOrientation(LinearLayout.HORIZONTAL);
+                cell.setGravity(Gravity.CENTER_VERTICAL);
+                cell.setPadding(dp(4), dp(2), dp(4), dp(2));
+                GradientDrawable rb = new GradientDrawable();
+                rb.setColor(Color.argb(255, 240, 241, 242));
+                rb.setCornerRadius(dp(10));
+                cell.setBackground(rb);
+                TextView val = new TextView(this);
+                val.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+                val.setTextColor(GRAFITO);
+                val.setGravity(Gravity.CENTER);
+                Runnable paint = () -> val.setText(AutoController.label(key) + "\n" + AutoController.values(key)[auto.get(key)]);
+                paint.run();
+                repaint.add(paint);
+                cell.addView(stepButton("‹", () -> { auto.step(key, -1); paint.run(); }));
+                cell.addView(val, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                cell.addView(stepButton("›", () -> { auto.step(key, 1); paint.run(); }));
+                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(cellW, LinearLayout.LayoutParams.WRAP_CONTENT);
+                clp.setMargins(c == 0 ? 0 : dp(8), dp(6), 0, 0);
+                line.addView(cell, clp);
+            }
+            box.addView(line);
+        }
         WindowManager.LayoutParams lp = overlayParams(false);
         lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp.height = (int) (Math.min(scr.x, scr.y) * 0.9f);
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
         lp.gravity = Gravity.CENTER;
-        menuWindow = scroll;
-        wm.addView(scroll, lp);
+        menuWindow = box;
+        wm.addView(box, lp);
     }
 
-    private TextView autoRow(int width, LinearLayout box) {
-        TextView row = new TextView(this);
-        row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        row.setTextColor(GRAFITO);
-        row.setPadding(dp(10), dp(8), dp(10), dp(8));
-        GradientDrawable rb = new GradientDrawable();
-        rb.setColor(Color.argb(255, 240, 241, 242));
-        rb.setCornerRadius(dp(10));
-        row.setBackground(rb);
-        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rlp.setMargins(0, dp(3), 0, 0);
-        box.addView(row, rlp);
-        return row;
+    /** Botón ‹ o › de los ajustes: zona de toque amplia, solo él cambia el valor. */
+    private TextView stepButton(String text, Runnable action) {
+        TextView b = new TextView(this);
+        b.setText(text);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        b.setTypeface(Typeface.DEFAULT_BOLD);
+        b.setTextColor(AZUL);
+        b.setGravity(Gravity.CENTER);
+        b.setMinWidth(dp(40));
+        b.setPadding(dp(6), dp(4), dp(6), dp(4));
+        b.setOnClickListener(v -> action.run());
+        return b;
     }
 
     private void closeMenu() {

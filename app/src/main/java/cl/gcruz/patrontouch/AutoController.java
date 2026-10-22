@@ -90,10 +90,6 @@ final class AutoController {
         return v >= 0 && v < PROFILES.length ? v : 0;
     }
 
-    void nextProfile() {
-        prefs.edit().putInt("auto_profile", (profile() + 1) % PROFILES.length).apply();
-    }
-
     /** Valor (índice) de una clave en el perfil activo; sin guardar, el de su preset. */
     int get(String key) {
         int k = java.util.Arrays.asList(KEYS).indexOf(key);
@@ -102,8 +98,15 @@ final class AutoController {
         return v >= 0 && v < n ? v : def;
     }
 
-    void cycle(String key) {
-        prefs.edit().putInt("auto." + PROFILES[profile()] + "." + key, (get(key) + 1) % values(key).length).apply();
+    /** Mueve el valor de una clave `step` posiciones (±1), dando la vuelta. */
+    void step(String key, int step) {
+        int n = values(key).length;
+        prefs.edit().putInt("auto." + PROFILES[profile()] + "." + key, ((get(key) + step) % n + n) % n).apply();
+    }
+
+    void stepProfile(int step) {
+        int n = PROFILES.length;
+        prefs.edit().putInt("auto_profile", ((profile() + step) % n + n) % n).apply();
     }
 
     private static final long WINDOW_MS = 3000, TICK_MS = 50;
