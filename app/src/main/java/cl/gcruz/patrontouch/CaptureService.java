@@ -187,10 +187,17 @@ public class CaptureService extends Service {
             return;
         }
         float kx = (float) sx / n, ky = (float) sy / n;
-        if (!pressed) {
+        // Joystick flotante: la base es donde la perilla aparece o SALTA (un apoyo nuevo: el lápiz de
+        // Gonzalo o un re-apoyo del patrón), no un centro fijo (22-oct, Gonzalo: con la base fija una
+        // perilla empujada a la derecha se leía a la izquierda).
+        boolean jumped = pressed && Math.hypot(kx - lastKx, ky - lastKy) > JUMP_PX;
+        lastKx = kx;
+        lastKy = ky;
+        if (!pressed || jumped) {
             pressed = true;
             baseX = kx;
             baseY = ky;
+            foreign = 0;
             return;
         }
         float dx = kx - baseX, dy = baseY - ky;   // pantalla: y hacia abajo
@@ -200,18 +207,18 @@ public class CaptureService extends Service {
         String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
         if (injecting) {
             // 22-oct: con el patrón corriendo la perilla puede ser la nuestra o la del lápiz de
-            // Gonzalo (con el lápiz cerca Android bloquea lo inyectado). La nuestra siempre se apoya
-            // en el centro calibrado y apunta, DESDE ESE CENTRO, al rumbo del patrón; medirla desde
-            // donde apareció hacía saltar la dirección a su opuesta en cada re-apoyo (v5.8.0). Se toma
-            // como del lápiz solo si desde el centro apunta a más de 45° del rumbo, está bien afuera
-            // del centro y se sostiene ADOPT_FRAMES cuadros seguidos.
-            float jx = kx - cx, jy = cy - ky;
-            if (jx * jx + jy * jy < (2 * MOVE_PX) * (2 * MOVE_PX)) { foreign = 0; return; }
-            String fromCenter = dirOf(jx, jy);
-            if (Script.steerDir != null && octants(fromCenter, Script.steerDir) < 2) { foreign = 0; return; }
+            // Gonzalo (con el lápiz cerca Android bloquea lo inyectado). La nuestra sale desde su
+            // apoyo hacia el rumbo del patrón; si sale a más de 45° de ese rumbo y se sostiene
+            // ADOPT_FRAMES cuadros, es la del lápiz.
+            if (Script.steerDir != null && octants(d, Script.steerDir) < 2) { foreign = 0; return; }
+            if (SystemClock.uptimeMillis() - adoptedAt < 400) return;   // el patrón recién cambió de rumbo
             if (!d.equals(foreignDir)) { foreignDir = d; foreign = 0; }
-            if (++foreign < ADOPT_FRAMES) return;
+            // Un giro al opuesto exacto exige el doble de cuadros: es lo que fabricaba un re-apoyo
+            // medido desde una base vieja (v5.8.0).
+            int need = Script.steerDir != null && octants(d, Script.steerDir) == 4 ? 2 * ADOPT_FRAMES : ADOPT_FRAMES;
+            if (++foreign < need) return;
             foreign = 0;
+            adoptedAt = SystemClock.uptimeMillis();
             android.util.Log.i(TouchService.TAG, "lápiz hacia " + d + " (el patrón iba " + Script.steerDir + ")");
             Script.steerDir = d;
             svc.steerChanged();
@@ -222,6 +229,9 @@ public class CaptureService extends Service {
     }
 
     private static final int ADOPT_FRAMES = 3;
+    private static final float JUMP_PX = 35;          // salto entre cuadros (media res.) = apoyo nuevo
+    private float lastKx, lastKy;
+    private long adoptedAt;
     private int foreign;
     private String foreignDir;
 
