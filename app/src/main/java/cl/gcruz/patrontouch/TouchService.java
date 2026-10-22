@@ -214,6 +214,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 Player.REPRESS_MS = i.getIntExtra("repress", (int) Player.REPRESS_MS);
                 android.util.Log.i(TAG, "tune hold=" + Script.joyHoldMs + " ramp=" + Script.joyRampMs + " slice=" + Player.SLICE_MS + " repress=" + Player.REPRESS_MS);
                 break;
+            case "conttest":
+                contTest(i.getIntExtra("n", 10), i.getIntExtra("ms", 300));
+                break;
             case "escape":
                 if (i.getBooleanExtra("on", !escapeOn()) != escapeOn()) toggleEscape();
                 android.util.Log.i(TAG, "escape=" + escapeOn());
@@ -405,6 +408,44 @@ public class TouchService extends AccessibilityService implements Player.Listene
     // ---------------------------------------------------------------- API para la app
 
     public boolean isPanelVisible() { return panel != null; }
+
+    /**
+     * Prueba (22-oct): ¿Android acepta encadenar gestos con el joystick apretado (continueStroke) si
+     * el tramo continuado es un punto fijo? En v5.0 se cancelaban (trazos en zigzag). Mueve a la
+     * derecha y sostiene `n` tramos de `ms`, sin soltar; registra cada tramo completo o cancelado.
+     */
+    private void contTest(int n, int ms) {
+        float[] joy = cal.get("joy");
+        if (joy == null) return;
+        float tx = joy[0] + cal.joyRadius(), ty = joy[1];
+        android.graphics.Path first = new android.graphics.Path();
+        first.moveTo(joy[0], joy[1]);
+        first.lineTo(tx, ty);
+        android.accessibilityservice.GestureDescription.StrokeDescription sd =
+                new android.accessibilityservice.GestureDescription.StrokeDescription(first, 0, 60, true);
+        contStep(sd, 0, n, ms, tx, ty);
+    }
+
+    private void contStep(android.accessibilityservice.GestureDescription.StrokeDescription sd, int k, int n, int ms, float tx, float ty) {
+        final long t0 = SystemClock.uptimeMillis();
+        dispatchGesture(new android.accessibilityservice.GestureDescription.Builder().addStroke(sd).build(),
+                new GestureResultCallback() {
+                    @Override
+                    public void onCompleted(android.accessibilityservice.GestureDescription g) {
+                        android.util.Log.i(TAG, "conttest tramo " + k + " completo (" + (SystemClock.uptimeMillis() - t0) + " ms)");
+                        if (k >= n) return;
+                        android.graphics.Path p = new android.graphics.Path();
+                        p.moveTo(tx, ty);
+                        boolean more = k + 1 < n;
+                        contStep(sd.continueStroke(p, 0, ms, more), k + 1, n, ms, tx, ty);
+                    }
+
+                    @Override
+                    public void onCancelled(android.accessibilityservice.GestureDescription g) {
+                        android.util.Log.w(TAG, "conttest tramo " + k + " CANCELADO");
+                    }
+                }, main);
+    }
 
     // ---- para CaptureService (lectura del joystick por captura de pantalla)
 
