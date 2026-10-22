@@ -23,7 +23,7 @@ import java.util.Locale;
 public class Script {
 
     public static class Step {
-        /** move | stop | attack | super | gadget | hyper | wait | config (línea «disparo …»: count = ms entre disparos, secs = mantener) */
+        /** move | stop | attack | super | gadget | hyper | wait | every | config (línea «disparo …»: count = ms entre disparos, secs = mantener) */
         public String kind;
         public String dir;      // move, o dirección de apuntado (attack/super)
         public double secs;     // move (opcional), wait
@@ -32,6 +32,8 @@ public class Script {
         public boolean fire;    // move: dispara durante el movimiento
         public boolean escape;  // move: tramo de huida (en modo Escape dura ESCAPE_RUN veces más)
         public int line;
+        /** every: acciones que se repiten cada `secs` toda la vuelta (attack, hyper, super, gadget) */
+        public List<String> actions;
     }
 
     public static class Result {
@@ -252,6 +254,35 @@ public class Script {
                 r.steps.add(s);
                 continue;
             }
+            if (cmd.equals("cada")) {
+                // 21-oct, pedido de Gonzalo («multipatrón»): «cada 1.2 hiper super» repite esas
+                // acciones cada 1,2 s durante toda la vuelta, en paralelo con el resto del patrón.
+                Double every = w.length > 1 ? number(w[1]) : null;
+                List<String> acts = new ArrayList<>();
+                for (int i = 2; i < w.length; i++) {
+                    switch (w[i]) {
+                        case "disparar": case "dispara": case "disparo": case "atacar": case "ataque": case "attack": acts.add("attack"); break;
+                        case "hiper": case "hipercarga": case "hyper": acts.add("hyper"); break;
+                        case "super": case "superataque": case "especial": acts.add("super"); break;
+                        case "gadget": case "artefacto": acts.add("gadget"); break;
+                        case "s": case "y": case "segundos": case "seg": break;
+                        default:
+                            r.error = "En «cada» solo van disparar, hiper, super o gadget (\"" + w[i] + "\")";
+                            r.errorLine = s.line;
+                            return r;
+                    }
+                }
+                if (every == null || every < 0.1 || acts.isEmpty()) {
+                    r.error = "Uso: cada <segundos> disparar | hiper | super | gadget";
+                    r.errorLine = s.line;
+                    return r;
+                }
+                s.kind = "every";
+                s.secs = Math.min(30, every);
+                s.actions = acts;
+                r.steps.add(s);
+                continue;
+            }
             String dir = null, mode = null;
             Double num = null;
             boolean badDir = false, firing = false, escaping = false;
@@ -349,6 +380,7 @@ public class Script {
 
     public static String format(Step s) {
         switch (s.kind) {
+            case "every": return "cada " + num(s.secs) + " " + everyLabel(s.actions, false);
             case "move": return "mover " + dirLabel(s.dir) + (s.secs > 0 ? " " + num(s.secs) : "") + (s.fire ? " disparando" : "") + (s.escape ? " escape" : "");
             case "stop": return "parar";
             case "attack": {
@@ -384,9 +416,19 @@ public class Script {
         return b.toString();
     }
 
+    private static String everyLabel(List<String> acts, boolean pretty) {
+        StringBuilder b = new StringBuilder();
+        for (String a : acts) {
+            if (b.length() > 0) b.append(pretty ? " + " : " ");
+            b.append("attack".equals(a) ? "disparar" : "hyper".equals(a) ? "hiper" : "super".equals(a) ? (pretty ? "súper" : "super") : "gadget");
+        }
+        return b.toString();
+    }
+
     /** Texto amigable para mostrar un paso en la lista del editor. */
     public static String pretty(Step s) {
         switch (s.kind) {
+            case "every": return "🔁 Cada " + num(s.secs) + " s: " + everyLabel(s.actions, true);
             case "move": return "🕹 Mover " + dirIcon(s.dir) + " " + dirLabel(s.dir) + (s.secs > 0 ? " · " + num(s.secs) + " s" : "") + (s.fire ? " · disparando" : "");
             case "stop": return "✋ Parar (soltar joystick)";
             case "attack": {
@@ -576,6 +618,21 @@ public class Script {
                     if (s.secs > 0) prof.hold = (int) Math.round(s.secs * 1000);
                     if (s.dir != null) prof.aimDir = s.dir;
                     break;
+            }
+        }
+        // «cada …»: relojes paralelos durante toda la vuelta; cada acción del mismo reloj sale 100 ms
+        // después de la anterior (híper y súper no se apoyan en el mismo instante).
+        long lap = Math.max(t, js != null ? jsLast + 100 : 0);
+        for (Step s : steps) {
+            if (!"every".equals(s.kind) || escapeMode) continue;   // Escape: sin disparos ni habilidades
+            long per = Math.round(s.secs * 1000);
+            for (long tt = 0; tt < lap; tt += per) {
+                long at = tt;
+                for (String a : s.actions) {
+                    float[] btn = cal.get("attack".equals(a) ? "attack" : "hyper".equals(a) ? "hyper" : "super".equals(a) ? "super" : "gadget");
+                    if (btn != null && at < lap) p.touches.add(press(at, btn, 70));
+                    at += 100;
+                }
             }
         }
         if (js != null) {

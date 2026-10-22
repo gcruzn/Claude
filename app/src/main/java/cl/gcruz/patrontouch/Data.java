@@ -406,6 +406,20 @@ public class Data {
             seeds.add("pruebas4");
             changed = true;
         }
+        if (!seeds.contains("pruebas5")) {
+            // 21-oct, pedido de Gonzalo: multipatrón con relojes separados de ataque, híper + súper y
+            // gadget (instrucción «cada»). Botón 6 de Pruebas.
+            if (pattern("multi") == null) addPattern("multi", "Multipatrón",
+                    "# Recto hacia tu última dirección; disparo cada 0,4 s, híper + súper cada 1,2 s, gadget cada 3,6 s\n"
+                            + "mover ultima 3.6\n"
+                            + "cada 0.4 disparar\n"
+                            + "cada 1.2 hiper super\n"
+                            + "cada 3.6 gadget");
+            PadSet s = set("pruebas");
+            if (s != null && !s.slots.contains("multi") && s.slots.size() < MAX_SLOTS) s.slots.add("multi");
+            seeds.add("pruebas5");
+            changed = true;
+        }
         if (!seeds.contains("dirigido1") && !seeds.contains("agresiva1")) { // agresiva1 lo reemplaza
             // Sigue la última dirección del S Pen (±45° al azar). Parte disparando: al levantar el
             // lápiz se reanuda al instante y la primera ráfaga sale sin esperar al gadget.
