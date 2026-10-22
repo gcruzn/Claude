@@ -312,3 +312,14 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
   b>140, b−r>90, b−g>50; medido 6.000–12.700 px a res. completa vs 100–960 sin tocar, la botonera
   se excluye). Base = primer cuadro con perilla; dirección = desplazamiento desde la base →
   Script.steerDir. Con el patrón corriendo no se lee (la perilla visible es la inyectada).
+
+### Lápiz por Shizuku (v6.1.0, 22-oct)
+
+- La captura de pantalla no sirvió para el rumbo del lápiz con el patrón corriendo (la perilla
+  «parpadea» para el detector; v5.8–v6.0 cambiaban de rumbo solas). Samsung además cancela siempre
+  `continueStroke` (comando ADB `conttest`), así que cada re-apoyo suelta el joystick.
+- **PenShizuku** lee `getevent -l` del sec_e-pen a través de Shizuku (dependencia
+  dev.rikka.shizuku:api/provider 13.1.5; `newProcess` por reflexión). Lápiz en rango → pausa con corte
+  seguro; arrastre → Script.steerDir; fuera de rango → retoma al instante. Con Shizuku activo, un
+  gesto por vuelta (sin re-apoyos) y la pantalla no se usa con el patrón corriendo.
+- Shizuku se inicia tras cada reinicio desde su propia app (Depuración inalámbrica, sin PC).

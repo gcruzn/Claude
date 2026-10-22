@@ -156,6 +156,9 @@ public class CaptureService extends Service {
         TouchService svc = TouchService.get();
         if (svc == null) return;
         boolean injecting = svc.isInjecting();   // entonces la perilla que se ve es la nuestra
+        // Con el lápiz por Shizuku, su dirección y su cercanía vienen de sus eventos: con el patrón
+        // corriendo la pantalla no se usa (era poco confiable, v5.8–v6.0).
+        if (injecting && PenShizuku.active()) return;
         float[] joy = svc.joyPoint();
         if (joy == null) return;
         Rect panel = svc.panelRect();

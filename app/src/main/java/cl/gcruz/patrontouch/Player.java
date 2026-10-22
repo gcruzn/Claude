@@ -324,6 +324,7 @@ public class Player {
      * y se prueba con tramos de PROBE_SLICE_MS hasta que vuelva a entrar. Sin captura, SLICE_MS.
      */
     private long jointSlice() {
+        if (PenShizuku.active()) return LONG_SLICE_MS;   // el lápiz se atiende por sus eventos: sin re-apoyos
         if (!CaptureService.isRunning()) return SLICE_MS;
         if (probing) {
             if (!CaptureService.knobVisible(150)) return PROBE_SLICE_MS;

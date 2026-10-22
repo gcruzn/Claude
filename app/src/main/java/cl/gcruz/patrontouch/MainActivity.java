@@ -90,6 +90,33 @@ public class MainActivity extends Activity {
         root.addView(card);
         root.addView(ui.space(12));
 
+        // --- Lápiz por Shizuku (22-oct)
+        LinearLayout pen = ui.card();
+        PenShizuku.State ps = PenShizuku.state();
+        boolean reading = PenShizuku.active();
+        pen.addView(ui.text(reading ? "● Lápiz conectado (Shizuku)"
+                : ps == PenShizuku.State.NOT_RUNNING ? "○ Shizuku no está corriendo"
+                : ps == PenShizuku.State.NO_PERMISSION ? "○ Falta el permiso de Shizuku" : "○ Conectando el lápiz…",
+                16, reading ? VERDE : GRIS, true));
+        pen.addView(ui.text("Con Shizuku la app sabe cuándo acercas, apoyas, arrastras y alejas el S Pen: pausa al "
+                + "acercarlo y retoma al alejarlo, hacia donde lo arrastraste. Shizuku se inicia una vez tras cada "
+                + "reinicio del celular, desde la app Shizuku (Depuración inalámbrica).", 13, GRAFITO, false));
+        if (ps == PenShizuku.State.NO_PERMISSION) {
+            pen.addView(ui.button("Dar permiso a Patrón Touch", AZUL, v -> {
+                PenShizuku.requestPermission();
+                sv.postDelayed(this::render, 1500);
+            }));
+        } else if (ps == PenShizuku.State.NOT_RUNNING) {
+            pen.addView(ui.button("Abrir Shizuku", AZUL, v -> {
+                Intent i = getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");
+                if (i != null) startActivity(i);
+                else startActivity(new Intent(Intent.ACTION_VIEW,
+                        android.net.Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")));
+            }));
+        }
+        root.addView(pen);
+        root.addView(ui.space(12));
+
         // --- Lectura del joystick por captura de pantalla (21-oct)
         LinearLayout cap = ui.card();
         boolean on = CaptureService.isRunning();

@@ -74,6 +74,101 @@ public class TouchService extends AccessibilityService implements Player.Listene
         showPanel();
         registerDebug();
         observePen();
+        PenShizuku.start(this::penLine);
+    }
+
+    // ---------------------------------------------------------------- S Pen por Shizuku (22-oct)
+
+    /**
+     * Eventos del lápiz (getevent -l de sec_e-pen, vía Shizuku). Con el lápiz en rango Android
+     * bloquea lo inyectado: al entrar en rango el patrón se pausa (corte seguro: el lápiz aún no
+     * toca, solo está abajo el joystick), mientras se arrastra se guarda la dirección y al salir de
+     * rango se retoma al instante hacia ella. Panel en coordenadas verticales (x corto, y largo).
+     */
+    private int penDownX = -1, penDownY = -1, penCurX = -1, penCurY = -1;
+    private volatile boolean penTouching;
+    private volatile long penUpAt;
+    private int penPausedIdx = -1;
+    private final Runnable penHoverTimeout = () -> { if (!penTouching) penAway(); };
+
+    private void penLine(String line) {
+        String[] w = line.trim().split("\\s+");
+        if (w.length < 3) return;
+        String code = w[w.length - 2], val = w[w.length - 1];
+        if (code.equals("ABS_X") || code.equals("ABS_Y")) {
+            int v;
+            try { v = Integer.parseInt(val, 16); } catch (NumberFormatException e) { return; }
+            if (code.equals("ABS_X")) penCurX = v; else penCurY = v;
+            if (penTouching && penDownX < 0 && penCurX >= 0 && penCurY >= 0) {
+                penDownX = penCurX;
+                penDownY = penCurY;
+            }
+            if (penTouching && penDownX >= 0) updatePenDir();
+        } else if (code.equals("BTN_TOUCH")) {
+            boolean down = val.equals("DOWN");
+            if (down == penTouching) return;
+            penTouching = down;
+            if (down) {
+                penDownX = penCurX;
+                penDownY = penCurY;
+                main.post(this::penNear);
+            } else {
+                penDownX = -1;
+                penUpAt = SystemClock.uptimeMillis();
+                // Si no llega el aviso de «fuera de rango», se retoma igual a los 1,5 s.
+                main.postDelayed(penHoverTimeout, 1500);
+            }
+        } else if (code.equals("BTN_TOOL_PEN") || code.equals("BTN_DIGI")) {   // en el S26 se llama BTN_DIGI
+            if (val.equals("DOWN")) {
+                android.util.Log.i(TAG, "lápiz en rango");
+                main.post(this::penNear);
+            } else {
+                android.util.Log.i(TAG, "lápiz fuera de rango");
+                // Un «levantado» de hace muy poco puede ser un rebote: se confirma a los 150 ms.
+                long wait = Math.max(0, 150 - (SystemClock.uptimeMillis() - penUpAt));
+                main.postDelayed(() -> {
+                    main.removeCallbacks(penHoverTimeout);
+                    if (!penTouching) penAway();
+                }, wait);
+            }
+        }
+    }
+
+    private void updatePenDir() {
+        float rx = penCurX - penDownX, ry = penCurY - penDownY;
+        if (rx * rx + ry * ry < 250f * 250f) return;
+        float sx, sy;
+        switch (wm.getDefaultDisplay().getRotation()) {
+            case android.view.Surface.ROTATION_90: sx = ry; sy = -rx; break;
+            case android.view.Surface.ROTATION_270: sx = -ry; sy = rx; break;
+            case android.view.Surface.ROTATION_180: sx = -rx; sy = -ry; break;
+            default: sx = rx; sy = ry;
+        }
+        double ang = (Math.toDegrees(Math.atan2(-sy, sx)) + 360) % 360;
+        String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
+        String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
+        if (!d.equals(Script.steerDir)) android.util.Log.i(TAG, "lápiz hacia " + d);
+        Script.steerDir = d;
+    }
+
+    private void penNear() {
+        main.removeCallbacks(penHoverTimeout);
+        if (player.isPlaying() && lastRun != null) {
+            penPausedIdx = activeIdx;
+            penResume = lastRun;
+            player.stopByUserTouch();
+            android.util.Log.i(TAG, "lápiz cerca: patrón en pausa");
+        }
+    }
+
+    private void penAway() {
+        if (penTouching) return;
+        Runnable r = penResume;
+        if (r != null && !player.isPlaying()) {
+            penResume = null;
+            android.util.Log.i(TAG, "lápiz lejos: retoma hacia " + Script.steerDir);
+            r.run();
+        }
     }
 
     // ---------------------------------------------------------------- S Pen
@@ -824,7 +919,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
                     if (isChannel(i)) return true;   // canal: se alterna al soltar, sin tocar el gesto en curso
-                    touchStopOnly = player.isPlaying() && activeIdx == i;
+                    touchStopOnly = (player.isPlaying() && activeIdx == i) || (penResume != null && penPausedIdx == i);
                     if (player.isPlaying()) player.stopByUserTouch();
                     ((GradientDrawable) v.getBackground()).setColor(activeColor(MODE_LOOP));
                     return true;
