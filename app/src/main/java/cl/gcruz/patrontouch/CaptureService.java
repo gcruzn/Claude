@@ -53,6 +53,12 @@ public class CaptureService extends Service {
     /** Último instante (uptime) en que se vio la perilla apretada, sea la del patrón o la de Gonzalo. */
     private static volatile long knobSeenAt;
 
+    /** Último análisis del cuadro completo (jugador, munición, enemigos), cada VISION_MS. */
+    static volatile Vision.Frame vision;
+    static volatile long enemiesSeenAt;
+    private static final long VISION_MS = 100;
+    private long lastVision, lastVisionLog;
+
     /**
      * ¿El juego está mostrando la perilla? Con el patrón corriendo es la del joystick inyectado: si
      * no se ve, Android lo está bloqueando (S Pen cerca) y el reproductor pasa a tramos cortos para
@@ -145,6 +151,25 @@ public class CaptureService extends Service {
             if (now - lastFrame < FRAME_MS) return;
             lastFrame = now;
             analyze(img);
+            if (now - lastVision >= VISION_MS) {
+                lastVision = now;
+                Image.Plane pl = img.getPlanes()[0];
+                Vision.Frame vf = Vision.analyze(pl.getBuffer(), w, h, pl.getRowStride(), pl.getPixelStride(), SCALE);
+                vision = vf;
+                if (!vf.enemies.isEmpty()) enemiesSeenAt = now;
+                if (now - lastVisionLog >= 1000) {
+                    lastVisionLog = now;
+                    StringBuilder b = new StringBuilder("visión: jugador ");
+                    b.append(vf.px < 0 ? "—" : Math.round(vf.px) + "," + Math.round(vf.py));
+                    b.append(" · balas ").append(vf.ammo < 0 ? "—" : String.format(java.util.Locale.ROOT, "%.1f", vf.ammo));
+                    b.append(" · enemigos ").append(vf.enemies.size());
+                    for (float[] e : vf.enemies) {
+                        if (vf.px >= 0) b.append(" d=").append(Math.round(Math.hypot(e[0] - vf.px, e[1] - vf.py)));
+                    }
+                    b.append(" (").append(SystemClock.uptimeMillis() - now).append(" ms)");
+                    android.util.Log.i(TouchService.TAG, b.toString());
+                }
+            }
         } catch (Exception e) {
             android.util.Log.w(TouchService.TAG, "captura: " + e);
         } finally {
