@@ -215,7 +215,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 android.util.Log.i(TAG, "tune hold=" + Script.joyHoldMs + " ramp=" + Script.joyRampMs + " slice=" + Player.SLICE_MS + " repress=" + Player.REPRESS_MS);
                 break;
             case "conttest":
-                contTest(i.getIntExtra("n", 10), i.getIntExtra("ms", 300));
+                contTest(i.getIntExtra("n", 10), i.getIntExtra("ms", 300), i.getBooleanExtra("pt", false));
                 break;
             case "escape":
                 if (i.getBooleanExtra("on", !escapeOn()) != escapeOn()) toggleEscape();
@@ -414,13 +414,17 @@ public class TouchService extends AccessibilityService implements Player.Listene
      * el tramo continuado es un punto fijo? En v5.0 se cancelaban (trazos en zigzag). Mueve a la
      * derecha y sostiene `n` tramos de `ms`, sin soltar; registra cada tramo completo o cancelado.
      */
-    private void contTest(int n, int ms) {
+    private void contTest(int n, int ms, boolean pointFirst) {
         float[] joy = cal.get("joy");
         if (joy == null) return;
         float tx = joy[0] + cal.joyRadius(), ty = joy[1];
         android.graphics.Path first = new android.graphics.Path();
-        first.moveTo(joy[0], joy[1]);
-        first.lineTo(tx, ty);
+        if (pointFirst) {
+            first.moveTo(tx, ty);       // variante: también el primer tramo es un punto fijo
+        } else {
+            first.moveTo(joy[0], joy[1]);
+            first.lineTo(tx, ty);
+        }
         android.accessibilityservice.GestureDescription.StrokeDescription sd =
                 new android.accessibilityservice.GestureDescription.StrokeDescription(first, 0, 60, true);
         contStep(sd, 0, n, ms, tx, ty);
