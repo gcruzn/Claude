@@ -292,13 +292,15 @@ public class Player {
         send(b.build(), () -> sendSlice(s));
     }
 
-    private static final long REPRESS_MS = 40;
+    /** ms del centro del joystick a su posición al re-apoyar; ajustable por ADB («tune repress»). */
+    static volatile long REPRESS_MS = 40;
     private static final long BORDER_GAP_MS = 60;
     /** Más largo que esto se parte en tramos (el joystick); más corto va entero (toques, apuntados). */
     private static final long SHORT_TOUCH_MS = 800;
 
     /** Continuación de un dedo largo desde sa: apoya en su punto inicial y en REPRESS_MS vuelve a donde iba. */
     static Pattern.Touch repress(Pattern.Touch t, long sa, long se) {
+        if (REPRESS_MS < 0) return sub(t, sa, se);   // prueba: apoyar directo donde iba, sin pasar por el centro
         Pattern.Touch r = new Pattern.Touch();
         Pattern.Point first = t.pts.get(0);
         r.pts.add(new Pattern.Point(sa, first.x, first.y));

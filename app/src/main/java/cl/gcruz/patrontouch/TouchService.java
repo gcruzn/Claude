@@ -210,7 +210,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 Script.joyHoldMs = i.getIntExtra("hold", Script.joyHoldMs);
                 Script.joyRampMs = i.getIntExtra("ramp", Script.joyRampMs);
                 Player.SLICE_MS = i.getIntExtra("slice", (int) Player.SLICE_MS);
-                android.util.Log.i(TAG, "tune hold=" + Script.joyHoldMs + " ramp=" + Script.joyRampMs + " slice=" + Player.SLICE_MS);
+                Player.REPRESS_MS = i.getIntExtra("repress", (int) Player.REPRESS_MS);
+                android.util.Log.i(TAG, "tune hold=" + Script.joyHoldMs + " ramp=" + Script.joyRampMs + " slice=" + Player.SLICE_MS + " repress=" + Player.REPRESS_MS);
                 break;
             case "escape":
                 if (i.getBooleanExtra("on", !escapeOn()) != escapeOn()) toggleEscape();
