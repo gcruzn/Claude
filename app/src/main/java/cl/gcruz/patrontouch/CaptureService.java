@@ -183,7 +183,9 @@ public class CaptureService extends Service {
         boolean injecting = svc.isInjecting();   // entonces la perilla que se ve es la nuestra
         // Con el lápiz por Shizuku, su dirección y su cercanía vienen de sus eventos: con el patrón
         // corriendo la pantalla no se usa (era poco confiable, v5.8–v6.0).
-        if (injecting && PenShizuku.active()) return;
+        // 22-oct (v6.3.1): tampoco con el patrón detenido; en la sesión con Auto la pantalla («perilla
+        // hacia right») y el lápiz («lápiz hacia downleft») se pisaban la dirección 20 veces por segundo.
+        if (PenShizuku.active()) return;   // con Shizuku, Player.jointSlice tampoco usa la perilla
         float[] joy = svc.joyPoint();
         if (joy == null) return;
         Rect panel = svc.panelRect();
