@@ -19,10 +19,92 @@ import android.os.SystemClock;
 final class AutoController {
 
     static final String[] SHAPES = {"recta", "zigzag", "círculo", "cuadrado", "triángulo", "óvalo", "rect. horizontal", "rect. vertical"};
-    static final String[] SHOTS = {"de a 1", "ráfaga", "de a 2", "de a 3", "sin disparo"};
+    static final String[] SHOTS = {"de a 1", "ráfaga", "de a 2", "de a 3", "sin disparo", "mantener cerca"};
     static final String[] SUPERS = {"con enemigo", "automático", "nunca"};
     static final int[] RANGES = {350, 500, 650, 800, 1000};
-    static final String[] ABILITIES = {"con enemigo", "cada 4 s", "nunca"};
+    static final String[] ABILITIES = {"con enemigo", "cada 4 s", "nunca", "con vida baja"};
+    static final String[] PROFILES = {"General", "Nita", "Edgar", "Gigi", "Amber", "Nori"};
+    static final String[] HEADINGS = {"lápiz", "enemigo más cercano"};
+    static final String[] DISTANCES = {"no", "corta", "media", "larga"};
+    static final int[] DIST_PX = {0, 250, 450, 650};
+    static final String[] FLEE = {"no", "sí"};
+
+    /** Claves de configuración, en el orden de la pantalla de ajustes. */
+    static final String[] KEYS = {"shape", "heading", "shot", "super", "range", "distance", "flee", "abil"};
+
+    /**
+     * Valores de partida por perfil (índices en el orden de KEYS). 22-oct, kits buscados en la web
+     * (Fandom, GameWith, esports.gg; los de Gigi y Nori son guías de fans):
+     *  - Nita: círculo hacia el lápiz, de a 2, súper (oso) a 650, distancia media.
+     *  - Edgar: zigzag al enemigo, ráfaga, súper (salto) a 500, sin distancia.
+     *  - Gigi: asesina cuerpo a cuerpo; su ataque es un giro que dura mientras se mantiene apretado:
+     *    recta al enemigo, «mantener cerca», súper (portal de ida y vuelta) a 650.
+     *  - Amber: lanzallamas de largo alcance con mucha munición y poca movilidad: zigzag al
+     *    enemigo, ráfaga, súper (frasco) a 650, distancia larga, huye con vida baja.
+     *  - Nori: corte cuerpo a cuerpo al tocar, súper en área que crece con los peces, gadget que
+     *    cura comiendo peces: zigzag al enemigo, ráfaga, súper a 350, distancia corta, gadget con
+     *    vida baja.
+     */
+    static final int[][] PRESETS = {
+            //  forma rumbo disparo súper alcance distancia huir habilidades
+            {2, 0, 2, 0, 1, 0, 0, 0},   // General
+            {2, 0, 2, 0, 2, 2, 1, 0},   // Nita
+            {1, 1, 1, 0, 1, 0, 0, 0},   // Edgar
+            {0, 1, 5, 0, 2, 0, 0, 0},   // Gigi
+            {1, 1, 1, 0, 2, 3, 1, 0},   // Amber
+            {1, 1, 1, 0, 0, 1, 1, 3},   // Nori
+    };
+
+    static String[] values(String key) {
+        switch (key) {
+            case "shape": return SHAPES;
+            case "heading": return HEADINGS;
+            case "shot": return SHOTS;
+            case "super": return SUPERS;
+            case "distance": return DISTANCES;
+            case "flee": return FLEE;
+            case "abil": return ABILITIES;
+            default: {
+                String[] r = new String[RANGES.length];
+                for (int i = 0; i < r.length; i++) r[i] = RANGES[i] + " px";
+                return r;
+            }
+        }
+    }
+
+    static String label(String key) {
+        switch (key) {
+            case "shape": return "Forma";
+            case "heading": return "Rumbo";
+            case "shot": return "Disparo";
+            case "super": return "Súper";
+            case "range": return "Alcance del súper";
+            case "distance": return "Mantener distancia";
+            case "flee": return "Huir con vida baja";
+            default: return "Gadget e híper";
+        }
+    }
+
+    int profile() {
+        int v = prefs.getInt("auto_profile", 0);
+        return v >= 0 && v < PROFILES.length ? v : 0;
+    }
+
+    void nextProfile() {
+        prefs.edit().putInt("auto_profile", (profile() + 1) % PROFILES.length).apply();
+    }
+
+    /** Valor (índice) de una clave en el perfil activo; sin guardar, el de su preset. */
+    int get(String key) {
+        int k = java.util.Arrays.asList(KEYS).indexOf(key);
+        int def = PRESETS[profile()][k], n = values(key).length;
+        int v = prefs.getInt("auto." + PROFILES[profile()] + "." + key, def);
+        return v >= 0 && v < n ? v : def;
+    }
+
+    void cycle(String key) {
+        prefs.edit().putInt("auto." + PROFILES[profile()] + "." + key, (get(key) + 1) % values(key).length).apply();
+    }
 
     private static final long WINDOW_MS = 3000, TICK_MS = 50;
     private static final float DRIFT = 0.7f;   // peso del desplazamiento frente a la forma
@@ -79,14 +161,47 @@ final class AutoController {
     }
 
     String summary() {
-        return "forma " + SHAPES[idx("auto_shape", 2, SHAPES.length)] + " · disparo " + SHOTS[idx("auto_shot", 2, SHOTS.length)]
-                + " · súper " + SUPERS[idx("auto_super", 0, SUPERS.length)] + " (" + RANGES[idx("auto_range", 1, RANGES.length)] + " px)"
-                + " · gadget/híper " + ABILITIES[idx("auto_abil", 0, ABILITIES.length)];
+        StringBuilder b = new StringBuilder("perfil " + PROFILES[profile()]);
+        for (String k : KEYS) b.append(" · ").append(label(k).toLowerCase()).append(" ").append(values(k)[get(k)]);
+        return b.toString();
     }
 
-    int idx(String key, int def, int n) {
-        int v = prefs.getInt(key, def);
-        return v >= 0 && v < n ? v : def;
+    // ---------------------------------------------------------------- lo que se ve
+
+    /** Situación en este instante, a partir del último cuadro analizado (CaptureService.vision). */
+    private static final class Sit {
+        boolean seen;          // cuadro reciente con el jugador ubicado
+        float px, py, ammo = -1, health = -1;   // health: fracción 0–1 (−1 = sin dato)
+        float[] enemy;         // el más cercano
+        float dist = Float.MAX_VALUE;
+    }
+
+    private float maxHealth;   // ancho máximo visto de la barra verde = vida llena
+
+    private Sit sit() {
+        Sit st = new Sit();
+        Vision.Frame v = CaptureService.vision;
+        long now = SystemClock.uptimeMillis();
+        if (v == null || now - v.at > 600 || v.px < 0) return st;
+        st.seen = true;
+        st.px = v.px;
+        st.py = v.py;
+        st.ammo = v.ammo;
+        if (v.health > maxHealth) maxHealth = v.health;
+        if (v.health >= 0 && maxHealth >= 20) st.health = Math.min(1f, v.health / maxHealth);
+        for (float[] en : v.enemies) {
+            float d = (float) Math.hypot(en[0] - v.px, en[1] - v.py);
+            if (d < st.dist) {
+                st.dist = d;
+                st.enemy = en;
+            }
+        }
+        return st;
+    }
+
+    /** Ángulo (rad, y hacia arriba) desde el jugador hacia el enemigo. */
+    private static double toward(Sit st) {
+        return Math.atan2(-(st.enemy[1] - st.py), st.enemy[0] - st.px);
     }
 
     // ---------------------------------------------------------------- decisiones
@@ -102,76 +217,119 @@ final class AutoController {
 
     private void decide() {
         long now = SystemClock.uptimeMillis();
-        Vision.Frame v = CaptureService.vision;
-        boolean seen = v != null && now - v.at < 400;
-        float ammo = seen ? v.ammo : -1;
-        int shot = idx("auto_shot", 2, SHOTS.length);
+        Sit st = sit();
+        int shot = get("shot");
         int taps = 0;
+        long hold = 0;
         // Munición: «de a N» espera a tener N (de a 1: dispara con 2 o más, así nunca queda en cero).
         if (shot == 0 || shot == 2 || shot == 3) {
-            float need = shot == 0 ? 1.9f : shot == 2 ? 1.9f : 2.85f;
+            float need = shot == 3 ? 2.85f : 1.9f;
             int burst = shot == 0 ? 1 : shot == 2 ? 2 : 3;
-            if (ammo >= 0) {
-                if (ammo >= need && now - lastShot > 350) taps = burst;
+            if (st.ammo >= 0) {
+                if (st.ammo >= need && now - lastShot > 350) taps = burst;
             } else if (now - lastShot > 900) {
                 taps = burst;   // sin ver la munición: ritmo prudente
             }
+        } else if (shot == 5 && st.enemy != null && st.dist < 300 && now - lastShot > 1000) {
+            hold = 900;   // Gigi: el giro dura mientras se mantiene apretado
         }
-        float[] target = null;
-        float range = RANGES[idx("auto_range", 1, RANGES.length)];
-        if (seen && v.px >= 0) {
-            float best = Float.MAX_VALUE;
-            for (float[] e : v.enemies) {
-                float d = (float) Math.hypot(e[0] - v.px, e[1] - v.py);
-                if (d < best) {
-                    best = d;
-                    target = e;
-                }
-            }
-            if (best > range) target = null;
-        }
-        int sup = idx("auto_super", 0, SUPERS.length);
+        float range = RANGES[get("range")];
+        float[] target = st.enemy != null && st.dist <= range ? st.enemy : null;
+        int sup = get("super");
         boolean doSuper = now - lastSuper > 1500 && (sup == 1 || (sup == 0 && target != null));
-        int ab = idx("auto_abil", 0, ABILITIES.length);
-        boolean abilityTime = ab == 1 || (ab == 0 && target != null);
-        boolean doGadget = abilityTime && now - lastGadget > 4000;
-        boolean doHyper = abilityTime && now - lastHyper > 4000;
-        if (taps == 0 && !doSuper && !doGadget && !doHyper) return;
+        int ab = get("abil");
+        boolean near = target != null;
+        boolean low = st.health >= 0 && st.health < 0.5f;
+        boolean doGadget = now - lastGadget > 4000 && (ab == 1 || (ab == 0 && near) || (ab == 3 && low));
+        boolean doHyper = now - lastHyper > 4000 && (ab == 1 || ((ab == 0 || ab == 3) && near));
+        // ¿Cambió el rumbo efectivo (enemigo, distancia, huida)? Entonces se rehace la ventana.
+        double b = effectiveBase(st);
+        boolean turn = running && windowMode != modeOf(st)
+                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(35) && now - lastTurn > 300);
+        if (taps == 0 && hold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
+        if (turn) lastTurn = now;
         Pattern p = window();
         long t = 40;   // después del re-apoyo del joystick (no en el mismo instante: el juego lo ignoraba)
         for (int i = 0; i < taps; i++, t += 130) press(p, "attack", t);
+        if (hold > 0) {
+            press(p, "attack", t, hold);
+            t += hold + 40;
+        }
         if (doHyper) { press(p, "hyper", t); t += 120; lastHyper = now; }
         if (doGadget) { press(p, "gadget", t); t += 120; lastGadget = now; }
         if (doSuper) {
             float[] btn = svc.calib().get("super");
             if (btn != null) {
-                if (target != null && v.px >= 0) {
-                    double a = Math.atan2(target[1] - v.py, target[0] - v.px);
+                if (target != null) {
+                    double ang = Math.atan2(target[1] - st.py, target[0] - st.px);
                     float r = svc.calib().aimRadius() * 1.8f;
+                    float ex = btn[0] + (float) (r * Math.cos(ang)), ey = btn[1] + (float) (r * Math.sin(ang));
                     Pattern.Touch x = new Pattern.Touch();
                     x.pts.add(new Pattern.Point(t, btn[0], btn[1]));
-                    x.pts.add(new Pattern.Point(t + 120, btn[0] + (float) (r * Math.cos(a)), btn[1] + (float) (r * Math.sin(a))));
-                    x.pts.add(new Pattern.Point(t + 200, btn[0] + (float) (r * Math.cos(a)), btn[1] + (float) (r * Math.sin(a))));
+                    x.pts.add(new Pattern.Point(t + 120, ex, ey));
+                    x.pts.add(new Pattern.Point(t + 200, ex, ey));
                     p.touches.add(x);
                 } else {
                     press(p, "super", t);
                 }
                 lastSuper = now;
-                android.util.Log.i(TouchService.TAG, "Auto: súper" + (target != null ? " hacia enemigo" : ""));
+                android.util.Log.i(TouchService.TAG, "Auto: súper" + (target != null ? " hacia enemigo a " + Math.round(st.dist) + " px" : ""));
             }
         }
-        if (taps > 0) lastShot = now;
+        if (taps > 0 || hold > 0) lastShot = now;
+        if (p.touches.isEmpty()) return;
         p.normalize();
         player.replaceNow(p, this::window);
     }
 
+    private long lastTurn;
+
     private void press(Pattern p, String key, long t) {
+        press(p, key, t, 70);
+    }
+
+    private void press(Pattern p, String key, long t, long ms) {
         float[] b = svc.calib().get(key);
         if (b == null) return;
         Pattern.Touch x = new Pattern.Touch();
         x.pts.add(new Pattern.Point(t, b[0], b[1]));
-        x.pts.add(new Pattern.Point(t + 70, b[0], b[1]));
+        x.pts.add(new Pattern.Point(t + ms, b[0], b[1]));
         p.touches.add(x);
+    }
+
+    // ---------------------------------------------------------------- rumbo
+
+    private static final int MODE_PEN = 0, MODE_CHASE = 1, MODE_AWAY = 2, MODE_ORBIT = 3, MODE_FLEE = 4;
+    private int windowMode = -1;
+    private double windowBase = Double.NaN;
+
+    /**
+     * Qué manda el rumbo ahora: huir (vida bajo 30 % con un enemigo a la vista), alejarse u orbitar
+     * para mantener la distancia, perseguir al enemigo más cercano, o la última dirección del lápiz.
+     */
+    private int modeOf(Sit st) {
+        if (st.enemy == null) return MODE_PEN;
+        if (get("flee") == 1 && st.health >= 0 && st.health < 0.3f) return MODE_FLEE;
+        int dpx = DIST_PX[get("distance")];
+        if (dpx > 0 && st.dist < dpx) return MODE_AWAY;
+        if (dpx > 0 && st.dist < dpx * 1.3f) return MODE_ORBIT;
+        return get("heading") == 1 ? MODE_CHASE : MODE_PEN;
+    }
+
+    /** Rumbo base (rad, y hacia arriba) para el modo actual; NaN = el del lápiz (o quieto). */
+    private double effectiveBase(Sit st) {
+        switch (modeOf(st)) {
+            case MODE_CHASE: return toward(st);
+            case MODE_AWAY:
+            case MODE_FLEE: return toward(st) + Math.PI;
+            case MODE_ORBIT: return toward(st) + Math.PI / 2;
+            default: return Double.NaN;
+        }
+    }
+
+    private static double angleDiff(double a, double b) {
+        double d = Math.abs(a - b) % (2 * Math.PI);
+        return d > Math.PI ? 2 * Math.PI - d : d;
     }
 
     // ---------------------------------------------------------------- movimiento
@@ -182,10 +340,15 @@ final class AutoController {
         p.name = "Auto";
         float[] joy = svc.calib().get("joy");
         long t0 = SystemClock.uptimeMillis() - startedAt;
+        Sit st = sit();
+        int mode = modeOf(st);
+        double eb = effectiveBase(st);
+        windowMode = mode;
+        windowBase = eb;
         String sd = Script.steerDir;
-        boolean center = sd == null || "center".equals(sd);
-        double base = Math.toRadians(dirAngle(sd));
-        int shape = idx("auto_shape", 2, SHAPES.length);
+        boolean center = Double.isNaN(eb) && (sd == null || "center".equals(sd));
+        double base = Double.isNaN(eb) ? Math.toRadians(dirAngle(sd)) : eb;
+        int shape = mode == MODE_FLEE ? 0 : get("shape");   // huir: en línea recta
         if (joy != null && !(shape <= 1 && center)) {
             float r = svc.calib().joyRadius();
             Pattern.Touch js = new Pattern.Touch();
@@ -196,7 +359,7 @@ final class AutoController {
             }
             p.touches.add(js);
         }
-        if (idx("auto_shot", 2, SHOTS.length) == 1) {   // ráfaga: uno cada 0,4 s
+        if (get("shot") == 1) {   // ráfaga: uno cada 0,4 s
             for (long t = 40; t < WINDOW_MS; t += 400) press(p, "attack", t);
         }
         if (p.touches.isEmpty()) {   // quieto y sin disparos: el reproductor se detiene y decide() lo retoma

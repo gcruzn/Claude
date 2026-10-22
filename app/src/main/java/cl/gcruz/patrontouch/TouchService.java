@@ -1318,31 +1318,25 @@ public class TouchService extends AccessibilityService implements Player.Listene
         t.setTextColor(GRAFITO);
         t.setPadding(dp(2), 0, dp(2), dp(6));
         box.addView(t);
-        String[] keys = {"auto_shape", "auto_shot", "auto_super", "auto_range", "auto_abil"};
-        String[] names = {"Forma", "Disparo", "Súper", "Alcance del súper", "Gadget e híper"};
-        int[] defs = {2, 2, 0, 1, 0};
-        String[][] values = {AutoController.SHAPES, AutoController.SHOTS, AutoController.SUPERS,
-                rangeLabels(), AutoController.ABILITIES};
-        for (int k = 0; k < keys.length; k++) {
-            final int kk = k;
-            TextView row = new TextView(this);
-            row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-            row.setTextColor(GRAFITO);
-            row.setPadding(dp(10), dp(10), dp(10), dp(10));
-            GradientDrawable rb = new GradientDrawable();
-            rb.setColor(Color.argb(255, 240, 241, 242));
-            rb.setCornerRadius(dp(10));
-            row.setBackground(rb);
-            Runnable paint = () -> row.setText(names[kk] + ":  " + values[kk][auto.idx(keys[kk], defs[kk], values[kk].length)] + "  ›");
+        // Fila de perfil (General, Nita, Edgar, Gigi, Amber, Nori) y, debajo, sus ajustes propios.
+        List<Runnable> repaint = new ArrayList<>();
+        TextView prof = autoRow(width, box);
+        Runnable paintProf = () -> prof.setText("Perfil:  " + AutoController.PROFILES[auto.profile()] + "  ›");
+        paintProf.run();
+        prof.setOnClickListener(v -> {
+            auto.nextProfile();
+            paintProf.run();
+            for (Runnable r : repaint) r.run();
+        });
+        for (String key : AutoController.KEYS) {
+            TextView row = autoRow(width, box);
+            Runnable paint = () -> row.setText(AutoController.label(key) + ":  " + AutoController.values(key)[auto.get(key)] + "  ›");
             paint.run();
+            repaint.add(paint);
             row.setOnClickListener(v -> {
-                int cur = auto.idx(keys[kk], defs[kk], values[kk].length);
-                prefs.edit().putInt(keys[kk], (cur + 1) % values[kk].length).apply();
+                auto.cycle(key);
                 paint.run();
             });
-            LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
-            rlp.setMargins(0, dp(4), 0, 0);
-            box.addView(row, rlp);
         }
         TextView close = new TextView(this);
         close.setText("Listo");
@@ -1362,18 +1356,30 @@ public class TouchService extends AccessibilityService implements Player.Listene
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
         clp.setMargins(0, dp(8), 0, dp(4));
         box.addView(close, clp);
+        // 10 filas no caben en la altura apaisada: van en un ScrollView de 90 % de alto.
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(box);
         WindowManager.LayoutParams lp = overlayParams(false);
         lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.height = (int) (Math.min(scr.x, scr.y) * 0.9f);
         lp.gravity = Gravity.CENTER;
-        menuWindow = box;
-        wm.addView(box, lp);
+        menuWindow = scroll;
+        wm.addView(scroll, lp);
     }
 
-    private static String[] rangeLabels() {
-        String[] r = new String[AutoController.RANGES.length];
-        for (int i = 0; i < r.length; i++) r[i] = AutoController.RANGES[i] + " px";
-        return r;
+    private TextView autoRow(int width, LinearLayout box) {
+        TextView row = new TextView(this);
+        row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        row.setTextColor(GRAFITO);
+        row.setPadding(dp(10), dp(8), dp(10), dp(8));
+        GradientDrawable rb = new GradientDrawable();
+        rb.setColor(Color.argb(255, 240, 241, 242));
+        rb.setCornerRadius(dp(10));
+        row.setBackground(rb);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rlp.setMargins(0, dp(3), 0, 0);
+        box.addView(row, rlp);
+        return row;
     }
 
     private void closeMenu() {

@@ -22,6 +22,7 @@ final class Vision {
         long at;
         float px = -1, py = -1;          // jugador (centro de la etiqueta), coordenadas de pantalla completa
         float ammo = -1;                 // segmentos llenos, 0–3 (−1 = no se vio)
+        float health = -1;               // ancho verde de la barra de vida propia, en px de media resolución
         final List<float[]> enemies = new ArrayList<>();   // {x, y} en pantalla completa
     }
 
@@ -84,6 +85,26 @@ final class Vision {
                 if (c >= 2) cols++;
             }
             f.ammo = Math.min(3f, cols / 17f);
+        }
+        // --- vida propia: la barra verde ~45 px bajo el nombre (93 px de ancho con la vida llena a
+        // resolución completa, color 72,227,53). Se entrega el ancho; AutoController lo normaliza
+        // con el máximo visto (la barra cambia con el brawler y los escudos).
+        if (f.px >= 0) {
+            int cx = (int) (f.px * scale), cy = (int) (f.py * scale);
+            int x0 = Math.max(0, cx - 45), x1 = Math.min(w - 1, cx + 45);
+            int y0 = Math.max(0, cy + 20), y1 = Math.min(h - 1, cy + 26);
+            int cols = 0;
+            for (int x = x0; x <= x1; x++) {
+                for (int y = y0; y <= y1; y++) {
+                    int o = y * rowStride + x * pixStride;
+                    int r = buf.get(o) & 0xff, g = buf.get(o + 1) & 0xff, b = buf.get(o + 2) & 0xff;
+                    if (g > 180 && g - r > 110 && g - b > 110) {
+                        cols++;
+                        break;
+                    }
+                }
+            }
+            f.health = cols;
         }
         // --- enemigos: tramos rojos horizontales agrupados en barras
         List<int[]> bars = new ArrayList<>();   // {x0, x1, y0, y1}
