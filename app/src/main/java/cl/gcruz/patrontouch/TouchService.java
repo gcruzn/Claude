@@ -461,6 +461,9 @@ public class TouchService extends AccessibilityService implements Player.Listene
     /** La captura vio que Gonzalo tomó otra dirección con el lápiz: la vuelta se rehace hacia ella. */
     public void steerChanged() { main.post(() -> player.restartLapSoon()); }
 
+    /** La captura dejó de ver la perilla del patrón (lápiz cerca): el reproductor corta y reintenta. */
+    public void patternBlocked() { main.post(() -> player.onBlocked()); }
+
     public float joyRadiusPx() { return cal.joyRadius(); }
 
     /** Zona de la botonera en pantalla: su azul no es la perilla. */

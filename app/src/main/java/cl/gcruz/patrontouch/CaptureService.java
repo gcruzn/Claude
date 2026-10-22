@@ -184,7 +184,10 @@ public class CaptureService extends Service {
         // Con el patrón corriendo, la perilla ausente más de BLOCK_MS = Android bloquea lo inyectado
         // (lápiz cerca). Solo en ese estado una perilla que aparece es la del lápiz de Gonzalo.
         if (!injecting) blocked = false;
-        else if (n < PRESSED_PX && now - knobSeenAt > BLOCK_MS) blocked = true;
+        else if (n < PRESSED_PX && now - knobSeenAt > BLOCK_MS && !blocked) {
+            blocked = true;
+            svc.patternBlocked();
+        }
         if (n < PRESSED_PX) {
             if (pressed) android.util.Log.i(TouchService.TAG, "perilla suelta (dirección guardada: " + Script.steerDir + ")");
             pressed = false;
@@ -232,7 +235,7 @@ public class CaptureService extends Service {
     private static final int ADOPT_FRAMES = 3;
     private static final float JUMP_PX = 35;          // salto entre cuadros (media res.) = apoyo nuevo
     private float lastKx, lastKy;
-    private static final long BLOCK_MS = 150;
+    private static final long BLOCK_MS = 200;
     private boolean blocked;
     private int foreign;
     private String foreignDir;

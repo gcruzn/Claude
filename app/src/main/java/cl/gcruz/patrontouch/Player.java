@@ -176,6 +176,11 @@ public class Player {
 
             @Override
             public void onCancelled(GestureDescription d) {
+                if (expectCancel) {   // lo cortamos nosotros (onBlocked)
+                    expectCancel = false;
+                    flightDone();
+                    return;
+                }
                 android.util.Log.w("PatronTouch", "gesto cancelado por Android");
                 flightDone();
                 if (playing) stop("Interrumpido (un toque u otra app de accesibilidad cortó el gesto)");
@@ -320,21 +325,49 @@ public class Player {
      */
     private long jointSlice() {
         if (!CaptureService.isRunning()) return SLICE_MS;
-        if (SystemClock.uptimeMillis() - repStartUptime < 300) return LONG_SLICE_MS; // la perilla aún no aparece
-        boolean probe = !CaptureService.knobVisible(150);
-        if (probe != probing) {
-            probing = probe;
-            android.util.Log.i("PatronTouch", probe ? "tramos cortos: no se ve la perilla del patrón" : "tramos largos: perilla visible");
+        if (probing) {
+            if (!CaptureService.knobVisible(150)) return PROBE_SLICE_MS;
+            probing = false;
+            android.util.Log.i("PatronTouch", "retomado: tramos largos");
+            return LONG_SLICE_MS;
         }
-        return probe ? PROBE_SLICE_MS : LONG_SLICE_MS;
+        if (SystemClock.uptimeMillis() - repStartUptime < 300) return LONG_SLICE_MS; // la perilla aún no aparece
+        if (CaptureService.knobVisible(150)) return LONG_SLICE_MS;
+        probing = true;
+        android.util.Log.i("PatronTouch", "tramos cortos: no se ve la perilla del patrón");
+        return PROBE_SLICE_MS;
     }
 
     private boolean probing;
+    private boolean expectCancel;
 
-    // 600 ms y no más: el bloqueo del lápiz se nota recién al terminar el tramo en curso (cortarlo
-    // a la mitad es lo que trababa Android). Con el lápiz cerca más de 0,6 s, al alejarlo ya se
-    // está probando cada 0,1 s.
-    static volatile long LONG_SLICE_MS = 600, PROBE_SLICE_MS = 100;
+    /**
+     * La captura dejó de ver la perilla del patrón: Android lo está bloqueando (S Pen cerca). Se corta
+     * el gesto en curso YA (solo si en este instante está abajo únicamente el joystick, la única
+     * cancelación que Android acepta sin trabar el dedo inyectado, ver stopByUserTouch) y se pasa a
+     * tramos de PROBE_SLICE_MS hasta que la perilla vuelva a verse. 22-oct: Samsung no admite
+     * continueStroke (conttest: el tramo 1 siempre cancelado), así que la fluidez exige un gesto por
+     * vuelta y la retomada rápida exige este corte.
+     */
+    public void onBlocked() {
+        if (!playing || inFlight == 0 || probing) return;
+        long now = SystemClock.uptimeMillis() - sliceSentAt;
+        for (long[] w : sliceShorts) if (now >= w[0] - 15 && now <= w[1] + 15) return; // al terminar el tramo
+        probing = true;
+        android.util.Log.i("PatronTouch", "bloqueado (lápiz): corte y tramos cortos");
+        expectCancel = true;
+        float[] pt = listener.releasePoint();
+        Path path = new Path();
+        path.moveTo(Math.max(0, pt[0]), Math.max(0, pt[1]));
+        restartLap = true;
+        final int s = session;
+        send(new GestureDescription.Builder().addStroke(new StrokeDescription(path, 0, 1)).build(), null);
+        whenIdle(() -> sendSlice(s));
+    }
+
+    // 22-oct (v6.0): tramo largo = la vuelta entera (sin re-apoyos: cada uno frenaba al brawler; la
+    // captura mostró «perilla suelta» cada 0,6 s). El lápiz se atiende con onBlocked.
+    static volatile long LONG_SLICE_MS = 60_000, PROBE_SLICE_MS = 100;
 
     /** ms del centro del joystick a su posición al re-apoyar; ajustable por ADB («tune repress»). */
     static volatile long REPRESS_MS = 40;
