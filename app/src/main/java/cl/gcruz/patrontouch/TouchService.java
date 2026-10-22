@@ -73,8 +73,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
         showPanel();
         registerDebug();
         observePen();
-        startPenBridge();
-        startFingerBridge();
     }
 
     // ---------------------------------------------------------------- S Pen
@@ -107,260 +105,13 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     /**
-     * Puente del S Pen por ADB (20-oct): un proceso lanzado una vez con ADB publica en
-     * 127.0.0.1:7787 la salida de «getevent -l» del lápiz (solo lee el dispositivo de entrada; el
-     * juego recibe el lápiz igual). La app se conecta y traduce: BTN_TOUCH DOWN = lápiz apoyado,
-     * UP = levantado, ABS_X/ABS_Y = posición en coordenadas del panel (vertical). Se reintenta cada
-     * 3 s, así funciona aunque el proceso se lance después.
+     * 21-oct, pedido de Gonzalo: se eliminaron los puentes del dedo y del lápiz (getevent por ADB en
+     * 7787/7788). El botón corre su patrón en bucle hasta volver a tocarlo; tocar la pantalla ya no
+     * lo pausa. Sin puentes no hay «última dirección»: «mover ultima/dirigido» salen al azar.
      */
-    static final int PEN_PORT = 7787;
-    private volatile boolean penBridgeRun;
-    private int penDownX = -1, penDownY = -1, penCurX = -1, penCurY = -1;
-    private boolean penTouching;
-
-    private void startPenBridge() {
-        if (penBridgeRun) return;
-        penBridgeRun = true;
-        Thread th = new Thread(() -> {
-            while (penBridgeRun) {
-                try (java.net.Socket so = new java.net.Socket()) {
-                    so.connect(new java.net.InetSocketAddress("127.0.0.1", PEN_PORT), 1500);
-                    android.util.Log.i(TAG, "puente S Pen conectado");
-                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(so.getInputStream()));
-                    String line;
-                    while (penBridgeRun && (line = in.readLine()) != null) penLine(line);
-                } catch (Exception ignored) {
-                }
-                try { Thread.sleep(3000); } catch (InterruptedException e) { return; }
-            }
-        }, "puente-spen");
-        th.setDaemon(true);
-        th.start();
-    }
-
-    private void penLine(String line) {
-        String[] w = line.trim().split("\\s+");
-        if (w.length < 3) return;
-        String code = w[w.length - 2], val = w[w.length - 1];
-        if (code.equals("ABS_X") || code.equals("ABS_Y")) {
-            int v;
-            try { v = Integer.parseInt(val, 16); } catch (NumberFormatException e) { return; }
-            if (code.equals("ABS_X")) penCurX = v; else penCurY = v;
-            if (penTouching && penDownX < 0 && penCurX >= 0 && penCurY >= 0) {
-                penDownX = penCurX;
-                penDownY = penCurY;
-            }
-            if (penTouching && penDownX >= 0) updatePenDir();
-        } else if (code.equals("BTN_TOUCH")) {
-            boolean down = val.equals("DOWN");
-            if (down == penTouching) return;
-            penTouching = down;
-            if (down) {
-                penDownX = penCurX;
-                penDownY = penCurY;
-                main.post(this::penDown);
-            } else {
-                penDownX = -1;
-                penUpAt = android.os.SystemClock.uptimeMillis();
-                android.util.Log.i(TAG, "lápiz levantado (sigue cerca de la pantalla)");
-                // Mientras el lápiz flota cerca, Android rechaza los toques (rechazo de palma):
-                // se reanuda al salir del rango; si no llega ese aviso, a los 1,5 s igual.
-                main.postDelayed(penHoverTimeout, 1500);
-            }
-        } else if (code.equals("BTN_TOOL_PEN") || code.equals("BTN_DIGI")) { // en el S26 se llama BTN_DIGI
-            android.util.Log.i(TAG, "lápiz " + (val.equals("DOWN") ? "entra en rango" : "sale de rango"));
-            if (val.equals("UP")) {
-                android.util.Log.i(TAG, "lápiz fuera de rango");
-                // Si el lápiz «se levantó» hace muy poco puede ser un rebote: se confirma 150 ms después.
-                long wait = Math.max(0, 150 - (android.os.SystemClock.uptimeMillis() - penUpAt));
-                main.postDelayed(() -> {
-                    main.removeCallbacks(penHoverTimeout);
-                    if (!penTouching) penUp();
-                }, wait);
-            }
-        }
-    }
-
-    // ---------------------------------------------------------------- dedo (pantalla táctil)
-
-    /**
-     * Puente del dedo (20-oct): igual que el del lápiz, pero leyendo la pantalla táctil
-     * (/dev/input/event7, multitáctil 0–4095) por 127.0.0.1:7788. Solo ve dedos reales: los toques
-     * de la app no pasan por el sensor. Con un dedo en la pantalla el patrón se pausa; el dedo que
-     * empezó sobre el joystick da la dirección; al levantar el último dedo se reanuda (60 ms, sin
-     * la espera del lápiz porque el dedo no flota).
-     */
-    static final int FINGER_PORT = 7788;
-    private final java.util.Map<Integer, float[]> fingers = new java.util.HashMap<>(); // slot → {x0,y0,x,y,esJoystick}
-    private int fSlot = 0;
-    private boolean fingerDown;
-
-    private void startFingerBridge() {
-        Thread th = new Thread(() -> {
-            while (penBridgeRun) {
-                try (java.net.Socket so = new java.net.Socket()) {
-                    so.connect(new java.net.InetSocketAddress("127.0.0.1", FINGER_PORT), 1500);
-                    android.util.Log.i(TAG, "puente dedo conectado");
-                    java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(so.getInputStream()));
-                    String line;
-                    while (penBridgeRun && (line = in.readLine()) != null) fingerLine(line);
-                } catch (Exception ignored) {
-                }
-                try { Thread.sleep(3000); } catch (InterruptedException e) { return; }
-            }
-        }, "puente-dedo");
-        th.setDaemon(true);
-        th.start();
-    }
-
-    /** Panel vertical 0–4095 → píxeles de pantalla según la rotación. */
-    private float[] panelToScreen(float nx, float ny) {
-        Point s = screenSize();
-        int pw = Math.min(s.x, s.y), ph = Math.max(s.x, s.y);
-        float px = nx / 4095f * pw, py = ny / 4095f * ph;
-        switch (wm.getDefaultDisplay().getRotation()) {
-            case android.view.Surface.ROTATION_90: return new float[]{py, pw - px};
-            case android.view.Surface.ROTATION_270: return new float[]{ph - py, px};
-            case android.view.Surface.ROTATION_180: return new float[]{pw - px, ph - py};
-            default: return new float[]{px, py};
-        }
-    }
-
-    private void fingerLine(String line) {
-        String[] w = line.trim().split("\\s+");
-        if (w.length < 3) return;
-        String code = w[w.length - 2], val = w[w.length - 1];
-        switch (code) {
-            case "ABS_MT_SLOT":
-                try { fSlot = Integer.parseInt(val, 16); } catch (NumberFormatException ignored) { }
-                break;
-            case "ABS_MT_TRACKING_ID":
-                if (val.equals("ffffffff")) fingers.remove(fSlot);
-                else fingers.put(fSlot, new float[]{-1, -1, -1, -1, 0});
-                break;
-            case "ABS_MT_POSITION_X":
-            case "ABS_MT_POSITION_Y": {
-                float[] f = fingers.get(fSlot);
-                if (f == null) break;
-                float v;
-                try { v = Integer.parseInt(val, 16); } catch (NumberFormatException e) { break; }
-                if (code.endsWith("X")) f[2] = v; else f[3] = v;
-                if (f[0] < 0 && f[2] >= 0 && f[3] >= 0) {
-                    f[0] = f[2];
-                    f[1] = f[3];
-                    float[] p = panelToScreen(f[0], f[1]), joy = cal.get("joy");
-                    if (joy != null && Math.hypot(p[0] - joy[0], p[1] - joy[1]) < cal.joyRadius() * 2.2f) f[4] = 1;
-                    if (f[4] == 1) fingerStill = true;
-                    android.util.Log.i(TAG, "dedo abajo en " + Math.round(p[0]) + "," + Math.round(p[1])
-                            + (f[4] == 1 ? " (joystick)" : ""));
-                }
-                if (f[4] == 1 && f[0] >= 0) fingerDir(f);
-                break;
-            }
-            case "SYN_REPORT": {
-                boolean any = !fingers.isEmpty();
-                if (any == fingerDown) break;
-                fingerDown = any;
-                if (any) {
-                    main.removeCallbacks(fingerResume);
-                    main.post(this::penDown);
-                } else {
-                    android.util.Log.i(TAG, "dedo levantado");
-                    // 80 ms: con 0 ms el toque inyectado llegaba antes de que el juego procesara el
-                    // UP real, Android lo descartaba y se perdía el gesto entero (20-oct, v4.9.0).
-                    main.postDelayed(fingerResume, resumeDelayMs);
-                }
-                break;
-            }
-        }
-    }
-
-    /** Espera entre levantar el dedo y reanudar; ajustable por ADB («tune») para medir variantes. */
-    // 20-oct, medido con el dedo en «Prueba · Dirección»: 80 → 0 ms y rampa 60 → 20 ms bajó el
-    // arranque de 0,20 a 0,17 s y la velocidad ya no cae a cero al soltar.
-    static volatile int resumeDelayMs = 0;
 
     /** Pausa entre vueltas del bucle (antes 120 ms: el brawler se notaba detenerse en cada vuelta). */
     static final long LOOP_PAUSE_MS = 15;
-
-    /**
-     * El dedo apoyó en el joystick y se levantó sin arrastrar (21-oct, pedido de Gonzalo): al
-     * soltar se gira en el sitio («Circular · En el sitio») en vez de seguir la dirección. El
-     * patrón del botón queda guardado: el próximo arrastre vuelve a él.
-     */
-    private boolean fingerStill;
-
-    private final Runnable fingerResume = () -> { if (!fingerDown && !penTouching) penUp(); };
-
-    private void fingerDir(float[] f) {
-        float[] a = panelToScreen(f[0], f[1]), b = panelToScreen(f[2], f[3]);
-        float sx = b[0] - a[0], sy = b[1] - a[1];
-        if (sx * sx + sy * sy < dp(14) * dp(14)) return;
-        double ang = (Math.toDegrees(Math.atan2(-sy, sx)) + 360) % 360;
-        String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
-        String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
-        fingerStill = false;
-        if (!d.equals(Script.steerDir)) android.util.Log.i(TAG, "dedo hacia " + d);
-        Script.steerDir = d;
-    }
-
-    /** Vector desde donde apoyó el lápiz, pasado de panel vertical a pantalla según la rotación. */
-    private void updatePenDir() {
-        float rx = penCurX - penDownX, ry = penCurY - penDownY; // panel: x a lo corto, y a lo largo, y hacia abajo
-        if (rx * rx + ry * ry < 250f * 250f) return;
-        float sx, sy;
-        switch (wm.getDefaultDisplay().getRotation()) {
-            case android.view.Surface.ROTATION_90: sx = ry; sy = -rx; break;
-            case android.view.Surface.ROTATION_270: sx = -ry; sy = rx; break;
-            case android.view.Surface.ROTATION_180: sx = -rx; sy = -ry; break;
-            default: sx = rx; sy = ry;
-        }
-        double ang = (Math.toDegrees(Math.atan2(-sy, sx)) + 360) % 360;
-        String[] dirs = {"right", "upright", "up", "upleft", "left", "downleft", "down", "downright"};
-        String d = dirs[(int) (((ang + 22.5) % 360) / 45)];
-        if (!d.equals(Script.steerDir)) android.util.Log.i(TAG, "lápiz hacia " + d);
-        Script.steerDir = d;
-    }
-
-    /**
-     * Rebotes (20-oct): con poca presión el S Pen reporta «levantado» y «apoyado» en ráfagas de
-     * 10–200 ms mientras se arrastra; si el patrón se reanudaba en ese hueco, el toque inyectado del
-     * joystick quedaba a medias y el juego lo dejaba pegado. Solo se reanuda si el lápiz sigue arriba.
-     */
-    private volatile long penUpAt;
-
-    private final Runnable penHoverTimeout = () -> { if (!penTouching) penUp(); };
-
-    /** Botón del patrón que el lápiz dejó en pausa (para que tocarlo lo detenga). */
-    private int penPausedIdx = -1;
-
-    private void penDown() {
-        main.removeCallbacks(penHoverTimeout);
-        if (player.isPlaying() && lastRun != null) {
-            penPausedIdx = activeIdx;
-            penResume = lastRun;
-            // 20-oct: el dedo o el lápiz NO cortan el gesto inyectado en curso (en el S26 conviven),
-            // y ese gesto seguía apretando el joystick: el juego atendía a ese dedo virtual y no al
-            // de Gonzalo. Se corta ya, con el toque mínimo de soltar en la zona invisible del panel.
-            player.stopByUserTouch();
-            android.util.Log.i(TAG, "lápiz/dedo abajo: patrón en pausa y gesto cortado");
-        }
-    }
-
-    private void penUp() {
-        if (penTouching) return;
-        if (penResume != null && !player.isPlaying()) {
-            Data.PatternDef circle = fingerStill ? data.pattern("cir_sitio") : null;
-            fingerStill = false;
-            if (circle != null) {
-                android.util.Log.i(TAG, "dedo quieto: gira en el sitio");
-                runScript(circle.name, circle.script, 0, penPausedIdx, MODE_LOOP);
-                return;
-            }
-            android.util.Log.i(TAG, "lápiz arriba: reanuda hacia " + Script.steerDir);
-            penResume.run();
-        }
-    }
 
     @SuppressWarnings("unused")
     private void observePenExperimental() {
@@ -456,11 +207,10 @@ public class TouchService extends AccessibilityService implements Player.Listene
                 player.stop("Detenido por ADB");
                 break;
             case "tune":
-                resumeDelayMs = i.getIntExtra("resume", resumeDelayMs);
                 Script.joyHoldMs = i.getIntExtra("hold", Script.joyHoldMs);
                 Script.joyRampMs = i.getIntExtra("ramp", Script.joyRampMs);
                 Player.SLICE_MS = i.getIntExtra("slice", (int) Player.SLICE_MS);
-                android.util.Log.i(TAG, "tune resume=" + resumeDelayMs + " hold=" + Script.joyHoldMs + " ramp=" + Script.joyRampMs + " slice=" + Player.SLICE_MS);
+                android.util.Log.i(TAG, "tune hold=" + Script.joyHoldMs + " ramp=" + Script.joyRampMs + " slice=" + Player.SLICE_MS);
                 break;
             case "escape":
                 if (i.getBooleanExtra("on", !escapeOn()) != escapeOn()) toggleEscape();
@@ -585,7 +335,6 @@ public class TouchService extends AccessibilityService implements Player.Listene
     }
 
     private void cleanup() {
-        penBridgeRun = false;
         if (debugReceiver != null) try { unregisterReceiver(debugReceiver); } catch (Exception ignored) { }
         debugReceiver = null;
         if (player != null) player.stop(null);
@@ -965,10 +714,7 @@ public class TouchService extends AccessibilityService implements Player.Listene
         return (v, e) -> {
             switch (e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
-                    // Con el S Pen, el puente avisa el apoyo antes que este toque y deja el patrón en
-                    // pausa: igual cuenta como «estaba corriendo» para que el toque lo DETENGA.
-                    touchStopOnly = (player.isPlaying() && activeIdx == i)
-                            || (penResume != null && penPausedIdx == i);
+                    touchStopOnly = player.isPlaying() && activeIdx == i;
                     if (player.isPlaying()) player.stopByUserTouch();
                     ((GradientDrawable) v.getBackground()).setColor(activeColor(MODE_LOOP));
                     return true;

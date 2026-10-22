@@ -296,3 +296,13 @@ Gonzalo decidió no probarlos en Terrenos: los usa directo en partida y reporta.
 - Set **Pruebas** (General): 1 «Prueba · Disparo» (solo 3 tiros), 2 «Prueba · Dirección» (solo
   mover hacia la última dirección). Para aislar fallas al soltar el dedo.
 - Comando ADB `tune` (resume/hold/ramp) para medir variantes sin recompilar.
+
+### Sin puentes (v5.4.0, 21-oct)
+
+- Pedido de Gonzalo: se ELIMINARON los puentes del dedo y del lápiz (7787/7788) y todo lo que
+  dependía de ellos (pausa al tocar, reanudar al soltar, última dirección, girar en el sitio con el
+  dedo quieto). El botón corre su patrón en bucle hasta volver a tocarlo. «mover ultima» y
+  «mover dirigido» salen al azar (Script.steerDir queda en null).
+- El reproductor sigue en un gesto continuo por vuelta, sin lanzar un gesto con otro en curso.
+- ADB por Tailscale cuando no están en la misma red: el celular aparece como 100.118.105.84
+  (Depuración inalámbrica → `adb connect 100.118.105.84:<puerto>`, luego `tcpip 5555`).
