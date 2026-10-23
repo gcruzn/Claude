@@ -218,7 +218,11 @@ final class AutoController {
     // velocidad) con radio de 140 a 300 px. Encima de él la barra no se ve (partida manual: «enemigos
     // 0» peleando), así que si se lo dejó de ver al alcance del golpe se espera 6 s antes de soltarlo.
     // Y los golpes se apuntan hacia el fijado: el toque simple pega al más cercano, que puede ser otro.
-    private static final float HIT_PX = 320, LOCK_MATCH_PX = 140, LOCK_MATCH_MAX_PX = 300, GADGET_REACH_PX = 1000;
+    // v6.6.7 (partida de Gonzalo 09:50, video seg. 80–89): golpeaba con el enemigo a 200–300 px,
+    // donde el puño de Edgar no llega (≈1,7 casillas ≈ 180 px): gastaba la munición al aire y al quedar
+    // pegado no tenía balas. Ahora golpea solo a < HIT_PX y fija/persigue desde LOCK_PX.
+    private static final float LOCK_PX = 320;
+    private static final float HIT_PX = 200, LOCK_MATCH_PX = 140, LOCK_MATCH_MAX_PX = 300, GADGET_REACH_PX = 1000;
     private static final long LOCK_LOST_MS = 4000, LOCK_LOST_CLOSE_MS = 6000;
     private float[] lock;
     private float lockVx, lockVy, lockLastDist = Float.MAX_VALUE;   // velocidad (px/ms) y distancia al verlo
@@ -246,7 +250,7 @@ final class AutoController {
         Sit st = new Sit();
         Vision.Frame v = CaptureService.vision;
         long now = SystemClock.uptimeMillis();
-        if (lock != null && now - lockSeen > (lockLastDist < HIT_PX * 1.2f ? LOCK_LOST_CLOSE_MS : LOCK_LOST_MS)) {
+        if (lock != null && now - lockSeen > (lockLastDist < LOCK_PX * 1.2f ? LOCK_LOST_CLOSE_MS : LOCK_LOST_MS)) {
             android.util.Log.i(TouchService.TAG, "Auto: objetivo fijado ya no se ve (derrotado o perdido), visto por última vez a "
                     + Math.round(lockLastDist) + " px");
             lock = null;
@@ -347,7 +351,7 @@ final class AutoController {
         // Mientras corre un súper o gadget no se rehace el gesto: el reemplazo lo cortaba a medias y el
         // juego no lo lanzaba (partida de Gonzalo con Edgar, 23-oct: 2 súpers, el botón siguió amarillo).
         if (now < actionUntil) return;
-        if (hunt && st.enemy != null && st.dist < HIT_PX) {
+        if (hunt && st.enemy != null && st.dist < LOCK_PX) {
             // Edgar: los golpes van DENTRO de la ventana (window()), no un reemplazo por golpe: eso
             // re-apoyaba el joystick cada 0,2 s y lo dejaba casi quieto.
             if (lock == null) {
@@ -372,14 +376,14 @@ final class AutoController {
         String why = null;
         if (hunt) {
             // Gadget: solo para alcanzar a un enemigo que está a la vista pero fuera del golpe.
-            doGadget = st.enemy != null && st.dist >= HIT_PX * 1.4f && st.dist < GADGET_REACH_PX && now - lastGadget > 6000;
+            doGadget = st.enemy != null && st.dist >= LOCK_PX * 1.25f && st.dist < GADGET_REACH_PX && now - lastGadget > 6000;
             // Súper (salto) solo sobre el fijado: si se escapó del golpe, o si la pelea sigue.
-            boolean escaped = lock != null && st.dist > HIT_PX * 1.3f;
-            boolean fighting = lock != null && st.dist < HIT_PX && now - fightSince > 1500;
+            boolean escaped = lock != null && st.dist > LOCK_PX;
+            boolean fighting = lock != null && st.dist < LOCK_PX && now - fightSince > 1500;
             // Apertura: así juega Gonzalo a mano (partida grabada, 23-oct): súper al enemigo a ~640 px y
             // la ráfaga apenas cae. Sin fijado, salta sobre el más cercano y lo fija.
-            boolean opener = lock == null && st.enemy != null && st.dist > HIT_PX * 1.3f;
-            doSuper = charged && now - lastSuper > 5000 && sup != 2 && st.enemy != null && st.dist <= range && (escaped || fighting || opener);
+            boolean opener = lock == null && st.enemy != null && st.dist > LOCK_PX;
+            doSuper = charged && now - lastSuper > 1500 && sup != 2 && st.enemy != null && st.dist <= range && (escaped || fighting || opener);
             if (doSuper) {
                 if (opener) setLock(st.enemy, st.dist, now);
                 target = st.enemy;
