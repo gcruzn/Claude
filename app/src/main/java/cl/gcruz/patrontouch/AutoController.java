@@ -118,6 +118,7 @@ final class AutoController {
     }
 
     private static final long WINDOW_MS = 3000, TICK_MS = 50;
+    private static final long ATTACK_EVERY_MS = 120, ABIL_EVERY_MS = 3000;   // Edgar «cazar», v6.7.0
     private static final float DRIFT = 0.7f;   // peso del desplazamiento frente a la forma
 
     private final TouchService svc;
@@ -418,20 +419,9 @@ final class AutoController {
         boolean doHyper = now - lastHyper > 4000 && (ab == 1 || ((ab == 0 || ab == 3) && near));
         String why = null;
         if (hunt) {
-            // Gadget: solo para alcanzar a un enemigo que está a la vista pero fuera del golpe.
-            doGadget = st.enemy != null && st.dist >= LOCK_PX * 1.25f && st.dist < GADGET_REACH_PX && now - lastGadget > 6000;
-            // Súper (salto) solo sobre el fijado: si se escapó del golpe, o si la pelea sigue.
-            boolean escaped = lock != null && st.dist > LOCK_PX;
-            boolean fighting = lock != null && st.dist < LOCK_PX && now - fightSince > 1500;
-            // Apertura: así juega Gonzalo a mano (partida grabada, 23-oct): súper al enemigo a ~640 px y
-            // la ráfaga apenas cae. Sin fijado, salta sobre el más cercano y lo fija.
-            boolean opener = lock == null && st.enemy != null && st.dist > LOCK_PX;
-            doSuper = charged && now - lastSuper > 1500 && sup != 2 && st.enemy != null && st.dist <= range && (escaped || fighting || opener);
-            if (doSuper) {
-                if (opener) setLock(st.enemy, st.dist, now);
-                target = st.enemy;
-                why = escaped ? "se escapó" : opener ? "apertura" : "sigue la pelea";
-            }
+            // v6.7.0 (Gonzalo, 23-oct): súper y gadget van en ciclo fijo dentro de la ventana (window()).
+            doGadget = false;
+            doSuper = false;
         }
         // ¿Cambió el rumbo efectivo (enemigo, distancia, huida)? Entonces se rehace la ventana.
         double b = effectiveBase(st);
@@ -442,7 +432,7 @@ final class AutoController {
         // rehízo 89 veces, 66 a menos de 0,45 s; cada rehecho re-apoya el joystick y reinicia la ráfaga.
         // Ahora al cazar: persiguiendo 45° cada ≥ 0,6 s; al alcance del golpe solo si el ángulo se va
         // más de 80° (de cerca cualquier paso lo mueve mucho) y como mucho cada 1 s.
-        boolean hitNow = hunt && inHit(st);
+        boolean hitNow = false;   // v6.7.0: al cazar se ataca siempre; entrar o salir del golpe no rehace nada
         long turnGap = !hunt ? 800 : hitNow && windowHit ? 1000 : 600;
         double turnAng = Math.toRadians(!hunt ? 50 : hitNow && windowHit ? 80 : 45);
         // v6.6.10 (partida de 10:17–10:26): aún 158 rehechos, mediana 0,54 s. Se registra el motivo.
@@ -642,12 +632,31 @@ final class AutoController {
         if (get("shot") == 1) {   // ráfaga: uno cada 0,4 s
             for (long t = 40; t < WINDOW_MS; t += 400) press(p, "attack", t);
         }
-        boolean hit = get("shot") == SHOT_HUNT && inHit(st);
-        windowHit = hit;
-        if (hit) {   // Edgar al alcance: golpes seguidos cada 0,17 s (el juego ignora los sin munición)
-            // Toque simple (el juego apunta solo): Gonzalo, 23-oct, «el ataque dirigido no sirve, basta con
-            // mantener cerca al brawler objetivo y atacar auto». El seguimiento del fijado lo da el joystick.
-            for (long t = 40; t < WINDOW_MS; t += 170) press(p, "attack", t);
+        windowHit = false;
+        if (get("shot") == SHOT_HUNT) {
+            // v6.7.0, pedido de Gonzalo (23-oct): «que dispare sus tres cargas todo el tiempo lo más rápido
+            // posible… como si tuviera munición infinita; el súper y el gadget cada 3 s de forma alternada,
+            // ciclos infinitos». Toque simple (auto-apuntado) cada ATTACK_EVERY_MS siempre, esté o no al
+            // alcance (sin munición el juego lo ignora y dispara apenas recarga). Súper y gadget alternan en
+            // instantes fijos desde que se encendió el Auto (múltiplos de ABIL_EVERY_MS: pares súper,
+            // impares gadget), así un rehecho de la ventana no corre el ciclo. Alrededor de cada uno se
+            // quitan los golpes: el juego atiende un solo botón de ataque a la vez y lo ignoraba.
+            for (long t = 40; t < WINDOW_MS; t += ATTACK_EVERY_MS) press(p, "attack", t);
+            long now = SystemClock.uptimeMillis();
+            for (long k = Math.max(1, (now - startedAt + 30) / ABIL_EVERY_MS + 1); ; k++) {
+                long off = startedAt + k * ABIL_EVERY_MS - now;
+                if (off >= WINDOW_MS) break;
+                if (off < 30) continue;
+                final long s0 = off - 130, s1 = off + 250;
+                float[] atk = svc.calib().get("attack");
+                if (atk != null) {
+                    p.touches.removeIf(x -> {
+                        Pattern.Point a = x.pts.get(0), z = x.pts.get(x.pts.size() - 1);
+                        return a.x == atk[0] && a.y == atk[1] && z.t > s0 && a.t < s1;
+                    });
+                }
+                press(p, k % 2 == 1 ? "super" : "gadget", off, 120);
+            }
         }
         if (p.touches.isEmpty()) {   // quieto y sin disparos: el reproductor se detiene y decide() lo retoma
             p.duration = WINDOW_MS;
