@@ -595,22 +595,9 @@ final class AutoController {
         boolean hit = get("shot") == SHOT_HUNT && inHit(st);
         windowHit = hit;
         if (hit) {   // Edgar al alcance: golpes seguidos cada 0,17 s (el juego ignora los sin munición)
-            float[] atk = svc.calib().get("attack");
-            if (lock != null && atk != null) {
-                // apuntados hacia el fijado (arrastre corto): el toque simple pega al más cercano
-                double ang = Math.atan2(st.enemy[1] - st.py, st.enemy[0] - st.px);
-                float r = svc.calib().aimRadius();
-                float ax = atk[0] + (float) (r * Math.cos(ang)), ay = atk[1] + (float) (r * Math.sin(ang));
-                for (long t = 40; t < WINDOW_MS; t += 170) {
-                    Pattern.Touch x = new Pattern.Touch();
-                    x.pts.add(new Pattern.Point(t, atk[0], atk[1]));
-                    x.pts.add(new Pattern.Point(t + 50, ax, ay));
-                    x.pts.add(new Pattern.Point(t + 110, ax, ay));
-                    p.touches.add(x);
-                }
-            } else {
-                for (long t = 40; t < WINDOW_MS; t += 170) press(p, "attack", t);
-            }
+            // Toque simple (el juego apunta solo): Gonzalo, 23-oct, «el ataque dirigido no sirve, basta con
+            // mantener cerca al brawler objetivo y atacar auto». El seguimiento del fijado lo da el joystick.
+            for (long t = 40; t < WINDOW_MS; t += 170) press(p, "attack", t);
         }
         if (p.touches.isEmpty()) {   // quieto y sin disparos: el reproductor se detiene y decide() lo retoma
             p.duration = WINDOW_MS;
