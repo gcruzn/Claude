@@ -337,10 +337,18 @@ final class AutoController {
             // Súper (salto) solo sobre el fijado: si se escapó del golpe, o si la pelea sigue.
             boolean escaped = lock != null && st.dist > HIT_PX * 1.3f;
             boolean fighting = lock != null && st.dist < HIT_PX && now - fightSince > 1500;
-            doSuper = charged && now - lastSuper > 5000 && sup != 2 && lock != null && st.dist <= range && (escaped || fighting);
+            // Apertura: así juega Gonzalo a mano (partida grabada, 23-oct): súper al enemigo a ~640 px y
+            // la ráfaga apenas cae. Sin fijado, salta sobre el más cercano y lo fija.
+            boolean opener = lock == null && st.enemy != null && st.dist > HIT_PX * 1.3f;
+            doSuper = charged && now - lastSuper > 5000 && sup != 2 && st.enemy != null && st.dist <= range && (escaped || fighting || opener);
             if (doSuper) {
+                if (opener) {
+                    lock = st.enemy.clone();
+                    lockSeen = now;
+                    fightSince = now;
+                }
                 target = lock;
-                why = escaped ? "se escapó" : "sigue la pelea";
+                why = escaped ? "se escapó" : opener ? "apertura" : "sigue la pelea";
             }
         }
         // ¿Cambió el rumbo efectivo (enemigo, distancia, huida)? Entonces se rehace la ventana.
@@ -510,6 +518,9 @@ final class AutoController {
         double base = Double.isNaN(eb) ? Math.toRadians(dirAngle(sd)) : eb;
         // huir, y cazar con un enemigo a la vista: en línea recta
         int shape = mode == MODE_FLEE || (mode == MODE_CHASE && get("shot") == SHOT_HUNT) ? 0 : get("shape");
+        // Edgar sin enemigo a la vista y con el lápiz en el centro: antes quedaba quieto (el toque del
+        // lápiz al apoyarse en el joystick deja «centro»); ahora recorre un círculo en el sitio.
+        if (get("shot") == SHOT_HUNT && mode == MODE_PEN && center && shape <= 1) shape = 2;
         if (joy != null && !(shape <= 1 && center)) {
             float r = svc.calib().joyRadius();
             Pattern.Touch js = new Pattern.Touch();
