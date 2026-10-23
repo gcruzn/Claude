@@ -212,18 +212,34 @@ final class AutoController {
     // 23-oct (partida de Gonzalo): soltaba al fijado y pasaba a otro sin eliminar a ninguno. Causas:
     // la pausa del lápiz contaba como «no se ve» (lo soltaba al retomar), y con 300 px de radio otro
     // enemigo cercano lo reemplazaba en los cuadros en que no se detectaba su barra. Ahora el radio
-    // parte en 140 px y crece con el tiempo sin verlo (~0,35 px/ms, tope 450), y se pierde a los 4 s.
-    private static final float HIT_PX = 320, LOCK_MATCH_PX = 140, LOCK_MATCH_MAX_PX = 450, GADGET_REACH_PX = 1000;
-    private static final long LOCK_LOST_MS = 4000;
+    // parte en 140 px y crece con el tiempo sin verlo, y se pierde a los 4 s.
+    // 23-oct, v6.6.4 (Gonzalo: «sigo sintiendo que suelta al enemigo»): el radio crecía hasta 450 px y
+    // otro enemigo de paso lo reemplazaba; ahora se busca donde DEBERÍA estar (última posición + su
+    // velocidad) con radio de 140 a 300 px. Encima de él la barra no se ve (partida manual: «enemigos
+    // 0» peleando), así que si se lo dejó de ver al alcance del golpe se espera 6 s antes de soltarlo.
+    // Y los golpes se apuntan hacia el fijado: el toque simple pega al más cercano, que puede ser otro.
+    private static final float HIT_PX = 320, LOCK_MATCH_PX = 140, LOCK_MATCH_MAX_PX = 300, GADGET_REACH_PX = 1000;
+    private static final long LOCK_LOST_MS = 4000, LOCK_LOST_CLOSE_MS = 6000;
     private float[] lock;
+    private float lockVx, lockVy, lockLastDist = Float.MAX_VALUE;   // velocidad (px/ms) y distancia al verlo
     private long lockSeen, fightSince, pausedAt;
+
+    /** Fija a un enemigo nuevo. */
+    private void setLock(float[] en, float dist, long now) {
+        lock = en.clone();
+        lockVx = lockVy = 0;
+        lockLastDist = dist;
+        lockSeen = now;
+        fightSince = now;
+    }
 
     private Sit sit() {
         Sit st = new Sit();
         Vision.Frame v = CaptureService.vision;
         long now = SystemClock.uptimeMillis();
-        if (lock != null && now - lockSeen > LOCK_LOST_MS) {
-            android.util.Log.i(TouchService.TAG, "Auto: objetivo fijado ya no se ve (derrotado o perdido)");
+        if (lock != null && now - lockSeen > (lockLastDist < HIT_PX * 1.2f ? LOCK_LOST_CLOSE_MS : LOCK_LOST_MS)) {
+            android.util.Log.i(TouchService.TAG, "Auto: objetivo fijado ya no se ve (derrotado o perdido), visto por última vez a "
+                    + Math.round(lockLastDist) + " px");
             lock = null;
         }
         if (v == null || now - v.at > 600 || v.px < 0) return st;
@@ -244,21 +260,35 @@ final class AutoController {
         if (lock != null) {
             // La barra detectada más cerca de donde estaba el fijado es él (en 100 ms no se mueve más
             // de LOCK_MATCH_PX); si no aparece en este cuadro se sigue hacia su última posición.
-            float best = Math.min(LOCK_MATCH_MAX_PX, LOCK_MATCH_PX + 0.35f * Math.max(0, v.at - lockSeen - 100));
+            long gap = Math.max(0, v.at - lockSeen);
+            long g = Math.min(gap, 800);
+            float ex = lock[0] + lockVx * g, ey = lock[1] + lockVy * g;   // donde debería estar
+            float best = Math.min(LOCK_MATCH_MAX_PX, LOCK_MATCH_PX + 0.15f * Math.max(0, gap - 100));
             float[] match = null;
             for (float[] en : v.enemies) {
-                float d = (float) Math.hypot(en[0] - lock[0], en[1] - lock[1]);
+                float d = (float) Math.hypot(en[0] - ex, en[1] - ey);
                 if (d < best) {
                     best = d;
                     match = en;
                 }
             }
-            if (match != null) {
+            if (match != null && gap > 0) {
+                if (gap < 600) {   // velocidad suavizada, tope 0,6 px/ms
+                    float vx = (match[0] - lock[0]) / gap, vy = (match[1] - lock[1]) / gap;
+                    float sp = (float) Math.hypot(vx, vy);
+                    if (sp > 0.6f) { vx *= 0.6f / sp; vy *= 0.6f / sp; }
+                    lockVx = 0.5f * lockVx + 0.5f * vx;
+                    lockVy = 0.5f * lockVy + 0.5f * vy;
+                }
+                if (gap > 700) android.util.Log.i(TouchService.TAG, "Auto: fijado reencontrado tras " + gap + " ms");
                 lock = match.clone();
                 lockSeen = v.at;
+                lockLastDist = (float) Math.hypot(lock[0] - v.px, lock[1] - v.py);
+                ex = lock[0];
+                ey = lock[1];
             }
-            st.enemy = lock;
-            st.dist = (float) Math.hypot(lock[0] - v.px, lock[1] - v.py);
+            st.enemy = new float[]{ex, ey};
+            st.dist = (float) Math.hypot(ex - v.px, ey - v.py);
         }
         return st;
     }
@@ -310,9 +340,7 @@ final class AutoController {
             // Edgar: los golpes van DENTRO de la ventana (window()), no un reemplazo por golpe: eso
             // re-apoyaba el joystick cada 0,2 s y lo dejaba casi quieto.
             if (lock == null) {
-                lock = st.enemy.clone();
-                lockSeen = now;
-                fightSince = now;
+                setLock(st.enemy, st.dist, now);
                 android.util.Log.i(TouchService.TAG, "Auto: fija objetivo a " + Math.round(st.dist) + " px");
             }
         }
@@ -342,12 +370,8 @@ final class AutoController {
             boolean opener = lock == null && st.enemy != null && st.dist > HIT_PX * 1.3f;
             doSuper = charged && now - lastSuper > 5000 && sup != 2 && st.enemy != null && st.dist <= range && (escaped || fighting || opener);
             if (doSuper) {
-                if (opener) {
-                    lock = st.enemy.clone();
-                    lockSeen = now;
-                    fightSince = now;
-                }
-                target = lock;
+                if (opener) setLock(st.enemy, st.dist, now);
+                target = st.enemy;
                 why = escaped ? "se escapó" : opener ? "apertura" : "sigue la pelea";
             }
         }
@@ -537,7 +561,22 @@ final class AutoController {
         boolean hit = get("shot") == SHOT_HUNT && inHit(st);
         windowHit = hit;
         if (hit) {   // Edgar al alcance: golpes seguidos cada 0,17 s (el juego ignora los sin munición)
-            for (long t = 40; t < WINDOW_MS; t += 170) press(p, "attack", t);
+            float[] atk = svc.calib().get("attack");
+            if (lock != null && atk != null) {
+                // apuntados hacia el fijado (arrastre corto): el toque simple pega al más cercano
+                double ang = Math.atan2(st.enemy[1] - st.py, st.enemy[0] - st.px);
+                float r = svc.calib().aimRadius();
+                float ax = atk[0] + (float) (r * Math.cos(ang)), ay = atk[1] + (float) (r * Math.sin(ang));
+                for (long t = 40; t < WINDOW_MS; t += 170) {
+                    Pattern.Touch x = new Pattern.Touch();
+                    x.pts.add(new Pattern.Point(t, atk[0], atk[1]));
+                    x.pts.add(new Pattern.Point(t + 50, ax, ay));
+                    x.pts.add(new Pattern.Point(t + 110, ax, ay));
+                    p.touches.add(x);
+                }
+            } else {
+                for (long t = 40; t < WINDOW_MS; t += 170) press(p, "attack", t);
+            }
         }
         if (p.touches.isEmpty()) {   // quieto y sin disparos: el reproductor se detiene y decide() lo retoma
             p.duration = WINDOW_MS;
