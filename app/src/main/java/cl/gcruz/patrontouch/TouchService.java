@@ -1306,7 +1306,10 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private void showAutoConfig() {
         closeMenu();
         Point scr = screenSize();
-        int cellW = Math.min(dp(300), (int) (Math.max(scr.x, scr.y) * 0.42f));
+        // v6.7.1: con más de 8 ajustes, tres columnas para que siga cabiendo sin scroll.
+        int cols = AutoController.KEYS.length > 8 ? 3 : 2;
+        int cellW = cols == 3 ? Math.min(dp(230), (int) (Math.max(scr.x, scr.y) * 0.29f))
+                : Math.min(dp(300), (int) (Math.max(scr.x, scr.y) * 0.42f));
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(12), dp(8), dp(12), dp(10));
@@ -1348,15 +1351,15 @@ public class TouchService extends AccessibilityService implements Player.Listene
             android.util.Log.i(TAG, "Auto: " + auto.summary());
         });
         head.addView(close);
-        box.addView(head, new LinearLayout.LayoutParams(2 * cellW + dp(8), LinearLayout.LayoutParams.WRAP_CONTENT));
+        box.addView(head, new LinearLayout.LayoutParams(cols * cellW + (cols - 1) * dp(8), LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        // Cuerpo: las claves en dos columnas.
+        // Cuerpo: las claves en columnas.
         String[] keys = AutoController.KEYS;
-        int rows = (keys.length + 1) / 2;
+        int rows = (keys.length + cols - 1) / cols;
         for (int r = 0; r < rows; r++) {
             LinearLayout line = new LinearLayout(this);
             line.setOrientation(LinearLayout.HORIZONTAL);
-            for (int c = 0; c < 2; c++) {
+            for (int c = 0; c < cols; c++) {
                 int k = r + c * rows;
                 if (k >= keys.length) break;
                 String key = keys[k];

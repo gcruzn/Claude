@@ -4,6 +4,9 @@ import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.SystemClock;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Botón «Auto» (22-oct, pedido de Gonzalo): un solo botón que se mueve con una forma, dispara según
  * la munición que ve en pantalla y tira el súper solo con un enemigo al alcance. Todo se configura
@@ -29,9 +32,13 @@ final class AutoController {
     static final String[] DISTANCES = {"no", "corta", "media", "larga"};
     static final int[] DIST_PX = {0, 250, 450, 650};
     static final String[] FLEE = {"no", "sí"};
+    /** Cada cuánto se tocan súper, gadget e híper en «cazar» (v6.7.1, pedido de Gonzalo 23-oct). */
+    static final String[] EVERY = {"no", "1 s", "2 s", "3 s", "4 s", "5 s", "6 s", "8 s", "10 s", "15 s"};
+    static final long[] EVERY_MS = {0, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 15000};
 
     /** Claves de configuración, en el orden de la pantalla de ajustes. */
-    static final String[] KEYS = {"shape", "heading", "shot", "super", "range", "distance", "flee", "abil"};
+    static final String[] KEYS = {"shape", "heading", "shot", "super", "range", "distance", "flee", "abil",
+            "superEvery", "gadgetEvery", "hyperEvery"};
 
     /**
      * Valores de partida por perfil (índices en el orden de KEYS). 22-oct, kits buscados en la web
@@ -54,13 +61,13 @@ final class AutoController {
      *    sigue (más de 1,5 s pegándole).
      */
     static final int[][] PRESETS = {
-            //  forma rumbo disparo súper alcance distancia huir habilidades
-            {2, 0, 2, 0, 1, 0, 0, 0},   // General
-            {2, 0, 2, 0, 2, 2, 1, 0},   // Nita
-            {0, 1, 7, 0, 2, 0, 0, 0},   // Edgar (cazar, ver arriba)
-            {0, 1, 5, 0, 2, 0, 0, 0},   // Gigi
-            {1, 1, 1, 0, 2, 3, 1, 0},   // Amber
-            {0, 0, 6, 3, 0, 0, 0, 3},   // Nori (de su partida grabada, ver abajo)
+            //  forma rumbo disparo súper alcance distancia huir habilidades súper/gadget/híper cada (6 s)
+            {2, 0, 2, 0, 1, 0, 0, 0, 6, 6, 6},   // General
+            {2, 0, 2, 0, 2, 2, 1, 0, 6, 6, 6},   // Nita
+            {0, 1, 7, 0, 2, 0, 0, 0, 6, 6, 6},   // Edgar (cazar, ver arriba)
+            {0, 1, 5, 0, 2, 0, 0, 0, 6, 6, 6},   // Gigi
+            {1, 1, 1, 0, 2, 3, 1, 0, 6, 6, 6},   // Amber
+            {0, 0, 6, 3, 0, 0, 0, 3, 6, 6, 6},   // Nori (de su partida grabada, ver abajo)
     };
 
     static String[] values(String key) {
@@ -72,6 +79,9 @@ final class AutoController {
             case "distance": return DISTANCES;
             case "flee": return FLEE;
             case "abil": return ABILITIES;
+            case "superEvery":
+            case "gadgetEvery":
+            case "hyperEvery": return EVERY;
             default: {
                 String[] r = new String[RANGES.length];
                 for (int i = 0; i < r.length; i++) r[i] = RANGES[i] + " px";
@@ -89,6 +99,9 @@ final class AutoController {
             case "range": return "Alcance del súper";
             case "distance": return "Mantener distancia";
             case "flee": return "Huir con vida baja";
+            case "superEvery": return "Súper cada (cazar)";
+            case "gadgetEvery": return "Gadget cada (cazar)";
+            case "hyperEvery": return "Híper cada (cazar)";
             default: return "Gadget e híper";
         }
     }
@@ -118,7 +131,7 @@ final class AutoController {
     }
 
     private static final long WINDOW_MS = 3000, TICK_MS = 50;
-    private static final long ATTACK_EVERY_MS = 120, ABIL_EVERY_MS = 3000;   // Edgar «cazar», v6.7.0
+    private static final long ATTACK_EVERY_MS = 120;   // Edgar «cazar», v6.7.0
     private static final float DRIFT = 0.7f;   // peso del desplazamiento frente a la forma
 
     private final TouchService svc;
@@ -637,25 +650,43 @@ final class AutoController {
             // v6.7.0, pedido de Gonzalo (23-oct): «que dispare sus tres cargas todo el tiempo lo más rápido
             // posible… como si tuviera munición infinita; el súper y el gadget cada 3 s de forma alternada,
             // ciclos infinitos». Toque simple (auto-apuntado) cada ATTACK_EVERY_MS siempre, esté o no al
-            // alcance (sin munición el juego lo ignora y dispara apenas recarga). Súper y gadget alternan en
-            // instantes fijos desde que se encendió el Auto (múltiplos de ABIL_EVERY_MS: pares súper,
-            // impares gadget), así un rehecho de la ventana no corre el ciclo. Alrededor de cada uno se
-            // quitan los golpes: el juego atiende un solo botón de ataque a la vez y lo ignoraba.
+            // alcance (sin munición el juego lo ignora y dispara apenas recarga). Súper, gadget e híper van
+            // en instantes fijos contados desde que se encendió el Auto, así un rehecho de la ventana no
+            // corre el ciclo. Alrededor de cada uno se quitan los golpes: el juego atiende un solo botón de
+            // ataque a la vez y lo ignoraba.
             for (long t = 40; t < WINDOW_MS; t += ATTACK_EVERY_MS) press(p, "attack", t);
+            // v6.7.1: cada uno con su período configurable (súper en múltiplos de P, gadget desfasado P/2,
+            // híper P/4; con los tres en 6 s queda súper y gadget alternados cada 3 s, como se pidió).
             long now = SystemClock.uptimeMillis();
-            for (long k = Math.max(1, (now - startedAt + 30) / ABIL_EVERY_MS + 1); ; k++) {
-                long off = startedAt + k * ABIL_EVERY_MS - now;
+            List<long[]> ev = new ArrayList<>();   // {instante en la ventana, 0 súper / 1 gadget / 2 híper}
+            String[] ek = {"superEvery", "gadgetEvery", "hyperEvery"};
+            long[] phase = {0, 2, 4};   // divisor del desfase (0 = sin desfase)
+            for (int i = 0; i < 3; i++) {
+                long per = EVERY_MS[get(ek[i])];
+                if (per <= 0) continue;
+                long ph = phase[i] == 0 ? 0 : per / phase[i];
+                for (long k = Math.max(0, (now - startedAt - ph) / per); ; k++) {
+                    long off = startedAt + ph + k * per - now;
+                    if (off >= WINDOW_MS) break;
+                    if (off >= 30 && startedAt + ph + k * per > startedAt + 500) ev.add(new long[]{off, i});
+                }
+            }
+            ev.sort((x, y) -> Long.compare(x[0], y[0]));
+            long last = -1000;
+            float[] atk = svc.calib().get("attack");
+            String[] btn = {"super", "gadget", "hyper"};
+            for (long[] e1 : ev) {
+                long off = Math.max(e1[0], last + 350);   // dos botones a la vez: el segundo, 0,35 s después
                 if (off >= WINDOW_MS) break;
-                if (off < 30) continue;
+                last = off;
                 final long s0 = off - 130, s1 = off + 250;
-                float[] atk = svc.calib().get("attack");
                 if (atk != null) {
                     p.touches.removeIf(x -> {
                         Pattern.Point a = x.pts.get(0), z = x.pts.get(x.pts.size() - 1);
                         return a.x == atk[0] && a.y == atk[1] && z.t > s0 && a.t < s1;
                     });
                 }
-                press(p, k % 2 == 1 ? "super" : "gadget", off, 120);
+                press(p, btn[(int) e1[1]], off, 120);
             }
         }
         if (p.touches.isEmpty()) {   // quieto y sin disparos: el reproductor se detiene y decide() lo retoma
