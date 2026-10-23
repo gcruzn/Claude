@@ -258,7 +258,9 @@ final class AutoController {
         // Súper: solo cargado (botón amarillo); sin dato de la pantalla, como máximo cada 6 s. Antes se
         // intentaba cada 1,5 s y cada intento re-apoyaba el joystick (partida de Gonzalo, 22-oct).
         boolean charged = st.superReady == 1 || (st.superReady < 0 && now - lastSuper > 6000);
-        boolean doSuper = charged && now - lastSuper > 1500 && (sup == 1 || ((sup == 0 || sup == 3) && target != null));
+        // Mínimo 5 s entre súpers: en la partida grabada el botón seguía amarillo tras presionarlo y se
+        // reintentaba cada 1,5 s (26 intentos en ~52 s de Auto).
+        boolean doSuper = charged && now - lastSuper > 5000 && (sup == 1 || ((sup == 0 || sup == 3) && target != null));
         int ab = get("abil");
         boolean near = target != null;
         boolean low = st.health >= 0 && st.health < 0.5f;

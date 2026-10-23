@@ -130,6 +130,7 @@ public class Player {
         boolean cut = inFlight > 0 && !shortDown;
         stop(null, false);
         if (cut) {
+            expectCancel = true;   // la cancelación es nuestra: no registrarla como un corte de Android
             float[] pt = listener.releasePoint();
             Path path = new Path();
             path.moveTo(Math.max(0, pt[0]), Math.max(0, pt[1]));
