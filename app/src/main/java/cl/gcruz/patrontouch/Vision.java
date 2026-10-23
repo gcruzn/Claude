@@ -23,6 +23,7 @@ final class Vision {
         float px = -1, py = -1;          // jugador (centro de la etiqueta), coordenadas de pantalla completa
         float ammo = -1;                 // segmentos llenos, 0–3 (−1 = no se vio)
         float health = -1;               // ancho verde de la barra de vida propia, en px de media resolución
+        float superYellow = -1;          // fracción amarilla del botón del súper (cargado ≈ 0,38; sin cargar 0)
         final List<float[]> enemies = new ArrayList<>();   // {x, y} en pantalla completa
     }
 
@@ -32,6 +33,25 @@ final class Vision {
      * Analiza un cuadro RGBA de w×h (media resolución, `scale` = 0,5) y devuelve coordenadas de
      * pantalla completa. `skipBottom` excluye la franja de botones (gadget verde, etc.).
      */
+    /**
+     * Fracción del recuadro de 80×80 px (resolución completa) alrededor del botón del súper que es
+     * amarillo brillante. Medido en la partida grabada de Gonzalo (22-oct): cargado ≈ 0,38 estable,
+     * sin cargar 0,00.
+     */
+    static float superYellow(ByteBuffer buf, int w, int h, int rs, int ps, float scale, float bx, float by) {
+        int cx = (int) (bx * scale), cy = (int) (by * scale), r = (int) (40 * scale);
+        int n = 0, yel = 0;
+        for (int y = Math.max(0, cy - r); y <= Math.min(h - 1, cy + r); y++) {
+            for (int x = Math.max(0, cx - r); x <= Math.min(w - 1, cx + r); x++) {
+                int o = y * rs + x * ps;
+                int R = buf.get(o) & 0xff, G = buf.get(o + 1) & 0xff, B = buf.get(o + 2) & 0xff;
+                n++;
+                if (R > 180 && G > 130 && B < 110 && R - B > 110 && G - B > 60) yel++;   // amarillo
+            }
+        }
+        return n == 0 ? -1 : yel / (float) n;
+    }
+
     static Frame analyze(ByteBuffer buf, int w, int h, int rowStride, int pixStride, float scale) {
         Frame f = new Frame();
         f.at = android.os.SystemClock.uptimeMillis();

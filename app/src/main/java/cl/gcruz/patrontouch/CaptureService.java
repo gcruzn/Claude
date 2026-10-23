@@ -155,6 +155,9 @@ public class CaptureService extends Service {
                 lastVision = now;
                 Image.Plane pl = img.getPlanes()[0];
                 Vision.Frame vf = Vision.analyze(pl.getBuffer(), w, h, pl.getRowStride(), pl.getPixelStride(), SCALE);
+                TouchService ts = TouchService.get();
+                float[] sb = ts != null ? ts.calib().get("super") : null;
+                if (sb != null) vf.superYellow = Vision.superYellow(pl.getBuffer(), w, h, pl.getRowStride(), pl.getPixelStride(), SCALE, sb[0], sb[1]);
                 vision = vf;
                 if (!vf.enemies.isEmpty()) enemiesSeenAt = now;
                 if (now - lastVisionLog >= 1000) {
@@ -162,6 +165,7 @@ public class CaptureService extends Service {
                     StringBuilder b = new StringBuilder("visión: jugador ");
                     b.append(vf.px < 0 ? "—" : Math.round(vf.px) + "," + Math.round(vf.py));
                     b.append(" · balas ").append(vf.ammo < 0 ? "—" : String.format(java.util.Locale.ROOT, "%.1f", vf.ammo));
+                    b.append(" · súper ").append(vf.superYellow < 0 ? "—" : vf.superYellow > 0.2f ? "cargado" : "no");
                     b.append(" · enemigos ").append(vf.enemies.size());
                     for (float[] e : vf.enemies) {
                         if (vf.px >= 0) b.append(" d=").append(Math.round(Math.hypot(e[0] - vf.px, e[1] - vf.py)));

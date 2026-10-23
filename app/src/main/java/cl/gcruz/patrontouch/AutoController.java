@@ -184,6 +184,7 @@ final class AutoController {
     private static final class Sit {
         boolean seen;          // cuadro reciente con el jugador ubicado
         float px, py, ammo = -1, health = -1;   // health: fracción 0–1 (−1 = sin dato)
+        int superReady = -1;   // 1 cargado, 0 no, −1 sin dato
         float[] enemy;         // el más cercano
         float dist = Float.MAX_VALUE;
     }
@@ -199,6 +200,7 @@ final class AutoController {
         st.px = v.px;
         st.py = v.py;
         st.ammo = v.ammo;
+        if (v.superYellow >= 0) st.superReady = v.superYellow > 0.2f ? 1 : 0;
         if (v.health > maxHealth) maxHealth = v.health;
         if (v.health >= 0 && maxHealth >= 20) st.health = Math.min(1f, v.health / maxHealth);
         for (float[] en : v.enemies) {
@@ -253,7 +255,10 @@ final class AutoController {
         float range = RANGES[get("range")];
         float[] target = st.enemy != null && st.dist <= range ? st.enemy : null;
         int sup = get("super");
-        boolean doSuper = now - lastSuper > 1500 && (sup == 1 || ((sup == 0 || sup == 3) && target != null));
+        // Súper: solo cargado (botón amarillo); sin dato de la pantalla, como máximo cada 6 s. Antes se
+        // intentaba cada 1,5 s y cada intento re-apoyaba el joystick (partida de Gonzalo, 22-oct).
+        boolean charged = st.superReady == 1 || (st.superReady < 0 && now - lastSuper > 6000);
+        boolean doSuper = charged && now - lastSuper > 1500 && (sup == 1 || ((sup == 0 || sup == 3) && target != null));
         int ab = get("abil");
         boolean near = target != null;
         boolean low = st.health >= 0 && st.health < 0.5f;
@@ -261,8 +266,10 @@ final class AutoController {
         boolean doHyper = now - lastHyper > 4000 && (ab == 1 || ((ab == 0 || ab == 3) && near));
         // ¿Cambió el rumbo efectivo (enemigo, distancia, huida)? Entonces se rehace la ventana.
         double b = effectiveBase(st);
-        boolean turn = running && windowMode != modeOf(st)
-                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(35) && now - lastTurn > 300);
+        // Cambio de rumbo con histéresis: la posición del enemigo tiembla de un cuadro a otro y rehacía el
+        // movimiento 13 veces en 2 s (partida de Gonzalo); ahora > 50° y como máximo cada 0,8 s.
+        boolean turn = now - lastTurn > 800 && (windowMode != modeOf(st)
+                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(50)));
         if (taps == 0 && hold == 0 && aimHold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
         if (turn) lastTurn = now;
         Pattern p = window();
