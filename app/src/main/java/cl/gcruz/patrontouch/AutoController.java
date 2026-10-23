@@ -19,7 +19,8 @@ import android.os.SystemClock;
 final class AutoController {
 
     static final String[] SHAPES = {"recta", "zigzag", "círculo", "cuadrado", "triángulo", "óvalo", "rect. horizontal", "rect. vertical"};
-    static final String[] SHOTS = {"de a 1", "ráfaga", "de a 2", "de a 3", "sin disparo", "mantener cerca", "cuerpo a cuerpo"};
+    static final String[] SHOTS = {"de a 1", "ráfaga", "de a 2", "de a 3", "sin disparo", "mantener cerca", "cuerpo a cuerpo", "cazar (Edgar)"};
+    static final int SHOT_HUNT = 7;
     static final String[] SUPERS = {"con enemigo", "automático", "nunca", "con enemigo (toque)"};
     static final int[] RANGES = {350, 500, 650, 800, 1000};
     static final String[] ABILITIES = {"con enemigo", "cada 4 s", "nunca", "con vida baja"};
@@ -46,12 +47,17 @@ final class AutoController {
      *    apuntando (caña), súper con un toque simple (auto-apuntado), gadget al inicio. Perfil:
      *    recta hacia el lápiz, «cuerpo a cuerpo» (golpes rápidos cerca, caña a media distancia),
      *    súper con toque cuando hay enemigo a 350, gadget (sushi) con vida baja.
+     *  - Edgar, pedido de Gonzalo (23-oct): «cazar». Con un enemigo a la vista va recto hacia él; si
+     *    no lo alcanza a golpear usa el gadget para acercarse; al alcance golpea sin parar y desde el
+     *    primer golpe queda FIJADO en ese jugador hasta que muere (deja de verse 2,5 s), aunque haya
+     *    otro más cerca. Con el súper cargado salta sobre el fijado si se le escapó o si la pelea
+     *    sigue (más de 1,5 s pegándole).
      */
     static final int[][] PRESETS = {
             //  forma rumbo disparo súper alcance distancia huir habilidades
             {2, 0, 2, 0, 1, 0, 0, 0},   // General
             {2, 0, 2, 0, 2, 2, 1, 0},   // Nita
-            {1, 1, 1, 0, 1, 0, 0, 0},   // Edgar
+            {0, 1, 7, 0, 2, 0, 0, 0},   // Edgar (cazar, ver arriba)
             {0, 1, 5, 0, 2, 0, 0, 0},   // Gigi
             {1, 1, 1, 0, 2, 3, 1, 0},   // Amber
             {0, 0, 6, 3, 0, 0, 0, 3},   // Nori (de su partida grabada, ver abajo)
@@ -132,6 +138,11 @@ final class AutoController {
             for (String k : KEYS) ed.remove("auto.Nori." + k);
             ed.putBoolean("auto_nori_v2", true).apply();
         }
+        if (!prefs.getBoolean("auto_edgar_v2", false)) {   // 23-oct: Edgar pasa a «cazar»
+            SharedPreferences.Editor ed = prefs.edit();
+            for (String k : KEYS) ed.remove("auto.Edgar." + k);
+            ed.putBoolean("auto_edgar_v2", true).apply();
+        }
         this.prefs = prefs;
         this.main = main;
     }
@@ -144,6 +155,7 @@ final class AutoController {
         running = true;
         paused = false;
         startedAt = SystemClock.uptimeMillis();
+        lock = null;
         android.util.Log.i(TouchService.TAG, "Auto: " + summary());
         player.start(window(), 0, 0, this::window);
         main.removeCallbacks(tick);
@@ -185,16 +197,26 @@ final class AutoController {
         boolean seen;          // cuadro reciente con el jugador ubicado
         float px, py, ammo = -1, health = -1;   // health: fracción 0–1 (−1 = sin dato)
         int superReady = -1;   // 1 cargado, 0 no, −1 sin dato
-        float[] enemy;         // el más cercano
+        float[] enemy;         // el más cercano (o el fijado, al cazar)
         float dist = Float.MAX_VALUE;
     }
 
     private float maxHealth;   // ancho máximo visto de la barra verde = vida llena
 
+    // Cazar (Edgar): el jugador al que se le pegó queda fijado hasta que deja de verse LOCK_LOST_MS.
+    private static final float HIT_PX = 320, LOCK_MATCH_PX = 300, GADGET_REACH_PX = 1000;
+    private static final long LOCK_LOST_MS = 2500;
+    private float[] lock;
+    private long lockSeen, fightSince;
+
     private Sit sit() {
         Sit st = new Sit();
         Vision.Frame v = CaptureService.vision;
         long now = SystemClock.uptimeMillis();
+        if (lock != null && now - lockSeen > LOCK_LOST_MS) {
+            android.util.Log.i(TouchService.TAG, "Auto: objetivo fijado ya no se ve (derrotado o perdido)");
+            lock = null;
+        }
         if (v == null || now - v.at > 600 || v.px < 0) return st;
         st.seen = true;
         st.px = v.px;
@@ -209,6 +231,25 @@ final class AutoController {
                 st.dist = d;
                 st.enemy = en;
             }
+        }
+        if (lock != null) {
+            // La barra detectada más cerca de donde estaba el fijado es él (en 100 ms no se mueve más
+            // de LOCK_MATCH_PX); si no aparece en este cuadro se sigue hacia su última posición.
+            float best = LOCK_MATCH_PX;
+            float[] match = null;
+            for (float[] en : v.enemies) {
+                float d = (float) Math.hypot(en[0] - lock[0], en[1] - lock[1]);
+                if (d < best) {
+                    best = d;
+                    match = en;
+                }
+            }
+            if (match != null) {
+                lock = match.clone();
+                lockSeen = v.at;
+            }
+            st.enemy = lock;
+            st.dist = (float) Math.hypot(lock[0] - v.px, lock[1] - v.py);
         }
         return st;
     }
@@ -252,6 +293,17 @@ final class AutoController {
             if (st.dist < 350 && now - lastShot > 170) taps = 1;
             else if (st.dist >= 350 && st.dist <= 750 && now - lastHook > 4000) aimHold = 2500;
         }
+        boolean hunt = shot == SHOT_HUNT;
+        if (hunt && st.enemy != null && st.dist < HIT_PX) {
+            // Edgar: al alcance, golpes seguidos (el juego ignora los que no tienen munición).
+            if (now - lastShot > 170) taps = 1;
+            if (lock == null) {
+                lock = st.enemy.clone();
+                lockSeen = now;
+                fightSince = now;
+                android.util.Log.i(TouchService.TAG, "Auto: fija objetivo a " + Math.round(st.dist) + " px");
+            }
+        }
         float range = RANGES[get("range")];
         float[] target = st.enemy != null && st.dist <= range ? st.enemy : null;
         int sup = get("super");
@@ -266,12 +318,26 @@ final class AutoController {
         boolean low = st.health >= 0 && st.health < 0.5f;
         boolean doGadget = now - lastGadget > 4000 && (ab == 1 || (ab == 0 && near) || (ab == 3 && low));
         boolean doHyper = now - lastHyper > 4000 && (ab == 1 || ((ab == 0 || ab == 3) && near));
+        String why = null;
+        if (hunt) {
+            // Gadget: solo para alcanzar a un enemigo que está a la vista pero fuera del golpe.
+            doGadget = st.enemy != null && st.dist >= HIT_PX && st.dist < GADGET_REACH_PX && now - lastGadget > 6000;
+            // Súper (salto) solo sobre el fijado: si se escapó del golpe, o si la pelea sigue.
+            boolean escaped = lock != null && st.dist > HIT_PX * 1.3f;
+            boolean fighting = lock != null && st.dist < HIT_PX && now - fightSince > 1500;
+            doSuper = charged && now - lastSuper > 5000 && sup != 2 && lock != null && st.dist <= range && (escaped || fighting);
+            if (doSuper) {
+                target = lock;
+                why = escaped ? "se escapó" : "sigue la pelea";
+            }
+        }
         // ¿Cambió el rumbo efectivo (enemigo, distancia, huida)? Entonces se rehace la ventana.
         double b = effectiveBase(st);
         // Cambio de rumbo con histéresis: la posición del enemigo tiembla de un cuadro a otro y rehacía el
         // movimiento 13 veces en 2 s (partida de Gonzalo); ahora > 50° y como máximo cada 0,8 s.
-        boolean turn = now - lastTurn > 800 && (windowMode != modeOf(st)
-                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(50)));
+        // Al cazar se corrige antes (30°, cada 0,3 s): cuerpo a cuerpo, un rumbo viejo lo deja atrás.
+        boolean turn = now - lastTurn > (hunt ? 300 : 800) && (windowMode != modeOf(st)
+                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(hunt ? 30 : 50)));
         if (taps == 0 && hold == 0 && aimHold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
         if (turn) lastTurn = now;
         Pattern p = window();
@@ -298,13 +364,22 @@ final class AutoController {
             }
         }
         if (doHyper) { press(p, "hyper", t); t += 120; lastHyper = now; }
-        if (doGadget) { press(p, "gadget", t); t += 120; lastGadget = now; }
+        if (doGadget) {
+            press(p, "gadget", t);
+            t += 120;
+            lastGadget = now;
+            if (hunt) android.util.Log.i(TouchService.TAG, "Auto: gadget para alcanzar enemigo a " + Math.round(st.dist) + " px");
+        }
         if (doSuper) {
             float[] btn = svc.calib().get("super");
             if (btn != null) {
                 if (target != null && sup != 3) {   // «con enemigo (toque)»: toque simple, el juego apunta
                     double ang = Math.atan2(target[1] - st.py, target[0] - st.px);
                     float r = svc.calib().aimRadius() * 1.8f;
+                    if (hunt) {   // salto de Edgar: el largo del arrastre fija dónde cae (todo el círculo = alcance)
+                        float f = Math.max(0.3f, Math.min(1f, st.dist / range));
+                        r = f >= 0.95f ? r : svc.calib().aimRadius() * f;
+                    }
                     float ex = btn[0] + (float) (r * Math.cos(ang)), ey = btn[1] + (float) (r * Math.sin(ang));
                     Pattern.Touch x = new Pattern.Touch();
                     x.pts.add(new Pattern.Point(t, btn[0], btn[1]));
@@ -315,7 +390,8 @@ final class AutoController {
                     press(p, "super", t);
                 }
                 lastSuper = now;
-                android.util.Log.i(TouchService.TAG, "Auto: súper" + (target != null ? " hacia enemigo a " + Math.round(st.dist) + " px" : ""));
+                android.util.Log.i(TouchService.TAG, "Auto: súper" + (target != null ? " hacia enemigo a " + Math.round(st.dist) + " px" : "")
+                        + (why != null ? " (" + why + ")" : ""));
             }
         }
         if (taps > 0 || hold > 0 || aimHold > 0) lastShot = now;
@@ -352,6 +428,7 @@ final class AutoController {
     private int modeOf(Sit st) {
         if (st.enemy == null) return MODE_PEN;
         if (get("flee") == 1 && st.health >= 0 && st.health < 0.3f) return MODE_FLEE;
+        if (get("shot") == SHOT_HUNT) return MODE_CHASE;   // Edgar: siempre encima del enemigo (o del fijado)
         int dpx = DIST_PX[get("distance")];
         if (dpx > 0 && st.dist < dpx) return MODE_AWAY;
         if (dpx > 0 && st.dist < dpx * 1.3f) return MODE_ORBIT;
@@ -390,7 +467,8 @@ final class AutoController {
         String sd = Script.steerDir;
         boolean center = Double.isNaN(eb) && (sd == null || "center".equals(sd));
         double base = Double.isNaN(eb) ? Math.toRadians(dirAngle(sd)) : eb;
-        int shape = mode == MODE_FLEE ? 0 : get("shape");   // huir: en línea recta
+        // huir, y cazar con un enemigo a la vista: en línea recta
+        int shape = mode == MODE_FLEE || (mode == MODE_CHASE && get("shot") == SHOT_HUNT) ? 0 : get("shape");
         if (joy != null && !(shape <= 1 && center)) {
             float r = svc.calib().joyRadius();
             Pattern.Touch js = new Pattern.Touch();
