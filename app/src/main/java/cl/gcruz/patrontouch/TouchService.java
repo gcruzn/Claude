@@ -1018,7 +1018,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
             return;
         }
         channels.clear();
-        if (!CaptureService.isRunning()) startCapture();   // la visión decide disparos y súper
+        // v6.8.0: la visión solo sirve para «sigue al enemigo»; disparos y habilidades van por tiempo.
+        if (auto.get("heading") == 0 && !CaptureService.isRunning()) startCapture();
         autoIdx = i;
         lastRun = null;
         auto.start();
@@ -1306,10 +1307,8 @@ public class TouchService extends AccessibilityService implements Player.Listene
     private void showAutoConfig() {
         closeMenu();
         Point scr = screenSize();
-        // v6.7.1: con más de 8 ajustes, tres columnas para que siga cabiendo sin scroll.
-        int cols = AutoController.KEYS.length > 8 ? 3 : 2;
-        int cellW = cols == 3 ? Math.min(dp(230), (int) (Math.max(scr.x, scr.y) * 0.29f))
-                : Math.min(dp(300), (int) (Math.max(scr.x, scr.y) * 0.42f));
+        int cols = 2;
+        int cellW = Math.min(dp(300), (int) (Math.max(scr.x, scr.y) * 0.42f));
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(12), dp(8), dp(12), dp(10));
@@ -1320,20 +1319,16 @@ public class TouchService extends AccessibilityService implements Player.Listene
         box.setElevation(dp(8));
 
         List<Runnable> repaint = new ArrayList<>();
-        // Cabecera: perfil ‹ › a la izquierda y «Listo» a la derecha.
+        // Cabecera: título a la izquierda y «Listo» a la derecha (v6.8.0: sin perfiles).
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
-        TextView profV = new TextView(this);
-        Runnable paintProf = () -> profV.setText("Perfil: " + AutoController.PROFILES[auto.profile()]);
-        paintProf.run();
-        profV.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        profV.setTypeface(Typeface.DEFAULT_BOLD);
-        profV.setTextColor(GRAFITO);
-        profV.setGravity(Gravity.CENTER);
-        head.addView(stepButton("‹", () -> { auto.stepProfile(-1); paintProf.run(); for (Runnable r : repaint) r.run(); }));
-        head.addView(profV, new LinearLayout.LayoutParams(dp(170), LinearLayout.LayoutParams.WRAP_CONTENT));
-        head.addView(stepButton("›", () -> { auto.stepProfile(1); paintProf.run(); for (Runnable r : repaint) r.run(); }));
+        TextView title = new TextView(this);
+        title.setText("Auto");
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextColor(GRAFITO);
+        head.addView(title);
         head.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
         TextView close = new TextView(this);
         close.setText("Listo");
