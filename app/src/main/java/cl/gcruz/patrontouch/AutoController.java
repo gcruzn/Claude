@@ -336,8 +336,20 @@ final class AutoController {
             st.enemy = new float[]{ex, ey};
             st.dist = (float) Math.hypot(ex - px, ey - py);
         }
+        // Sin fijado, un cuadro sin barra enemiga no cambia el modo: se recuerda el último 0,5 s
+        // (antes alternaba perseguir ↔ lápiz y rehacía el gesto).
+        if (st.enemy != null) {
+            lastFoe = st.enemy.clone();
+            lastFoeAt = v.at;
+        } else if (lastFoe != null && v.at - lastFoeAt < 500) {
+            st.enemy = lastFoe;
+            st.dist = (float) Math.hypot(lastFoe[0] - px, lastFoe[1] - py);
+        }
         return st;
     }
+
+    private float[] lastFoe;
+    private long lastFoeAt;
 
     /** Ángulo (rad, y hacia arriba) desde el jugador hacia el enemigo. */
     private static double toward(Sit st) {
@@ -433,11 +445,18 @@ final class AutoController {
         boolean hitNow = hunt && inHit(st);
         long turnGap = !hunt ? 800 : hitNow && windowHit ? 1000 : 600;
         double turnAng = Math.toRadians(!hunt ? 50 : hitNow && windowHit ? 80 : 45);
-        boolean turn = (hunt && windowHit != hitNow && now - lastTurn > 250)
-                || now - lastTurn > turnGap && (windowMode != modeOf(st)
-                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > turnAng));
+        // v6.6.10 (partida de 10:17–10:26): aún 158 rehechos, mediana 0,54 s. Se registra el motivo.
+        String why2 = null;
+        if (hunt && windowHit != hitNow && now - lastTurn > 400) why2 = hitNow ? "entra al golpe" : "sale del golpe";
+        else if (now - lastTurn > turnGap && windowMode != modeOf(st)) why2 = "modo " + windowMode + "→" + modeOf(st);
+        else if (now - lastTurn > turnGap && !Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > turnAng)
+            why2 = "giro " + Math.round(Math.toDegrees(angleDiff(b, windowBase))) + "°";
+        boolean turn = why2 != null;
         if (taps == 0 && hold == 0 && aimHold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
-        if (turn) lastTurn = now;
+        if (turn) {
+            lastTurn = now;
+            if (hunt) android.util.Log.i(TouchService.TAG, "Auto: rehace (" + why2 + ")");
+        }
         Pattern p = window();
         long t = 40;   // después del re-apoyo del joystick (no en el mismo instante: el juego lo ignoraba)
         for (int i = 0; i < taps; i++, t += 130) press(p, "attack", t);
@@ -537,7 +556,7 @@ final class AutoController {
     /** Al cazar: ¿el enemigo está al alcance del golpe? (con margen para no titubear en el borde). */
     private boolean inHit(Sit st) {
         if (st.enemy == null) return false;
-        return st.dist < (windowHit ? HIT_PX * 1.15f : HIT_PX);
+        return st.dist < (windowHit ? HIT_PX * 1.4f : HIT_PX);   // entra a 200, sale a 280: sin titubeo
     }
 
     private void press(Pattern p, String key, long t) {
