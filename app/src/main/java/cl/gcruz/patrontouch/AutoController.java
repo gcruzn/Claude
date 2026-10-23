@@ -173,6 +173,7 @@ final class AutoController {
     void pause() {
         if (!running || paused) return;
         paused = true;
+        pausedAt = SystemClock.uptimeMillis();
         main.removeCallbacks(tick);
         player.stopByUserTouch();
     }
@@ -180,6 +181,10 @@ final class AutoController {
     void resume() {
         if (!running || !paused) return;
         paused = false;
+        // La pausa del lápiz no cuenta como «no se ve»: el fijado se conserva al retomar.
+        long d = SystemClock.uptimeMillis() - pausedAt;
+        lockSeen += d;
+        fightSince += d;
         player.start(window(), 0, 0, this::window);
         main.postDelayed(tick, TICK_MS);
     }
@@ -204,10 +209,14 @@ final class AutoController {
     private float maxHealth;   // ancho máximo visto de la barra verde = vida llena
 
     // Cazar (Edgar): el jugador al que se le pegó queda fijado hasta que deja de verse LOCK_LOST_MS.
-    private static final float HIT_PX = 320, LOCK_MATCH_PX = 300, GADGET_REACH_PX = 1000;
-    private static final long LOCK_LOST_MS = 2500;
+    // 23-oct (partida de Gonzalo): soltaba al fijado y pasaba a otro sin eliminar a ninguno. Causas:
+    // la pausa del lápiz contaba como «no se ve» (lo soltaba al retomar), y con 300 px de radio otro
+    // enemigo cercano lo reemplazaba en los cuadros en que no se detectaba su barra. Ahora el radio
+    // parte en 140 px y crece con el tiempo sin verlo (~0,35 px/ms, tope 450), y se pierde a los 4 s.
+    private static final float HIT_PX = 320, LOCK_MATCH_PX = 140, LOCK_MATCH_MAX_PX = 450, GADGET_REACH_PX = 1000;
+    private static final long LOCK_LOST_MS = 4000;
     private float[] lock;
-    private long lockSeen, fightSince;
+    private long lockSeen, fightSince, pausedAt;
 
     private Sit sit() {
         Sit st = new Sit();
@@ -235,7 +244,7 @@ final class AutoController {
         if (lock != null) {
             // La barra detectada más cerca de donde estaba el fijado es él (en 100 ms no se mueve más
             // de LOCK_MATCH_PX); si no aparece en este cuadro se sigue hacia su última posición.
-            float best = LOCK_MATCH_PX;
+            float best = Math.min(LOCK_MATCH_MAX_PX, LOCK_MATCH_PX + 0.35f * Math.max(0, v.at - lockSeen - 100));
             float[] match = null;
             for (float[] en : v.enemies) {
                 float d = (float) Math.hypot(en[0] - lock[0], en[1] - lock[1]);
