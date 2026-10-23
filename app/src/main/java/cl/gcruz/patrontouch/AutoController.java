@@ -380,8 +380,16 @@ final class AutoController {
         // Cambio de rumbo con histéresis: la posición del enemigo tiembla de un cuadro a otro y rehacía el
         // movimiento 13 veces en 2 s (partida de Gonzalo); ahora > 50° y como máximo cada 0,8 s.
         // Al cazar se corrige antes (30°, cada 0,3 s): cuerpo a cuerpo, un rumbo viejo lo deja atrás.
-        boolean turn = now - lastTurn > (hunt ? 300 : 800) && (windowMode != modeOf(st) || (hunt && windowHit != inHit(st))
-                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(hunt ? 30 : 50)));
+        // v6.6.5 (partida de Gonzalo, 23-oct: «pausas y demoras fatales»): con 30°/0,3 s el gesto se
+        // rehízo 89 veces, 66 a menos de 0,45 s; cada rehecho re-apoya el joystick y reinicia la ráfaga.
+        // Ahora al cazar: persiguiendo 45° cada ≥ 0,6 s; al alcance del golpe solo si el ángulo se va
+        // más de 80° (de cerca cualquier paso lo mueve mucho) y como mucho cada 1 s.
+        boolean hitNow = hunt && inHit(st);
+        long turnGap = !hunt ? 800 : hitNow && windowHit ? 1000 : 600;
+        double turnAng = Math.toRadians(!hunt ? 50 : hitNow && windowHit ? 80 : 45);
+        boolean turn = (hunt && windowHit != hitNow && now - lastTurn > 250)
+                || now - lastTurn > turnGap && (windowMode != modeOf(st)
+                || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > turnAng));
         if (taps == 0 && hold == 0 && aimHold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
         if (turn) lastTurn = now;
         Pattern p = window();
