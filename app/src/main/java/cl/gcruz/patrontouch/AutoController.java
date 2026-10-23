@@ -224,6 +224,15 @@ final class AutoController {
     private float lockVx, lockVy, lockLastDist = Float.MAX_VALUE;   // velocidad (px/ms) y distancia al verlo
     private long lockSeen, fightSince, pausedAt;
 
+    /**
+     * ¿Es el número rojo de daño sobre la cabeza del propio jugador (p. ej. «2000»)? Rojo con borde
+     * oscuro y blanco cerca: la visión lo tomaba por barra enemiga a 56–94 px y Edgar se quedaba
+     * pegando al aire, fijado en ese fantasma (partida de Gonzalo, 23-oct, 09:40:40–09:40:50).
+     */
+    private static boolean selfGhost(float[] en, float px, float py) {
+        return Math.abs(en[0] - px) < 130 && en[1] > py - 130 && en[1] < py + 60;
+    }
+
     /** Fija a un enemigo nuevo. */
     private void setLock(float[] en, float dist, long now) {
         lock = en.clone();
@@ -250,7 +259,9 @@ final class AutoController {
         if (v.superYellow >= 0) st.superReady = v.superYellow > 0.2f ? 1 : 0;
         if (v.health > maxHealth) maxHealth = v.health;
         if (v.health >= 0 && maxHealth >= 20) st.health = Math.min(1f, v.health / maxHealth);
-        for (float[] en : v.enemies) {
+        java.util.List<float[]> foes = new java.util.ArrayList<>();
+        for (float[] en : v.enemies) if (!selfGhost(en, v.px, v.py)) foes.add(en);
+        for (float[] en : foes) {
             float d = (float) Math.hypot(en[0] - v.px, en[1] - v.py);
             if (d < st.dist) {
                 st.dist = d;
@@ -265,7 +276,7 @@ final class AutoController {
             float ex = lock[0] + lockVx * g, ey = lock[1] + lockVy * g;   // donde debería estar
             float best = Math.min(LOCK_MATCH_MAX_PX, LOCK_MATCH_PX + 0.15f * Math.max(0, gap - 100));
             float[] match = null;
-            for (float[] en : v.enemies) {
+            for (float[] en : foes) {
                 float d = (float) Math.hypot(en[0] - ex, en[1] - ey);
                 if (d < best) {
                     best = d;
@@ -434,6 +445,17 @@ final class AutoController {
                     // se escapó → arrastre lento hacia él, largo según la distancia (círculo entero =
                     // alcance). Empieza ≥ 150 ms tras el re-apoyo del joystick y nada lo corta.
                     t = Math.max(t, 150);
+                    // El juego atiende un solo control apuntando a la vez: un golpe apuntado en curso
+                    // hacía ignorar el súper (09:40:31–09:40:46, 4 súpers, el botón siguió amarillo).
+                    // Se quitan los golpes de la ventana que se cruzan con el súper.
+                    float[] atk = svc.calib().get("attack");
+                    if (atk != null) {
+                        final long s0 = t - 140, s1 = t + 460;
+                        p.touches.removeIf(x -> {
+                            Pattern.Point a = x.pts.get(0), z = x.pts.get(x.pts.size() - 1);
+                            return a.x == atk[0] && a.y == atk[1] && z.t > s0 && a.t < s1;
+                        });
+                    }
                     if ("sigue la pelea".equals(why)) {
                         press(p, "super", t, 150);
                         end = t + 150;
