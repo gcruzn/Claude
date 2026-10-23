@@ -294,9 +294,12 @@ final class AutoController {
             else if (st.dist >= 350 && st.dist <= 750 && now - lastHook > 4000) aimHold = 2500;
         }
         boolean hunt = shot == SHOT_HUNT;
+        // Mientras corre un súper o gadget no se rehace el gesto: el reemplazo lo cortaba a medias y el
+        // juego no lo lanzaba (partida de Gonzalo con Edgar, 23-oct: 2 súpers, el botón siguió amarillo).
+        if (now < actionUntil) return;
         if (hunt && st.enemy != null && st.dist < HIT_PX) {
-            // Edgar: al alcance, golpes seguidos (el juego ignora los que no tienen munición).
-            if (now - lastShot > 170) taps = 1;
+            // Edgar: los golpes van DENTRO de la ventana (window()), no un reemplazo por golpe: eso
+            // re-apoyaba el joystick cada 0,2 s y lo dejaba casi quieto.
             if (lock == null) {
                 lock = st.enemy.clone();
                 lockSeen = now;
@@ -321,7 +324,7 @@ final class AutoController {
         String why = null;
         if (hunt) {
             // Gadget: solo para alcanzar a un enemigo que está a la vista pero fuera del golpe.
-            doGadget = st.enemy != null && st.dist >= HIT_PX && st.dist < GADGET_REACH_PX && now - lastGadget > 6000;
+            doGadget = st.enemy != null && st.dist >= HIT_PX * 1.4f && st.dist < GADGET_REACH_PX && now - lastGadget > 6000;
             // Súper (salto) solo sobre el fijado: si se escapó del golpe, o si la pelea sigue.
             boolean escaped = lock != null && st.dist > HIT_PX * 1.3f;
             boolean fighting = lock != null && st.dist < HIT_PX && now - fightSince > 1500;
@@ -336,7 +339,7 @@ final class AutoController {
         // Cambio de rumbo con histéresis: la posición del enemigo tiembla de un cuadro a otro y rehacía el
         // movimiento 13 veces en 2 s (partida de Gonzalo); ahora > 50° y como máximo cada 0,8 s.
         // Al cazar se corrige antes (30°, cada 0,3 s): cuerpo a cuerpo, un rumbo viejo lo deja atrás.
-        boolean turn = now - lastTurn > (hunt ? 300 : 800) && (windowMode != modeOf(st)
+        boolean turn = now - lastTurn > (hunt ? 300 : 800) && (windowMode != modeOf(st) || (hunt && windowHit != inHit(st))
                 || (!Double.isNaN(b) && !Double.isNaN(windowBase) && angleDiff(b, windowBase) > Math.toRadians(hunt ? 30 : 50)));
         if (taps == 0 && hold == 0 && aimHold == 0 && !doSuper && !doGadget && !doHyper && !turn) return;
         if (turn) lastTurn = now;
@@ -368,18 +371,40 @@ final class AutoController {
             press(p, "gadget", t);
             t += 120;
             lastGadget = now;
-            if (hunt) android.util.Log.i(TouchService.TAG, "Auto: gadget para alcanzar enemigo a " + Math.round(st.dist) + " px");
+            if (hunt) {
+                android.util.Log.i(TouchService.TAG, "Auto: gadget para alcanzar enemigo a " + Math.round(st.dist) + " px");
+                actionUntil = now + t + 100;
+            }
         }
         if (doSuper) {
             float[] btn = svc.calib().get("super");
             if (btn != null) {
-                if (target != null && sup != 3) {   // «con enemigo (toque)»: toque simple, el juego apunta
+                long end;
+                if (hunt) {
+                    // Edgar: pelea encima → toque (el juego salta sobre el más cercano, que es él);
+                    // se escapó → arrastre lento hacia él, largo según la distancia (círculo entero =
+                    // alcance). Empieza ≥ 150 ms tras el re-apoyo del joystick y nada lo corta.
+                    t = Math.max(t, 150);
+                    if ("sigue la pelea".equals(why)) {
+                        press(p, "super", t, 150);
+                        end = t + 150;
+                    } else {
+                        double ang = Math.atan2(target[1] - st.py, target[0] - st.px);
+                        float f = Math.max(0.5f, Math.min(1f, st.dist / range));
+                        float r = f >= 0.95f ? svc.calib().aimRadius() * 1.8f : svc.calib().aimRadius() * f;
+                        float ex = btn[0] + (float) (r * Math.cos(ang)), ey = btn[1] + (float) (r * Math.sin(ang));
+                        Pattern.Touch x = new Pattern.Touch();
+                        x.pts.add(new Pattern.Point(t, btn[0], btn[1]));
+                        x.pts.add(new Pattern.Point(t + 80, btn[0], btn[1]));
+                        x.pts.add(new Pattern.Point(t + 280, ex, ey));
+                        x.pts.add(new Pattern.Point(t + 400, ex, ey));
+                        p.touches.add(x);
+                        end = t + 400;
+                    }
+                    actionUntil = now + end + 150;
+                } else if (target != null && sup != 3) {   // «con enemigo (toque)»: toque simple, el juego apunta
                     double ang = Math.atan2(target[1] - st.py, target[0] - st.px);
                     float r = svc.calib().aimRadius() * 1.8f;
-                    if (hunt) {   // salto de Edgar: el largo del arrastre fija dónde cae (todo el círculo = alcance)
-                        float f = Math.max(0.3f, Math.min(1f, st.dist / range));
-                        r = f >= 0.95f ? r : svc.calib().aimRadius() * f;
-                    }
                     float ex = btn[0] + (float) (r * Math.cos(ang)), ey = btn[1] + (float) (r * Math.sin(ang));
                     Pattern.Touch x = new Pattern.Touch();
                     x.pts.add(new Pattern.Point(t, btn[0], btn[1]));
@@ -400,7 +425,14 @@ final class AutoController {
         player.replaceNow(p, this::window);
     }
 
-    private long lastTurn, lastHook;
+    private long lastTurn, lastHook, actionUntil;
+    private boolean windowHit;
+
+    /** Al cazar: ¿el enemigo está al alcance del golpe? (con margen para no titubear en el borde). */
+    private boolean inHit(Sit st) {
+        if (st.enemy == null) return false;
+        return st.dist < (windowHit ? HIT_PX * 1.15f : HIT_PX);
+    }
 
     private void press(Pattern p, String key, long t) {
         press(p, key, t, 70);
@@ -481,6 +513,11 @@ final class AutoController {
         }
         if (get("shot") == 1) {   // ráfaga: uno cada 0,4 s
             for (long t = 40; t < WINDOW_MS; t += 400) press(p, "attack", t);
+        }
+        boolean hit = get("shot") == SHOT_HUNT && inHit(st);
+        windowHit = hit;
+        if (hit) {   // Edgar al alcance: golpes seguidos cada 0,17 s (el juego ignora los sin munición)
+            for (long t = 40; t < WINDOW_MS; t += 170) press(p, "attack", t);
         }
         if (p.touches.isEmpty()) {   // quieto y sin disparos: el reproductor se detiene y decide() lo retoma
             p.duration = WINDOW_MS;
