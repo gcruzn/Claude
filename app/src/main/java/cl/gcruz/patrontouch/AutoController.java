@@ -185,6 +185,19 @@ final class AutoController {
         long d = SystemClock.uptimeMillis() - pausedAt;
         lockSeen += d;
         fightSince += d;
+        // Hacia donde Gonzalo dirigió con el lápiz manda (23-oct: «lo dirijo directo al enemigo, suelto
+        // y se va en sentido contrario»: fijaba al más cercano en cualquier dirección). Durante
+        // PEN_INTENT_MS solo cuentan los enemigos a ±60° de esa dirección; un fijado fuera de ella se suelta.
+        String sd = Script.steerDir;
+        if (sd != null && !"center".equals(sd)) {
+            penIntentAng = Math.toRadians(dirAngle(sd));
+            penIntentUntil = SystemClock.uptimeMillis() + PEN_INTENT_MS;
+            if (lock != null && lastPx >= 0
+                    && angleDiff(Math.atan2(-(lock[1] - lastPy), lock[0] - lastPx), penIntentAng) > Math.toRadians(60)) {
+                android.util.Log.i(TouchService.TAG, "Auto: suelta el fijado, el lápiz apuntó a otro lado");
+                lock = null;
+            }
+        }
         player.start(window(), 0, 0, this::window);
         main.postDelayed(tick, TICK_MS);
     }
@@ -228,6 +241,14 @@ final class AutoController {
     private float lockVx, lockVy, lockLastDist = Float.MAX_VALUE;   // velocidad (px/ms) y distancia al verlo
     private long lockSeen, fightSince, pausedAt;
 
+    private static final long PEN_INTENT_MS = 2500, PLAYER_HOLD_MS = 700;
+    private double penIntentAng;
+    private long penIntentUntil;
+    // Última posición vista del jugador: en plena pelea la etiqueta se pierde cuadros enteros
+    // («jugador —») y el Auto quedaba sin enemigo, dejaba de pegar y rehacía el movimiento.
+    private float lastPx = -1, lastPy = -1;
+    private long lastPAt;
+
     /**
      * ¿Es el número rojo de daño sobre la cabeza del propio jugador (p. ej. «2000»)? Rojo con borde
      * oscuro y blanco cerca: la visión lo tomaba por barra enemiga a 56–94 px y Edgar se quedaba
@@ -255,18 +276,28 @@ final class AutoController {
                     + Math.round(lockLastDist) + " px");
             lock = null;
         }
-        if (v == null || now - v.at > 600 || v.px < 0) return st;
+        if (v == null || now - v.at > 600) return st;
+        if (v.px >= 0) {
+            lastPx = v.px;
+            lastPy = v.py;
+            lastPAt = v.at;
+        } else if (lastPx < 0 || v.at - lastPAt > PLAYER_HOLD_MS) {
+            return st;
+        }
+        final float px = lastPx, py = lastPy;
+        boolean intent = now < penIntentUntil && lock == null;
         st.seen = true;
-        st.px = v.px;
-        st.py = v.py;
+        st.px = px;
+        st.py = py;
         st.ammo = v.ammo;
         if (v.superYellow >= 0) st.superReady = v.superYellow > 0.2f ? 1 : 0;
         if (v.health > maxHealth) maxHealth = v.health;
         if (v.health >= 0 && maxHealth >= 20) st.health = Math.min(1f, v.health / maxHealth);
         java.util.List<float[]> foes = new java.util.ArrayList<>();
-        for (float[] en : v.enemies) if (!selfGhost(en, v.px, v.py)) foes.add(en);
+        for (float[] en : v.enemies) if (!selfGhost(en, px, py)) foes.add(en);
         for (float[] en : foes) {
-            float d = (float) Math.hypot(en[0] - v.px, en[1] - v.py);
+            float d = (float) Math.hypot(en[0] - px, en[1] - py);
+            if (intent && angleDiff(Math.atan2(-(en[1] - py), en[0] - px), penIntentAng) > Math.toRadians(60)) continue;
             if (d < st.dist) {
                 st.dist = d;
                 st.enemy = en;
@@ -298,12 +329,12 @@ final class AutoController {
                 if (gap > 700) android.util.Log.i(TouchService.TAG, "Auto: fijado reencontrado tras " + gap + " ms");
                 lock = match.clone();
                 lockSeen = v.at;
-                lockLastDist = (float) Math.hypot(lock[0] - v.px, lock[1] - v.py);
+                lockLastDist = (float) Math.hypot(lock[0] - px, lock[1] - py);
                 ex = lock[0];
                 ey = lock[1];
             }
             st.enemy = new float[]{ex, ey};
-            st.dist = (float) Math.hypot(ex - v.px, ey - v.py);
+            st.dist = (float) Math.hypot(ex - px, ey - py);
         }
         return st;
     }
