@@ -1,0 +1,52 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'cl.gcruz.cerebro'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'cl.gcruz.cerebro'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '0.1.0'
+    }
+
+    // Clave fija desde el secreto SIDELOAD_KEYSTORE del CI (el workflow la deja en
+    // app/sideload.p12). Sin ella se firma con la clave debug del runner.
+    def sideloadFile = file('sideload.p12')
+    signingConfigs {
+        if (sideloadFile.exists()) {
+            sideload {
+                storeFile sideloadFile
+                storeType 'pkcs12'
+                storePassword System.getenv('SIDELOAD_PASSWORD') ?: ''
+                keyAlias 'patrontouch'
+                keyPassword System.getenv('SIDELOAD_PASSWORD') ?: ''
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig sideloadFile.exists() ? signingConfigs.sideload : signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        jniLibs { useLegacyPackaging = true }
+    }
+}
+
+dependencies {
+    // Vosk (Apache-2.0): reconocimiento de la palabra clave, sin red, en el dispositivo.
+    implementation 'com.alphacephei:vosk-android:0.3.47'
+}
