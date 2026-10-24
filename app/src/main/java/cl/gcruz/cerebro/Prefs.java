@@ -29,5 +29,11 @@ final class Prefs {
 
     void setToken(String t) { sp.edit().putString("token", t).apply(); }
     void clearToken() { sp.edit().remove("token").apply(); }
+    String ultimoOido() { return sp.getString("oido", ""); }
+    String ultimaRespuesta() { return sp.getString("respuesta", ""); }
+    void guardarUltimo(String oido, String respuesta) {
+        sp.edit().putString("oido", oido).putString("respuesta", respuesta).apply();
+    }
+
     void setListen(boolean on) { sp.edit().putBoolean("listen", on).apply(); }
 }

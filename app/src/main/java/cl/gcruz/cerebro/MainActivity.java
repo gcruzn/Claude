@@ -35,6 +35,10 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         prefs = new Prefs(this);
+        if (CerebroService.respuesta.isEmpty() && CerebroService.oido.isEmpty()) {
+            CerebroService.oido = prefs.ultimoOido();
+            CerebroService.respuesta = prefs.ultimaRespuesta();
+        }
         construir();
     }
 

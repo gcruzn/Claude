@@ -24,7 +24,9 @@ import android.speech.tts.UtteranceProgressListener;
 import org.json.JSONObject;
 import org.vosk.Model;
 import org.vosk.Recognizer;
-import org.vosk.android.SpeechService;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -61,7 +63,7 @@ public class CerebroService extends Service {
     private boolean ttsListo;
     private Model model;
     private Recognizer recognizer;
-    private SpeechService keyword;
+    private Escucha keyword;
     private SpeechRecognizer sr;
     private PowerManager.WakeLock wake;
     private boolean ocupado;
@@ -181,21 +183,61 @@ public class CerebroService extends Service {
             return;
         }
         pararKeyword();
-        try {
-            recognizer.reset();
-            keyword = new SpeechService(recognizer, 16000f);
-            keyword.startListening(new org.vosk.android.RecognitionListener() {
-                @Override public void onPartialResult(String s) { revisar(s, "partial"); }
-                @Override public void onResult(String s) { revisar(s, "text"); }
-                @Override public void onFinalResult(String s) {}
-                @Override public void onError(Exception e) {
-                    h.post(() -> poner("Error del micrófono: " + e.getMessage()));
+        keyword = new Escucha(recognizer);
+        keyword.start();
+        poner("Escuchando: di «oye cerebro»");
+    }
+
+    /**
+     * Hilo propio con AudioRecord + Vosk Recognizer. Si el micrófono está ocupado o read() da
+     * error, libera, espera y reintenta: nunca lanza al hilo (SpeechService de Vosk sí lo hacía).
+     */
+    private final class Escucha extends Thread {
+        private final Recognizer rec;
+        private volatile boolean fin;
+
+        Escucha(Recognizer r) { super("cerebro-escucha"); rec = r; }
+
+        void parar() {
+            fin = true;
+            interrupt();
+            try { join(2500); } catch (InterruptedException ignored) { }
+        }
+
+        @Override public void run() {
+            try { rec.reset(); } catch (Throwable ignored) { }
+            short[] buf = new short[4000];
+            while (!fin) {
+                AudioRecord ar = null;
+                try {
+                    int min = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO,
+                            AudioFormat.ENCODING_PCM_16BIT);
+                    ar = new AudioRecord(MediaRecorder.AudioSource.MIC, 16000,
+                            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                            Math.max(min, 16000));
+                    if (ar.getState() != AudioRecord.STATE_INITIALIZED) throw new IllegalStateException("micrófono no disponible");
+                    ar.startRecording();
+                    if (ar.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) throw new IllegalStateException("micrófono ocupado");
+                    h.post(() -> { if (!ocupado) poner("Escuchando: di «oye cerebro»"); });
+                    while (!fin) {
+                        int n = ar.read(buf, 0, buf.length);
+                        if (n < 0) throw new IllegalStateException("lectura falló (" + n + ")");
+                        if (n == 0) continue;
+                        if (rec.acceptWaveForm(buf, n)) revisar(rec.getResult(), "text");
+                        else revisar(rec.getPartialResult(), "partial");
+                    }
+                } catch (Throwable t) {
+                    if (!fin) h.post(() -> { if (!ocupado) poner("Micrófono ocupado, reintento…"); });
+                } finally {
+                    if (ar != null) {
+                        try { ar.stop(); } catch (Throwable ignored) { }
+                        try { ar.release(); } catch (Throwable ignored) { }
+                    }
                 }
-                @Override public void onTimeout() {}
-            });
-            poner("Escuchando: di «oye cerebro»");
-        } catch (Exception e) {
-            poner("No pude abrir el micrófono: " + e.getMessage());
+                if (fin) break;
+                try { rec.reset(); } catch (Throwable ignored) { }
+                try { Thread.sleep(1500); } catch (InterruptedException e) { break; }
+            }
         }
     }
 
@@ -208,7 +250,7 @@ public class CerebroService extends Service {
 
     private void pararKeyword() {
         if (keyword != null) {
-            try { keyword.shutdown(); } catch (Exception ignored) { }
+            keyword.parar();
             keyword = null;
         }
     }
@@ -340,14 +382,16 @@ public class CerebroService extends Service {
             String r;
             try {
                 r = Net.ask(this, texto, n);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 if (n) nueva = true;
                 r = e.getMessage() == null ? "Falló la conexión con el PC." : e.getMessage();
                 final String msg = r;
+                prefs.guardarUltimo(texto, msg);
                 h.post(() -> { respuesta = msg; poner("Sin conexión"); decir(msg, "aviso", true); });
                 return;
             }
             final String ok = r;
+            prefs.guardarUltimo(texto, ok);
             h.post(() -> { respuesta = ok; poner("Respuesta"); decir(ok, "respuesta", true); });
         }, "cerebro-red").start();
     }
