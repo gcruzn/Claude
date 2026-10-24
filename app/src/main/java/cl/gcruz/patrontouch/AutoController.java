@@ -368,14 +368,19 @@ final class AutoController {
                 for (long[] e : abil) if (t + 70 > e[0] - 130 && t < e[0] + 250) clash = true;
                 if (!clash) press(p, "attack", t);
             }
-        } else if (shot < 0) {   // mantener apretado: tramos largos que se sueltan solo en cada habilidad
+        } else if (shot < 0) {
+            // Mantener apretado, ARRASTRADO hacia el enemigo (o hacia donde camina): con el dedo quieto
+            // sobre el botón el juego solo apunta y dispara al soltar; Gonzalo con Amber (24-oct): «no
+            // logro vaciar su cartucho y en un momento ni siquiera disparó». Se suelta solo en cada
+            // súper/gadget/híper.
+            double aim = Double.isNaN(chase) ? base : chase;
             long from = 40;
             for (long[] e : abil) {
                 long to = e[0] - 130;
-                if (to - from >= 80) press(p, "attack", from, to - from);
+                if (to - from >= 150) holdAimed(p, from, to, aim);
                 from = Math.max(from, e[0] + 250);
             }
-            if (WINDOW_MS - from >= 80) press(p, "attack", from, WINDOW_MS - from);
+            if (WINDOW_MS - from >= 150) holdAimed(p, from, WINDOW_MS, aim);
         }
         String[] btn = {"super", "gadget", "hyper"};
         for (long[] e : abil) press(p, btn[(int) e[1]], e[0], 120);
@@ -386,6 +391,19 @@ final class AutoController {
         p.normalize();
         p.duration = Math.max(p.duration, WINDOW_MS);
         return p;
+    }
+
+    /** Ataque apretado de `from` a `to` arrastrado hacia `ang` (rad, y hacia arriba). */
+    private void holdAimed(Pattern p, long from, long to, double ang) {
+        float[] b = svc.calib().get("attack");
+        if (b == null) return;
+        float r = svc.calib().aimRadius() * 1.2f;
+        float ax = b[0] + (float) (r * Math.cos(ang)), ay = b[1] - (float) (r * Math.sin(ang));
+        Pattern.Touch x = new Pattern.Touch();
+        x.pts.add(new Pattern.Point(from, b[0], b[1]));
+        x.pts.add(new Pattern.Point(from + 60, ax, ay));
+        x.pts.add(new Pattern.Point(to, ax, ay));
+        p.touches.add(x);
     }
 
     private void press(Pattern p, String key, long t) {
