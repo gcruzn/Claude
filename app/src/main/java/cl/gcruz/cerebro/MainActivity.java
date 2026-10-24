@@ -75,7 +75,7 @@ public class MainActivity extends Activity {
         col.setPadding(dp(20), dp(24), dp(20), dp(24));
         sv.addView(col);
 
-        col.addView(texto("Oye cerebro", 30, 0xFF454A51, true));
+        col.addView(texto("Jarvis", 30, 0xFF454A51, true));
         estado = texto("", 22, 0xFF406AB4, true);
         col.addView(estado);
 
@@ -98,7 +98,7 @@ public class MainActivity extends Activity {
         col.addView(tareas);
 
         escucha = new Switch(this);
-        escucha.setText("Escuchar «oye cerebro»");
+        escucha.setText("Escuchar «Jarvis»");
         escucha.setTextSize(22);
         escucha.setTextColor(0xFF454A51);
         escucha.setPadding(0, dp(18), 0, dp(18));

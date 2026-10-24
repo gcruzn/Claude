@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 
 /**
  * Oído y boca del cerebro. Servicio en primer plano que:
- * 1. escucha "oye cerebro" con Vosk (en el dispositivo, gramática restringida);
+ * 1. escucha "jarvis" con Vosk (en el dispositivo, gramática restringida);
  * 2. dice "dime", captura la orden con SpeechRecognizer hasta el silencio;
  * 3. la manda al PC (Net.ask), dice "voy" mientras espera y lee la respuesta.
  * Si la respuesta termina en "?" vuelve a escuchar de inmediato (sin palabra clave) para el "sí".
@@ -49,7 +49,7 @@ public class CerebroService extends Service {
     static final String ACTION_ENSENAR_FIN = "cl.gcruz.cerebro.ENSENAR_FIN";
     static final String ACTION_REFRESH = "cl.gcruz.cerebro.REFRESH";
     private static final String CHANNEL = "cerebro";
-    private static final String KEYWORD = "oye cerebro";
+    static final String KEYWORD = "jarvis";
 
     /** La pantalla se suscribe para mostrar estado y textos. */
     interface Ui { void cambio(); }
@@ -155,15 +155,15 @@ public class CerebroService extends Service {
 
     private void ponerPrimerPlano() {
         NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Oye cerebro", NotificationManager.IMPORTANCE_LOW));
+        nm.createNotificationChannel(new NotificationChannel(CHANNEL, "Jarvis", NotificationManager.IMPORTANCE_LOW));
         PendingIntent abrir = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class),
                 PendingIntent.FLAG_IMMUTABLE);
         PendingIntent parar = PendingIntent.getService(this, 1,
                 new Intent(this, CerebroService.class).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE);
         Notification n = new Notification.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-                .setContentTitle("Oye cerebro")
-                .setContentText("Escuchando. Di «oye cerebro».")
+                .setContentTitle("Jarvis")
+                .setContentText("Escuchando. Di «Jarvis».")
                 .setContentIntent(abrir)
                 .setOngoing(true)
                 .addAction(new Notification.Action.Builder(null, "Apagar", parar).build())
@@ -178,12 +178,13 @@ public class CerebroService extends Service {
     // --- Palabra clave (Vosk) ---------------------------------------------
 
     // Gramática: la clave más señuelos (palabras parecidas y muy comunes) para que el habla ajena
-    // caiga en ellas y no en «oye cerebro».
+    // caiga en ellas y no en «jarvis».
     private static final String[] SENUELOS = {
-        "oye", "cerebro", "hoy", "ojo", "oiga", "celebro", "cerebral", "sombrero", "febrero",
+        "jardín", "jarra", "jarabe", "jarro", "jaime", "javier", "jabón", "jamás", "travis",
+        "davis", "chávez", "carlos", "marcos", "lápiz", "parís", "martes", "tarde", "bárbara",
         "verde", "el", "la", "los", "las", "que", "sí", "no", "un", "una", "de", "y", "en", "es",
         "por", "con", "para", "mi", "me", "te", "lo", "ya", "si", "muy", "más", "pero", "como",
-        "aquí", "bien", "hola", "bueno", "vamos", "mira", "cajón", "cebra", "cerro", "cierro",
+        "aquí", "bien", "hola", "bueno", "vamos", "mira", "oye", "oiga", "hoy", "ojo",
         "pero", "dime", "eso", "está", "tiene", "hay", "todo", "nada", "algo", "ver", "oír"
     };
 
@@ -229,7 +230,7 @@ public class CerebroService extends Service {
         pararKeyword();
         keyword = new Escucha(recognizer);
         keyword.start();
-        poner("Escuchando: di «oye cerebro»");
+        poner("Escuchando: di «Jarvis»");
     }
 
     /**
@@ -262,7 +263,7 @@ public class CerebroService extends Service {
                     if (ar.getState() != AudioRecord.STATE_INITIALIZED) throw new IllegalStateException("micrófono no disponible");
                     ar.startRecording();
                     if (ar.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) throw new IllegalStateException("micrófono ocupado");
-                    h.post(() -> { if (!ocupado) poner("Escuchando: di «oye cerebro»"); });
+                    h.post(() -> { if (!ocupado) poner("Escuchando: di «Jarvis»"); });
                     while (!fin) {
                         int n = ar.read(buf, 0, buf.length);
                         if (n < 0) throw new IllegalStateException("lectura falló (" + n + ")");
@@ -286,14 +287,14 @@ public class CerebroService extends Service {
 
     /**
      * Resultado final del reconocedor (en el hilo de escucha). Acepta la palabra clave solo si
-     * es exactamente «oye cerebro», con confianza alta en cada palabra y, si Gonzalo enseñó su
+     * es exactamente «jarvis», con confianza alta en cada palabra y, si Gonzalo enseñó su
      * voz, con huella parecida a alguna de sus muestras. Todo queda en el registro.
      */
     private void resultado(String json) {
         try {
             JSONObject o = new JSONObject(json);
             String text = o.optString("text", "").trim();
-            if (!text.contains("oye") && !text.contains("cerebro")) return;   // ruido: ni se registra
+            if (!text.contains(KEYWORD)) return;   // ruido: ni se registra
             org.json.JSONArray ws = o.optJSONArray("result");
             double minConf = 1;
             StringBuilder cs = new StringBuilder();
@@ -349,7 +350,7 @@ public class CerebroService extends Service {
         if (ocupado) { ensenarMsg = "Estoy ocupado con un pedido. Intenta en un momento."; avisarUi(); return; }
         nuevasMuestras.clear();
         ensenarHechas = 0;
-        ensenarMsg = "Di «oye cerebro»";
+        ensenarMsg = "Di «Jarvis»";
         modoEnsenar = true;
         reanudar();
         avisarUi();
@@ -372,10 +373,10 @@ public class CerebroService extends Service {
         h.post(() -> { if (!ocupado) reanudar(); });
     }
 
-    /** Una repetición de «oye cerebro» durante la enseñanza (hilo de escucha). */
+    /** Una repetición de «jarvis» durante la enseñanza (hilo de escucha). */
     private void muestra(String text, double minConf, double[] huella) {
         if (!text.equals(KEYWORD) || huella == null || minConf < 0.8) {
-            h.post(() -> { ensenarMsg = "No te entendí bien. Di «oye cerebro» otra vez"; avisarUi(); });
+            h.post(() -> { ensenarMsg = "No te entendí bien. Di «Jarvis» otra vez"; avisarUi(); });
             return;
         }
         new Registro(this).anotar("muestra de voz " + (nuevasMuestras.size() + 1) + " | conf " + String.format(Locale.US, "%.2f", minConf));
@@ -384,7 +385,7 @@ public class CerebroService extends Service {
             ensenarHechas = nuevasMuestras.size();
             beep();
             if (ensenarHechas >= MUESTRAS) terminarEnsenanza(true);
-            else { ensenarMsg = "Muy bien. Otra vez: «oye cerebro»"; avisarUi(); }
+            else { ensenarMsg = "Muy bien. Otra vez: «Jarvis»"; avisarUi(); }
         });
     }
 

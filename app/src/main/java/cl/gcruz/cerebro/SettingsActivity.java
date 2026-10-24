@@ -124,7 +124,7 @@ public class SettingsActivity extends Activity {
         silencioTxt.setText("Espero " + prefs.silencio() + " segundos de silencio antes de enviar tu orden");
         col.addView(silencio);
 
-        col.addView(etiqueta("Sensibilidad de «oye cerebro»"));
+        col.addView(etiqueta("Sensibilidad de «Jarvis»"));
         sensib = new Spinner(this);
         String[] niveles = {"Alta (se activa más fácil)", "Media", "Baja (más exigente, menos falsas)"};
         sensib.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, niveles) {
@@ -266,7 +266,7 @@ public class SettingsActivity extends Activity {
     protected void onResume() {
         super.onResume();
         int n = new VozDueno(this).cantidad();
-        vozInfo.setText(n == 0 ? "Sin voz enseñada: «oye cerebro» responde a cualquier voz."
+        vozInfo.setText(n == 0 ? "Sin voz enseñada: «Jarvis» responde a cualquier voz."
                 : "Tengo " + n + " muestras de tu voz. Solo respondo a una voz parecida.");
         activaciones.setText(new Registro(this).ultimas(15));
         errores.setText(new Registro(this, "errores-escucha.log").ultimas(10));

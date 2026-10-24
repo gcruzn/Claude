@@ -16,7 +16,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * «Enseñarle mi voz»: pide decir «oye cerebro» 6 veces, avanza sola (sin tocar entre
+ * «Enseñarle mi voz»: pide decir «Jarvis» 6 veces, avanza sola (sin tocar entre
  * repeticiones) y AGREGA las muestras a las que ya había. Las toma el servicio con el micrófono
  * que ya tiene abierto para la palabra clave.
  */

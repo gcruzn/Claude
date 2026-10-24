@@ -12,7 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Huellas de voz (x-vectors de Vosk, 128 números) de las veces que Gonzalo dijo «oye cerebro».
+ * Huellas de voz (x-vectors de Vosk, 128 números) de las veces que Gonzalo dijo la palabra clave.
+ * El archivo lleva la palabra clave en el nombre: al cambiarla, las huellas de la anterior no
+ * sirven (otra frase, otra huella) y se parte sin voz enseñada.
  * Se AGREGAN muestras sin borrar las anteriores (su voz cambia entre días) y se compara contra
  * la más parecida, no contra el promedio.
  */
@@ -21,7 +23,7 @@ final class VozDueno {
     private final List<double[]> muestras = new ArrayList<>();
 
     VozDueno(Context c) {
-        archivo = new File(c.getFilesDir(), "voz.json");
+        archivo = new File(c.getFilesDir(), "voz-" + CerebroService.KEYWORD + ".json");
         cargar();
     }
 

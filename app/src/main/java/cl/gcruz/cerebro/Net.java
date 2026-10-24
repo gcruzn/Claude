@@ -93,7 +93,7 @@ final class Net {
         try {
             JSONObject j = new JSONObject();
             j.put("password", p.password());
-            j.put("device", "Oye cerebro " + Build.MODEL);
+            j.put("device", "Jarvis " + Build.MODEL);
             Result r = post(p.url() + "/api/pair", null, j, 20000);
             if (r.status == 401) throw new IOException("La contraseña no es correcta.");
             if (r.status == 429) throw new IOException("Demasiados intentos. Espera unos minutos.");
