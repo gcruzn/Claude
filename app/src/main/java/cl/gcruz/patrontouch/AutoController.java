@@ -32,8 +32,10 @@ final class AutoController {
 
     static final String[] HEADINGS = {"sigue al enemigo", "dirección del lápiz"};
     static final String[] SHAPES = {"recta", "zigzag", "círculo", "cuadrado", "triángulo", "óvalo", "rect. horizontal", "rect. vertical"};
-    static final String[] SHOT_EVERY = {"no", "0,1 s", "0,12 s", "0,15 s", "0,2 s", "0,25 s", "0,3 s", "0,4 s", "0,5 s", "0,75 s", "1 s"};
-    static final long[] SHOT_EVERY_MS = {0, 100, 120, 150, 200, 250, 300, 400, 500, 750, 1000};
+    static final String[] SHOT_EVERY = {"no", "0,1 s", "0,12 s", "0,15 s", "0,2 s", "0,25 s", "0,3 s", "0,4 s", "0,5 s", "0,75 s", "1 s",
+            "mantener apretado"};
+    /** −1 = mantener apretado (v6.8.1, pedido de Gonzalo 24-oct). */
+    static final long[] SHOT_EVERY_MS = {0, 100, 120, 150, 200, 250, 300, 400, 500, 750, 1000, -1};
     static final String[] EVERY = {"no", "1 s", "2 s", "3 s", "4 s", "5 s", "6 s", "8 s", "10 s", "15 s"};
     static final long[] EVERY_MS = {0, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 15000};
 
@@ -331,9 +333,6 @@ final class AutoController {
             }
             p.touches.add(js);
         }
-        // --- disparo: toque simple cada «Disparo cada», siempre
-        long shot = SHOT_EVERY_MS[get("shotEvery")];
-        if (shot > 0) for (long t = 40; t < WINDOW_MS; t += shot) press(p, "attack", t);
         // --- súper, gadget e híper: cada uno en múltiplos de su período desde que se encendió el Auto
         // (gadget desfasado medio período, híper un cuarto: con los tres en 6 s quedan súper y gadget
         // alternados cada 3 s). Si dos coinciden, el segundo va 0,35 s después.
@@ -352,22 +351,34 @@ final class AutoController {
             }
         }
         ev.sort((x, y) -> Long.compare(x[0], y[0]));
-        float[] atk = svc.calib().get("attack");
-        String[] btn = {"super", "gadget", "hyper"};
+        List<long[]> abil = new ArrayList<>();   // {instante, botón}, ya separados 0,35 s
         long last = -1000;
         for (long[] e : ev) {
             long off = Math.max(e[0], last + 350);
             if (off >= WINDOW_MS) break;
             last = off;
-            final long s0 = off - 130, s1 = off + 250;
-            if (atk != null) {
-                p.touches.removeIf(x -> {
-                    Pattern.Point a = x.pts.get(0), z = x.pts.get(x.pts.size() - 1);
-                    return a.x == atk[0] && a.y == atk[1] && z.t > s0 && a.t < s1;
-                });
-            }
-            press(p, btn[(int) e[1]], off, 120);
+            abil.add(new long[]{off, e[1]});
         }
+        // --- disparo, siempre. Alrededor de cada súper/gadget/híper (‒130 a +250 ms) no hay disparo:
+        // el juego atiende un solo botón de ataque a la vez y los ignoraba.
+        long shot = SHOT_EVERY_MS[get("shotEvery")];
+        if (shot > 0) {
+            for (long t = 40; t < WINDOW_MS; t += shot) {
+                boolean clash = false;
+                for (long[] e : abil) if (t + 70 > e[0] - 130 && t < e[0] + 250) clash = true;
+                if (!clash) press(p, "attack", t);
+            }
+        } else if (shot < 0) {   // mantener apretado: tramos largos que se sueltan solo en cada habilidad
+            long from = 40;
+            for (long[] e : abil) {
+                long to = e[0] - 130;
+                if (to - from >= 80) press(p, "attack", from, to - from);
+                from = Math.max(from, e[0] + 250);
+            }
+            if (WINDOW_MS - from >= 80) press(p, "attack", from, WINDOW_MS - from);
+        }
+        String[] btn = {"super", "gadget", "hyper"};
+        for (long[] e : abil) press(p, btn[(int) e[1]], e[0], 120);
         if (p.touches.isEmpty()) {   // quieto y sin nada que tocar: el reproductor espera la ventana
             p.duration = WINDOW_MS;
             return p;
