@@ -33,9 +33,9 @@ final class AutoController {
     static final String[] HEADINGS = {"sigue al enemigo", "dirección del lápiz"};
     static final String[] SHAPES = {"recta", "zigzag", "círculo", "cuadrado", "triángulo", "óvalo", "rect. horizontal", "rect. vertical"};
     static final String[] SHOT_EVERY = {"no", "0,1 s", "0,12 s", "0,15 s", "0,2 s", "0,25 s", "0,3 s", "0,4 s", "0,5 s", "0,75 s", "1 s",
-            "mantener apretado"};
-    /** −1 = mantener apretado (v6.8.1, pedido de Gonzalo 24-oct). */
-    static final long[] SHOT_EVERY_MS = {0, 100, 120, 150, 200, 250, 300, 400, 500, 750, 1000, -1};
+            "mantener apretado", "mantener apuntado"};
+    /** −1 = mantener apretado quieto; −2 = mantener arrastrado hacia el rumbo (24-oct). */
+    static final long[] SHOT_EVERY_MS = {0, 100, 120, 150, 200, 250, 300, 400, 500, 750, 1000, -1, -2};
     static final String[] EVERY = {"no", "1 s", "2 s", "3 s", "4 s", "5 s", "6 s", "8 s", "10 s", "15 s"};
     static final long[] EVERY_MS = {0, 1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 15000};
 
@@ -369,18 +369,18 @@ final class AutoController {
                 if (!clash) press(p, "attack", t);
             }
         } else if (shot < 0) {
-            // Mantener apretado, ARRASTRADO hacia el enemigo (o hacia donde camina): con el dedo quieto
-            // sobre el botón el juego solo apunta y dispara al soltar; Gonzalo con Amber (24-oct): «no
-            // logro vaciar su cartucho y en un momento ni siquiera disparó». Se suelta solo en cada
-            // súper/gadget/híper.
+            // «mantener apretado»: dedo quieto sobre el botón (así lo hace Gonzalo a mano con Amber);
+            // «mantener apuntado»: arrastrado hacia el enemigo o hacia donde camina. Con Amber (24-oct)
+            // el quieto no vació el cartucho; se dejan los dos para compararlos grabando. Se suelta solo
+            // en cada súper/gadget/híper.
             double aim = Double.isNaN(chase) ? base : chase;
             long from = 40;
             for (long[] e : abil) {
                 long to = e[0] - 130;
-                if (to - from >= 150) holdAimed(p, from, to, aim);
+                if (to - from >= 150) hold(p, from, to, shot == -2 ? aim : Double.NaN);
                 from = Math.max(from, e[0] + 250);
             }
-            if (WINDOW_MS - from >= 150) holdAimed(p, from, WINDOW_MS, aim);
+            if (WINDOW_MS - from >= 150) hold(p, from, WINDOW_MS, shot == -2 ? aim : Double.NaN);
         }
         String[] btn = {"super", "gadget", "hyper"};
         for (long[] e : abil) press(p, btn[(int) e[1]], e[0], 120);
@@ -393,10 +393,14 @@ final class AutoController {
         return p;
     }
 
-    /** Ataque apretado de `from` a `to` arrastrado hacia `ang` (rad, y hacia arriba). */
-    private void holdAimed(Pattern p, long from, long to, double ang) {
+    /** Ataque apretado de `from` a `to`; si `ang` no es NaN, arrastrado hacia `ang` (rad, y hacia arriba). */
+    private void hold(Pattern p, long from, long to, double ang) {
         float[] b = svc.calib().get("attack");
         if (b == null) return;
+        if (Double.isNaN(ang)) {
+            press(p, "attack", from, to - from);
+            return;
+        }
         float r = svc.calib().aimRadius() * 1.2f;
         float ax = b[0] + (float) (r * Math.cos(ang)), ay = b[1] - (float) (r * Math.sin(ang));
         Pattern.Touch x = new Pattern.Touch();
