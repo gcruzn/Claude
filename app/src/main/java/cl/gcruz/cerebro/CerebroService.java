@@ -25,6 +25,7 @@ import android.speech.tts.UtteranceProgressListener;
 import org.json.JSONObject;
 import org.vosk.Model;
 import org.vosk.Recognizer;
+import org.vosk.SpeakerModel;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
@@ -44,6 +45,8 @@ import java.util.regex.Pattern;
 public class CerebroService extends Service {
     static final String ACTION_ASK = "cl.gcruz.cerebro.ASK";
     static final String ACTION_STOP = "cl.gcruz.cerebro.STOP";
+    static final String ACTION_ENSENAR = "cl.gcruz.cerebro.ENSENAR";
+    static final String ACTION_ENSENAR_FIN = "cl.gcruz.cerebro.ENSENAR_FIN";
     static final String ACTION_REFRESH = "cl.gcruz.cerebro.REFRESH";
     private static final String CHANNEL = "cerebro";
     private static final String KEYWORD = "oye cerebro";
@@ -66,6 +69,8 @@ public class CerebroService extends Service {
     private boolean ttsListo;
     private Model model;
     private Recognizer recognizer;
+    private SpeakerModel spk;
+    private VozDueno duenoVoz;
     private Escucha keyword;
     private SpeechRecognizer sr;
     private PowerManager.WakeLock wake;
@@ -87,6 +92,7 @@ public class CerebroService extends Service {
     public void onCreate() {
         super.onCreate();
         prefs = new Prefs(this);
+        duenoVoz = new VozDueno(this);
         vivo = true;
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         wake = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "cerebro:escucha");
@@ -120,6 +126,8 @@ public class CerebroService extends Service {
             return START_NOT_STICKY;
         }
         if (ACTION_REFRESH.equals(a)) sondear(0);
+        if (ACTION_ENSENAR.equals(a)) h.post(this::iniciarEnsenanza);
+        if (ACTION_ENSENAR_FIN.equals(a)) h.post(() -> terminarEnsenanza(true));
         if (ACTION_ASK.equals(a)) {
             if (ttsListo) empezarDialogo(); else pendienteAsk = true;
         }
@@ -169,24 +177,52 @@ public class CerebroService extends Service {
 
     // --- Palabra clave (Vosk) ---------------------------------------------
 
+    // Gramática: la clave más señuelos (palabras parecidas y muy comunes) para que el habla ajena
+    // caiga en ellas y no en «oye cerebro».
+    private static final String[] SENUELOS = {
+        "oye", "cerebro", "hoy", "ojo", "oiga", "celebro", "cerebral", "sombrero", "febrero",
+        "verde", "el", "la", "los", "las", "que", "sí", "no", "un", "una", "de", "y", "en", "es",
+        "por", "con", "para", "mi", "me", "te", "lo", "ya", "si", "muy", "más", "pero", "como",
+        "aquí", "bien", "hola", "bueno", "vamos", "mira", "cajón", "cebra", "cerro", "cierro",
+        "pero", "dime", "eso", "está", "tiene", "hay", "todo", "nada", "algo", "ver", "oír"
+    };
+
+    private static String gramatica() {
+        StringBuilder sb = new StringBuilder("[\"" + KEYWORD + "\"");
+        for (String w : SENUELOS) sb.append(", \"").append(w).append("\"");
+        return sb.append(", \"[unk]\"]").toString();
+    }
+
     private void cargarModelo() {
         try {
-            File dir = Modelo.asegurar(this, t -> h.post(() -> { if (!ocupado) poner(t); }));
+            File dir = Modelo.espanol(this, t -> h.post(() -> { if (!ocupado) poner(t); }));
             Model m = new Model(dir.getAbsolutePath());
-            Recognizer r = new Recognizer(m, 16000f, "[\"" + KEYWORD + "\", \"[unk]\"]");
+            SpeakerModel sm = null;
+            try {
+                File sd = Modelo.hablante(this, t -> h.post(() -> { if (!ocupado) poner(t); }));
+                sm = new SpeakerModel(sd.getAbsolutePath());
+            } catch (Throwable e) {
+                // Sin modelo de hablante la palabra clave funciona igual, sin filtro de voz.
+                new Registro(this).anotar("sin modelo de hablante: " + e.getMessage());
+            }
+            Recognizer r = new Recognizer(m, 16000f, gramatica());
+            r.setWords(true);
+            if (sm != null) r.setSpeakerModel(sm);
+            final SpeakerModel fsm = sm;
             h.post(() -> {
                 if (!vivo) { r.close(); m.close(); return; }
                 model = m;
+                spk = fsm;
                 recognizer = r;
                 if (!ocupado) reanudar();
             });
-        } catch (Exception e) {
+        } catch (Throwable e) {
             h.post(() -> poner("No pude preparar la voz: " + e.getMessage() + ". El botón sigue funcionando."));
         }
     }
 
     private void reanudar() {
-        if (!prefs.listen() || recognizer == null) {
+        if ((!prefs.listen() && !modoEnsenar) || recognizer == null) {
             poner(prefs.listen() ? "Preparando la voz…" : "Listo. Toca el botón para hablar.");
             return;
         }
@@ -231,8 +267,7 @@ public class CerebroService extends Service {
                         int n = ar.read(buf, 0, buf.length);
                         if (n < 0) throw new IllegalStateException("lectura falló (" + n + ")");
                         if (n == 0) continue;
-                        if (rec.acceptWaveForm(buf, n)) revisar(rec.getResult(), "text");
-                        else revisar(rec.getPartialResult(), "partial");
+                        if (rec.acceptWaveForm(buf, n)) resultado(rec.getResult());
                     }
                 } catch (Throwable t) {
                     if (!fin) h.post(() -> { if (!ocupado) poner("Micrófono ocupado, reintento…"); });
@@ -249,11 +284,113 @@ public class CerebroService extends Service {
         }
     }
 
-    private void revisar(String json, String clave) {
+    /**
+     * Resultado final del reconocedor (en el hilo de escucha). Acepta la palabra clave solo si
+     * es exactamente «oye cerebro», con confianza alta en cada palabra y, si Gonzalo enseñó su
+     * voz, con huella parecida a alguna de sus muestras. Todo queda en el registro.
+     */
+    private void resultado(String json) {
         try {
-            String t = new JSONObject(json).optString(clave, "");
-            if (t.contains(KEYWORD)) h.post(this::empezarDialogo);
+            JSONObject o = new JSONObject(json);
+            String text = o.optString("text", "").trim();
+            if (!text.contains("oye") && !text.contains("cerebro")) return;   // ruido: ni se registra
+            org.json.JSONArray ws = o.optJSONArray("result");
+            double minConf = 1;
+            StringBuilder cs = new StringBuilder();
+            if (ws != null) {
+                for (int i = 0; i < ws.length(); i++) {
+                    JSONObject w = ws.getJSONObject(i);
+                    double c = w.optDouble("conf", 0);
+                    minConf = Math.min(minConf, c);
+                    cs.append(w.optString("word")).append(String.format(Locale.US, " %.2f ", c));
+                }
+            }
+            double[] huella = null;
+            org.json.JSONArray sp = o.optJSONArray("spk");
+            if (sp != null) {
+                huella = new double[sp.length()];
+                for (int i = 0; i < huella.length; i++) huella[i] = sp.getDouble(i);
+            }
+            if (modoEnsenar) { muestra(text, minConf, huella); return; }
+            double umbral = prefs.umbralConfianza();
+            String motivo = null;
+            String sim = "voz -";
+            if (!text.equals(KEYWORD)) motivo = "texto";
+            else if (minConf < umbral) motivo = String.format(Locale.US, "confianza %.2f<%.2f", minConf, umbral);
+            else if (duenoVoz.cantidad() > 0) {
+                if (huella == null) motivo = "sin huella de voz";
+                else {
+                    double s = duenoVoz.maxSimilitud(huella);
+                    sim = String.format(Locale.US, "voz %.2f", s);
+                    if (s < prefs.umbralVoz() / 100.0) motivo = String.format(Locale.US, "voz %.2f<%.2f", s, prefs.umbralVoz() / 100.0);
+                }
+            }
+            new Registro(this).anotar("«" + text + "» | " + cs.toString().trim() + " | " + sim + " | "
+                    + (motivo == null ? "ACEPTADA" : "rechazada (" + motivo + ")"));
+            if (motivo == null) h.post(this::empezarDialogo);
         } catch (Exception ignored) { }
+    }
+
+    // --- Enseñar la voz -----------------------------------------------------
+
+    static final int MUESTRAS = 6;
+    static volatile boolean modoEnsenar;
+    static volatile String ensenarMsg = "";
+    static volatile int ensenarHechas;
+    private final java.util.List<double[]> nuevasMuestras = new ArrayList<>();
+
+    private void iniciarEnsenanza() {
+        if (spk == null) {
+            ensenarMsg = recognizer == null ? "Todavía estoy bajando la voz. Espera un momento y vuelve a entrar."
+                    : "No tengo el modelo de reconocimiento de voz. Revisa internet y reinicia la app.";
+            avisarUi();
+            return;
+        }
+        if (ocupado) { ensenarMsg = "Estoy ocupado con un pedido. Intenta en un momento."; avisarUi(); return; }
+        nuevasMuestras.clear();
+        ensenarHechas = 0;
+        ensenarMsg = "Di «oye cerebro»";
+        modoEnsenar = true;
+        reanudar();
+        avisarUi();
+    }
+
+    private void terminarEnsenanza(boolean guardar) {
+        modoEnsenar = false;
+        if (guardar && !nuevasMuestras.isEmpty()) {
+            try {
+                duenoVoz.agregar(new ArrayList<>(nuevasMuestras));
+                ensenarMsg = "Listo. Guardé " + nuevasMuestras.size() + " muestras. Ya tengo " + duenoVoz.cantidad() + " en total.";
+            } catch (Exception e) {
+                ensenarMsg = "No pude guardar las muestras: " + e.getMessage();
+            }
+        } else if (!guardar) {
+            ensenarMsg = nuevasMuestras.isEmpty() ? "Cancelado." : "Cancelado, no guardé nada.";
+        }
+        nuevasMuestras.clear();
+        avisarUi();
+        h.post(() -> { if (!ocupado) reanudar(); });
+    }
+
+    /** Una repetición de «oye cerebro» durante la enseñanza (hilo de escucha). */
+    private void muestra(String text, double minConf, double[] huella) {
+        if (!text.equals(KEYWORD) || huella == null || minConf < 0.8) {
+            h.post(() -> { ensenarMsg = "No te entendí bien. Di «oye cerebro» otra vez"; avisarUi(); });
+            return;
+        }
+        new Registro(this).anotar("muestra de voz " + (nuevasMuestras.size() + 1) + " | conf " + String.format(Locale.US, "%.2f", minConf));
+        h.post(() -> {
+            nuevasMuestras.add(huella);
+            ensenarHechas = nuevasMuestras.size();
+            beep();
+            if (ensenarHechas >= MUESTRAS) terminarEnsenanza(true);
+            else { ensenarMsg = "Muy bien. Otra vez: «oye cerebro»"; avisarUi(); }
+        });
+    }
+
+    private void avisarUi() {
+        Ui u = ui;
+        if (u != null) u.cambio();
     }
 
     private void pararKeyword() {
@@ -482,8 +619,17 @@ public class CerebroService extends Service {
         capFinalizar = false;
         h.removeCallbacks(vigilante);
         destruirSr();
-        if (t.isEmpty()) hablarYTerminar("No te escuché.");
+        if (t.isEmpty()) { oido = ""; respuesta = ""; poner("Cerrado, no oí nada"); terminar(); }
+        else if (esCancelacion(t)) { poner("Cerrado, no envié nada"); new Registro(this).anotar("orden cancelada: " + t); terminar(); }
         else enviar(t);
+    }
+
+    private static boolean esCancelacion(String t) {
+        String n = java.text.Normalizer.normalize(t.toLowerCase(Locale.ROOT), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").replaceAll("[^a-z ]", " ").replaceAll("\\s+", " ").trim();
+        return n.equals("nada") || n.equals("cancela") || n.equals("cancelar") || n.equals("olvidalo")
+                || n.contains("no era a ti") || n.contains("no era para ti") || n.contains("no te hablaba")
+                || n.equals("nada nada") || n.equals("no nada");
     }
 
     private void cerrarConMensaje(String msg) {

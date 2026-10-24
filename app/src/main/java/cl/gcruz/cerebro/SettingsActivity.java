@@ -32,7 +32,9 @@ public class SettingsActivity extends Activity {
     private EditText url, clave;
     private TextView bateria, silencioTxt, velTxt, tonoTxt;
     private SeekBar silencio, vel, tono;
-    private Spinner voces;
+    private Spinner voces, sensib;
+    private TextView vozInfo, umbralTxt, activaciones;
+    private SeekBar umbralVoz;
     private TextToSpeech tts;
     private boolean ttsListo;
     private final List<Voice> lista = new ArrayList<>();
@@ -122,6 +124,45 @@ public class SettingsActivity extends Activity {
         silencioTxt.setText("Espero " + prefs.silencio() + " segundos de silencio antes de enviar tu orden");
         col.addView(silencio);
 
+        col.addView(etiqueta("Sensibilidad de «oye cerebro»"));
+        sensib = new Spinner(this);
+        String[] niveles = {"Alta (se activa más fácil)", "Media", "Baja (más exigente, menos falsas)"};
+        sensib.setAdapter(new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, niveles) {
+            @Override public View getView(int pos, View v, android.view.ViewGroup g) {
+                TextView t = (TextView) super.getView(pos, v, g);
+                t.setTextSize(18);
+                return t;
+            }
+        });
+        sensib.setSelection(prefs.sensibilidad());
+        sensib.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> a, View v, int pos, long id) { prefs.setSensibilidad(pos); }
+            @Override public void onNothingSelected(AdapterView<?> a) {}
+        });
+        col.addView(sensib);
+
+        vozInfo = etiqueta("");
+        col.addView(vozInfo);
+        Button ensenar = boton("Enseñarle mi voz", 0xFF406AB4);
+        ensenar.setOnClickListener(v -> startActivity(new Intent(this, EnsenarActivity.class)));
+        LinearLayout.LayoutParams lp3 = new LinearLayout.LayoutParams(-1, dp(72));
+        lp3.setMargins(0, dp(6), 0, 0);
+        col.addView(ensenar, lp3);
+        Button borrarVoz = boton("Borrar mis muestras de voz", 0xFF969798);
+        borrarVoz.setOnClickListener(v -> { new VozDueno(this).borrar(); onResume(); });
+        LinearLayout.LayoutParams lp4 = new LinearLayout.LayoutParams(-1, dp(60));
+        lp4.setMargins(0, dp(8), 0, 0);
+        col.addView(borrarVoz, lp4);
+
+        umbralTxt = etiqueta("");
+        col.addView(umbralTxt);
+        umbralVoz = barra(65, prefs.umbralVoz() - 30, p -> {
+            prefs.setUmbralVoz(p + 30);
+            umbralTxt.setText("Parecido mínimo con tu voz: " + (p + 30) + "%");
+        });
+        umbralTxt.setText("Parecido mínimo con tu voz: " + prefs.umbralVoz() + "%");
+        col.addView(umbralVoz);
+
         col.addView(etiqueta("Voz de lectura"));
         voces = new Spinner(this);
         col.addView(voces);
@@ -140,6 +181,13 @@ public class SettingsActivity extends Activity {
         LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(-1, dp(72));
         lp2.setMargins(0, dp(10), 0, 0);
         col.addView(probar, lp2);
+
+        col.addView(etiqueta("Últimas activaciones"));
+        activaciones = new TextView(this);
+        activaciones.setTextSize(15);
+        activaciones.setTextColor(0xFF454A51);
+        activaciones.setTypeface(android.graphics.Typeface.MONOSPACE);
+        col.addView(activaciones);
 
         bateria = etiqueta("");
         col.addView(bateria);
@@ -210,6 +258,10 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        int n = new VozDueno(this).cantidad();
+        vozInfo.setText(n == 0 ? "Sin voz enseñada: «oye cerebro» responde a cualquier voz."
+                : "Tengo " + n + " muestras de tu voz. Solo respondo a una voz parecida.");
+        activaciones.setText(new Registro(this).ultimas(15));
         PowerManager pm = getSystemService(PowerManager.class);
         boolean libre = pm.isIgnoringBatteryOptimizations(getPackageName());
         bateria.setText(libre ? "Batería: sin restricciones (bien)"

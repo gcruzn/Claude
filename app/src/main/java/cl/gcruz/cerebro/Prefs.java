@@ -41,6 +41,14 @@ final class Prefs {
     int silencio() { return Math.max(3, Math.min(12, sp.getInt("silencio", 6))); }
     void setSilencio(int s) { sp.edit().putInt("silencio", s).apply(); }
 
+    /** Sensibilidad de la palabra clave: 0 alta (más fácil), 1 media, 2 baja (más exigente). */
+    int sensibilidad() { return sp.getInt("sensibilidad", 1); }
+    void setSensibilidad(int s) { sp.edit().putInt("sensibilidad", s).apply(); }
+    double umbralConfianza() { return new double[]{0.85, 0.95, 0.98}[Math.max(0, Math.min(2, sensibilidad()))]; }
+    /** Parecido mínimo de voz con las muestras de Gonzalo, en porcentaje. */
+    int umbralVoz() { return sp.getInt("umbralVoz", 60); }
+    void setUmbralVoz(int v) { sp.edit().putInt("umbralVoz", v).apply(); }
+
     /** Voz de TextToSpeech elegida (nombre), o "" para la mejor disponible. */
     String voz() { return sp.getString("voz", ""); }
     void setVoz(String v) { sp.edit().putString("voz", v).apply(); }
