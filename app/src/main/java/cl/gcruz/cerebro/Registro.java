@@ -17,7 +17,9 @@ final class Registro {
     private static final Object LOCK = new Object();
     private final File archivo;
 
-    Registro(Context c) { archivo = new File(c.getFilesDir(), "activaciones.log"); }
+    Registro(Context c) { this(c, "activaciones.log"); }
+
+    Registro(Context c, String nombre) { archivo = new File(c.getFilesDir(), nombre); }
 
     void anotar(String linea) {
         String hora = new SimpleDateFormat("dd/MM HH:mm:ss", Locale.US).format(new Date());
@@ -52,7 +54,7 @@ final class Registro {
             List<String> l = todas();
             StringBuilder sb = new StringBuilder();
             for (int i = l.size() - 1; i >= 0 && i >= l.size() - n; i--) sb.append(l.get(i)).append("\n\n");
-            return sb.length() == 0 ? "Aún no hay activaciones." : sb.toString().trim();
+            return sb.length() == 0 ? "Sin registros." : sb.toString().trim();
         }
     }
 }

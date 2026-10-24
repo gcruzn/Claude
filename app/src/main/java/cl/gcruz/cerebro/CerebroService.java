@@ -455,6 +455,7 @@ public class CerebroService extends Service {
         if (ocupado) return;
         ocupado = true;
         reintentoUS = false;
+        capRepetido = false;
         pararKeyword();
         beep();
         poner("Te escucho…");
@@ -474,6 +475,9 @@ public class CerebroService extends Service {
                 } else {
                     terminar();
                 }
+                break;
+            case "repite":
+                capturar("es-CL");
                 break;
             case "aviso":
                 terminar();
@@ -496,20 +500,27 @@ public class CerebroService extends Service {
     private long capInicio;
     private boolean capFinalizar;
 
+    private boolean sesionActiva;     // nunca dos sesiones a la vez
+    private int capReintentos;        // reintentos por errores del servicio de voz
+    private boolean capRepetido;      // ya pedí «¿me repites?» en esta orden
+
     private void capturar(String idioma) {
         capIdioma = idioma;
         capAcum.setLength(0);
         capParcial = "";
         capFinalizar = false;
+        capReintentos = 0;
         capInicio = capUltimoHabla = System.currentTimeMillis();
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             capIdioma = null;
             hablarYTerminar("Este teléfono no tiene reconocimiento de voz.");
             return;
         }
-        lanzarSesion();
         h.removeCallbacks(vigilante);
         h.postDelayed(vigilante, 400);
+        // Un SpeechRecognizer por captura, nuevo y con un respiro tras soltar el anterior.
+        soltarSr();
+        h.postDelayed(() -> { if (capIdioma != null) { crearSr(); iniciarSesion(); } }, 300);
     }
 
     private final Runnable vigilante = new Runnable() {
@@ -519,7 +530,7 @@ public class CerebroService extends Service {
             long silencio = prefs.silencio() * 1000L;
             if (!capFinalizar && (ahora - capUltimoHabla >= silencio || ahora - capInicio > 90000)) {
                 capFinalizar = true;
-                if (sr != null) { try { sr.stopListening(); } catch (Exception ignored) { } }
+                if (sr != null && sesionActiva) { try { sr.stopListening(); } catch (Exception ignored) { } }
                 // por si no llegan resultados
                 h.postDelayed(() -> { if (capFinalizar && capIdioma != null) cerrarCaptura(); }, 2500);
             }
@@ -533,33 +544,35 @@ public class CerebroService extends Service {
         return t.trim();
     }
 
-    private void lanzarSesion() {
-        destruirSr();
-        final int mia = ++gen;
-        sr = SpeechRecognizer.createSpeechRecognizer(this);
-        sr.setRecognitionListener(new android.speech.RecognitionListener() {
-            @Override public void onReadyForSpeech(Bundle b) { if (mia == gen) poner("Habla ahora…"); }
-            @Override public void onBeginningOfSpeech() { if (mia == gen) capUltimoHabla = System.currentTimeMillis(); }
+    private void crearSr() {
+        if (sr != null) return;
+        final SpeechRecognizer mi = SpeechRecognizer.createSpeechRecognizer(this);
+        sr = mi;
+        mi.setRecognitionListener(new android.speech.RecognitionListener() {
+            private boolean vigente() { return sr == mi && capIdioma != null; }
+            @Override public void onReadyForSpeech(Bundle b) { if (vigente()) poner("Habla ahora…"); }
+            @Override public void onBeginningOfSpeech() { if (vigente()) capUltimoHabla = System.currentTimeMillis(); }
             @Override public void onRmsChanged(float v) {}
             @Override public void onBufferReceived(byte[] b) {}
             @Override public void onEndOfSpeech() {}
             @Override public void onEvent(int t, Bundle b) {}
             @Override public void onPartialResults(Bundle b) {
-                if (mia != gen) return;
+                if (!vigente()) return;
                 String t = primero(b);
                 if (t != null && !t.isEmpty()) {
                     capParcial = t;
                     capUltimoHabla = System.currentTimeMillis();
                     oido = textoActual();
                     poner("Oyendo…");
-                    if (LISTO.matcher(oido).find() && !capFinalizar) {
+                    if (LISTO.matcher(oido).find() && !capFinalizar && sesionActiva) {
                         capFinalizar = true;
-                        try { sr.stopListening(); } catch (Exception ignored) { }
+                        try { mi.stopListening(); } catch (Exception ignored) { }
                     }
                 }
             }
             @Override public void onResults(Bundle b) {
-                if (mia != gen) return;
+                if (!vigente()) return;
+                sesionActiva = false;
                 String t = primero(b);
                 if (t != null && !t.trim().isEmpty()) {
                     if (capAcum.length() > 0) capAcum.append(" ");
@@ -572,30 +585,82 @@ public class CerebroService extends Service {
                 terminoSesion();
             }
             @Override public void onError(int e) {
-                if (mia != gen) return;
+                if (!vigente()) return;
+                sesionActiva = false;
+                new Registro(CerebroService.this, "errores-escucha.log").anotar("error " + e + " " + nombreError(e)
+                        + " | captura " + (System.currentTimeMillis() - capInicio) / 1000 + " s | reintento " + capReintentos);
                 if ((e == 12 || e == 13) && !reintentoUS) {   // idioma no disponible
                     reintentoUS = true;
                     capIdioma = "es-US";
-                    h.post(CerebroService.this::lanzarSesion);
-                } else if (e == 7 || e == 6 || e == 8 || e == 1 || e == 2 || e == 5) {
-                    // sin voz / ocupado / red / cliente: se cuenta como fin de sesión
-                    capParcial = "";
+                    reiniciarSr();
+                } else if (e == 7 || e == 6) {
+                    capParcial = "";            // sin voz: fin normal de sesión
                     terminoSesion();
                 } else if (e == 9) {
                     cerrarConMensaje("Me falta el permiso del micrófono.");
+                } else if (capReintentos < 2) {
+                    capReintentos++;            // 11, 8, 5 y otros: recrear y reintentar
+                    reiniciarSr();
+                } else if (!capRepetido) {
+                    capRepetido = true;
+                    capIdioma = null;
+                    h.removeCallbacks(vigilante);
+                    soltarSr();
+                    poner("No te escuché bien");
+                    decir("No te escuché bien, ¿me repites?", "repite", false);
                 } else {
                     cerrarConMensaje("No pude escucharte. Error " + e + ".");
                 }
             }
         });
+    }
+
+    private static String nombreError(int e) {
+        switch (e) {
+            case 1: return "red (timeout)";
+            case 2: return "red";
+            case 3: return "audio";
+            case 4: return "servidor";
+            case 5: return "cliente";
+            case 6: return "sin voz (timeout)";
+            case 7: return "sin coincidencia";
+            case 8: return "reconocedor ocupado";
+            case 9: return "sin permisos";
+            case 10: return "demasiadas peticiones";
+            case 11: return "servidor desconectado";
+            case 12: return "idioma no soportado";
+            case 13: return "idioma no disponible";
+            default: return "otro";
+        }
+    }
+
+    /** Destruye el reconocedor y, tras un respiro, crea uno nuevo y reintenta. Nunca en el mismo tick. */
+    private void reiniciarSr() {
+        soltarSr();
+        h.postDelayed(() -> { if (capIdioma != null) { crearSr(); iniciarSesion(); } }, 600);
+    }
+
+    /** Arranca una sesión del reconocedor, solo si no hay otra en marcha. */
+    private void iniciarSesion() {
+        if (sesionActiva || capIdioma == null || sr == null) return;
+        sesionActiva = true;
+        // Los extras de silencio van como INT (con long Android los ignora).
+        int silencioMs = prefs.silencio() * 1000;
         Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, capIdioma)
                 .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L)
-                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L);
-        sr.startListening(i);
+                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, silencioMs)
+                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, silencioMs);
+        try {
+            sr.startListening(i);
+        } catch (Exception e) {
+            sesionActiva = false;
+            new Registro(this, "errores-escucha.log").anotar("startListening falló: " + e);
+            if (capReintentos < 2) { capReintentos++; reiniciarSr(); }
+            else cerrarConMensaje("No pude escucharte.");
+        }
     }
 
     /** Terminó una sesión del reconocedor: ¿enviar o seguir escuchando? */
@@ -608,7 +673,9 @@ public class CerebroService extends Service {
         if (listo || capFinalizar || paso) {
             cerrarCaptura();
         } else {
-            h.postDelayed(() -> { if (capIdioma != null && !capFinalizar) lanzarSesion(); }, 250);
+            // Respaldo: la sesión cerró antes del silencio configurado. Se relanza SOLO después
+            // de este onResults/onError y con una pausa; iniciarSesion() impide sesiones dobles.
+            h.postDelayed(() -> { if (capIdioma != null && !capFinalizar) iniciarSesion(); }, 300);
         }
     }
 
@@ -618,7 +685,7 @@ public class CerebroService extends Service {
         capIdioma = null;
         capFinalizar = false;
         h.removeCallbacks(vigilante);
-        destruirSr();
+        soltarSr();
         if (t.isEmpty()) { oido = ""; respuesta = ""; poner("Cerrado, no oí nada"); terminar(); }
         else if (esCancelacion(t)) { poner("Cerrado, no envié nada"); new Registro(this).anotar("orden cancelada: " + t); terminar(); }
         else enviar(t);
@@ -635,7 +702,7 @@ public class CerebroService extends Service {
     private void cerrarConMensaje(String msg) {
         capIdioma = null;
         h.removeCallbacks(vigilante);
-        destruirSr();
+        soltarSr();
         hablarYTerminar(msg);
     }
 
@@ -644,11 +711,18 @@ public class CerebroService extends Service {
         return l == null || l.isEmpty() ? null : l.get(0);
     }
 
-    private void destruirSr() {
-        gen++;
-        if (sr != null) {
-            try { sr.cancel(); sr.destroy(); } catch (Exception ignored) { }
-            sr = null;
+    private void destruirSr() { soltarSr(); }
+
+    /** Suelta el reconocedor actual; el destroy va en un tick posterior, nunca junto a un create. */
+    private void soltarSr() {
+        final SpeechRecognizer x = sr;
+        sr = null;
+        sesionActiva = false;
+        if (x != null) {
+            h.postDelayed(() -> {
+                try { x.cancel(); } catch (Exception ignored) { }
+                try { x.destroy(); } catch (Exception ignored) { }
+            }, 50);
         }
     }
 
@@ -689,6 +763,7 @@ public class CerebroService extends Service {
 
     private void terminar() {
         ocupado = false;
+        capRepetido = false;
         if (!anuncios.isEmpty()) { h.postDelayed(this::siguienteAnuncio, 400); return; }
         h.postDelayed(() -> { if (!ocupado) reanudar(); }, 500);
     }

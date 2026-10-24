@@ -33,7 +33,7 @@ public class SettingsActivity extends Activity {
     private TextView bateria, silencioTxt, velTxt, tonoTxt;
     private SeekBar silencio, vel, tono;
     private Spinner voces, sensib;
-    private TextView vozInfo, umbralTxt, activaciones;
+    private TextView vozInfo, umbralTxt, activaciones, errores;
     private SeekBar umbralVoz;
     private TextToSpeech tts;
     private boolean ttsListo;
@@ -189,6 +189,13 @@ public class SettingsActivity extends Activity {
         activaciones.setTypeface(android.graphics.Typeface.MONOSPACE);
         col.addView(activaciones);
 
+        col.addView(etiqueta("Últimos errores de escucha"));
+        errores = new TextView(this);
+        errores.setTextSize(15);
+        errores.setTextColor(0xFF454A51);
+        errores.setTypeface(android.graphics.Typeface.MONOSPACE);
+        col.addView(errores);
+
         bateria = etiqueta("");
         col.addView(bateria);
         Button bat = boton("Permitir en segundo plano", 0xFF73C96A);
@@ -262,6 +269,7 @@ public class SettingsActivity extends Activity {
         vozInfo.setText(n == 0 ? "Sin voz enseñada: «oye cerebro» responde a cualquier voz."
                 : "Tengo " + n + " muestras de tu voz. Solo respondo a una voz parecida.");
         activaciones.setText(new Registro(this).ultimas(15));
+        errores.setText(new Registro(this, "errores-escucha.log").ultimas(10));
         PowerManager pm = getSystemService(PowerManager.class);
         boolean libre = pm.isIgnoringBatteryOptimizations(getPackageName());
         bateria.setText(libre ? "Batería: sin restricciones (bien)"
