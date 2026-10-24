@@ -180,8 +180,8 @@ public class CerebroService extends Service {
     // Gramática: la clave más señuelos (palabras parecidas y muy comunes) para que el habla ajena
     // caiga en ellas y no en «jarvis».
     private static final String[] SENUELOS = {
-        "jardín", "jarra", "jarabe", "jarro", "jaime", "javier", "jabón", "jamás", "travis",
-        "davis", "chávez", "carlos", "marcos", "lápiz", "parís", "martes", "tarde", "bárbara",
+        "jardín", "jarra", "jarabe", "jarro", "jaime", "javier", "jabón", "jamás", "carlos",
+        "marcos", "lápiz", "parís", "martes", "tarde", "bárbara",
         "verde", "el", "la", "los", "las", "que", "sí", "no", "un", "una", "de", "y", "en", "es",
         "por", "con", "para", "mi", "me", "te", "lo", "ya", "si", "muy", "más", "pero", "como",
         "aquí", "bien", "hola", "bueno", "vamos", "mira", "oye", "oiga", "hoy", "ojo",
@@ -318,8 +318,10 @@ public class CerebroService extends Service {
             String sim = "voz -";
             if (!text.equals(KEYWORD)) motivo = "texto";
             else if (minConf < umbral) motivo = String.format(Locale.US, "confianza %.2f<%.2f", minConf, umbral);
-            else if (duenoVoz.cantidad() > 0) {
-                if (huella == null) motivo = "sin huella de voz";
+            else if (duenoVoz.recargar() > 0) {
+                // «Jarvis» es corto: Vosk a veces no alcanza a sacar la huella. Sin huella no hay con
+                // qué comparar, así que se acepta (antes se rechazaba y bloqueaba 3 de cada 5).
+                if (huella == null) sim = "voz sin huella";
                 else {
                     double s = duenoVoz.maxSimilitud(huella);
                     sim = String.format(Locale.US, "voz %.2f", s);

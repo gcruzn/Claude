@@ -45,6 +45,9 @@ final class VozDueno {
 
     synchronized int cantidad() { return muestras.size(); }
 
+    /** Relee el archivo (Ajustes puede haber borrado o agregado muestras) y devuelve cuántas hay. */
+    synchronized int recargar() { cargar(); return muestras.size(); }
+
     synchronized void agregar(List<double[]> nuevas) throws IOException {
         muestras.addAll(nuevas);
         guardar();
