@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.ToneGenerator;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,6 +32,7 @@ import android.media.MediaRecorder;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Oído y boca del cerebro. Servicio en primer plano que:
@@ -42,7 +44,7 @@ import java.util.Locale;
 public class CerebroService extends Service {
     static final String ACTION_ASK = "cl.gcruz.cerebro.ASK";
     static final String ACTION_STOP = "cl.gcruz.cerebro.STOP";
-    static final String ACTION_RELISTEN = "cl.gcruz.cerebro.RELISTEN";
+    static final String ACTION_REFRESH = "cl.gcruz.cerebro.REFRESH";
     private static final String CHANNEL = "cerebro";
     private static final String KEYWORD = "oye cerebro";
 
@@ -54,6 +56,7 @@ public class CerebroService extends Service {
     static volatile String estado = "Apagado";
     static volatile String oido = "";
     static volatile String respuesta = "";
+    static volatile String tareasTexto = "";
     /** La próxima orden abre conversación nueva (botón "Nueva conversación"). */
     static volatile boolean nueva = true;
 
@@ -100,10 +103,12 @@ public class CerebroService extends Service {
                 @Override public void onDone(String id) { h.post(() -> terminoHabla(id)); }
                 @Override public void onError(String id) { h.post(() -> terminoHabla(id)); }
             });
+            Voces.aplicar(tts, prefs);
             ttsListo = true;
             h.post(() -> { if (pendienteAsk) { pendienteAsk = false; empezarDialogo(); } });
         });
         new Thread(this::cargarModelo, "cerebro-modelo").start();
+        sondear(1000);
     }
 
     @Override
@@ -114,6 +119,7 @@ public class CerebroService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (ACTION_REFRESH.equals(a)) sondear(0);
         if (ACTION_ASK.equals(a)) {
             if (ttsListo) empezarDialogo(); else pendienteAsk = true;
         }
@@ -124,10 +130,12 @@ public class CerebroService extends Service {
     public void onDestroy() {
         vivo = false;
         gen++;
+        capIdioma = null;
         h.removeCallbacksAndMessages(null);
         pararKeyword();
         destruirSr();
         if (tts != null) { tts.stop(); tts.shutdown(); }
+        if (reproductor != null) { try { reproductor.release(); } catch (Exception ignored) { } }
         if (recognizer != null) recognizer.close();
         if (model != null) model.close();
         if (wake != null && wake.isHeld()) wake.release();
@@ -265,8 +273,44 @@ public class CerebroService extends Service {
         } catch (Exception ignored) { }
     }
 
+    private boolean vozRemota;   // el servidor ofrece voz personalizada (apagada por defecto)
+    private MediaPlayer reproductor;
+
     private void decir(String texto, String id, boolean encolar) {
+        decir(texto, id, encolar, null);
+    }
+
+    /** Habla con la voz personalizada del servidor si existe; si no o si falla, con TextToSpeech. */
+    private void decir(String texto, String id, boolean encolar, String audioUrl) {
+        boolean remota = audioUrl != null || (vozRemota && !id.equals("dime") && !id.equals("voy"));
+        if (!remota) { hablarTts(texto, id, encolar); return; }
+        final String url = audioUrl;
+        new Thread(() -> {
+            File f = Net.audio(this, url != null ? url : texto, url != null);
+            h.post(() -> { if (f == null || !reproducir(f, id)) hablarTts(texto, id, encolar); });
+        }, "cerebro-voz").start();
+    }
+
+    private boolean reproducir(File f, String id) {
+        try {
+            if (reproductor != null) { try { reproductor.release(); } catch (Exception ignored) { } }
+            final MediaPlayer mp = new MediaPlayer();
+            reproductor = mp;
+            mp.setDataSource(f.getPath());
+            mp.setOnCompletionListener(m -> { m.release(); f.delete(); h.post(() -> terminoHabla(id)); });
+            mp.setOnErrorListener((m, w, e) -> { m.release(); f.delete(); h.post(() -> terminoHabla(id)); return true; });
+            mp.prepare();
+            mp.start();
+            return true;
+        } catch (Exception e) {
+            f.delete();
+            return false;
+        }
+    }
+
+    private void hablarTts(String texto, String id, boolean encolar) {
         if (!ttsListo) { h.post(() -> terminoHabla(id)); return; }
+        Voces.aplicar(tts, prefs);
         tts.speak(texto, encolar ? TextToSpeech.QUEUE_ADD : TextToSpeech.QUEUE_FLUSH, null, id);
     }
 
@@ -287,7 +331,7 @@ public class CerebroService extends Service {
                 break;
             case "respuesta":
                 if (respuesta.trim().endsWith("?")) {
-                    // Espera un "sí" o un "no": escucha directo, sin palabra clave.
+                    // Espera una respuesta (sí/no, cuál tarea): escucha directo, sin palabra clave.
                     beep();
                     capturar("es-CL");
                 } else {
@@ -302,60 +346,151 @@ public class CerebroService extends Service {
         }
     }
 
+    // --- Captura continua ---------------------------------------------------
+    // El reconocedor de Google corta a los 1-2 s de silencio sin importar los extras, así que se
+    // relanza y se concatena el texto hasta que pasen X segundos sin habla (Ajustes, 3 a 12 s).
+
+    private static final Pattern LISTO = Pattern.compile("(?i)[\\s,.;:!¡¿?]*\\b(listo|eso es todo)[\\s.!]*$");
+
+    private String capIdioma;
+    private final StringBuilder capAcum = new StringBuilder();
+    private String capParcial = "";
+    private long capUltimoHabla;
+    private long capInicio;
+    private boolean capFinalizar;
+
     private void capturar(String idioma) {
-        destruirSr();
+        capIdioma = idioma;
+        capAcum.setLength(0);
+        capParcial = "";
+        capFinalizar = false;
+        capInicio = capUltimoHabla = System.currentTimeMillis();
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            capIdioma = null;
             hablarYTerminar("Este teléfono no tiene reconocimiento de voz.");
             return;
         }
+        lanzarSesion();
+        h.removeCallbacks(vigilante);
+        h.postDelayed(vigilante, 400);
+    }
+
+    private final Runnable vigilante = new Runnable() {
+        @Override public void run() {
+            if (!ocupado || capIdioma == null) return;
+            long ahora = System.currentTimeMillis();
+            long silencio = prefs.silencio() * 1000L;
+            if (!capFinalizar && (ahora - capUltimoHabla >= silencio || ahora - capInicio > 90000)) {
+                capFinalizar = true;
+                if (sr != null) { try { sr.stopListening(); } catch (Exception ignored) { } }
+                // por si no llegan resultados
+                h.postDelayed(() -> { if (capFinalizar && capIdioma != null) cerrarCaptura(); }, 2500);
+            }
+            h.postDelayed(this, 400);
+        }
+    };
+
+    private String textoActual() {
+        String t = capAcum.toString();
+        if (!capParcial.isEmpty()) t = (t.isEmpty() ? "" : t + " ") + capParcial;
+        return t.trim();
+    }
+
+    private void lanzarSesion() {
+        destruirSr();
         final int mia = ++gen;
         sr = SpeechRecognizer.createSpeechRecognizer(this);
         sr.setRecognitionListener(new android.speech.RecognitionListener() {
-            @Override public void onReadyForSpeech(Bundle b) { poner("Habla ahora…"); }
-            @Override public void onBeginningOfSpeech() {}
+            @Override public void onReadyForSpeech(Bundle b) { if (mia == gen) poner("Habla ahora…"); }
+            @Override public void onBeginningOfSpeech() { if (mia == gen) capUltimoHabla = System.currentTimeMillis(); }
             @Override public void onRmsChanged(float v) {}
             @Override public void onBufferReceived(byte[] b) {}
             @Override public void onEndOfSpeech() {}
             @Override public void onEvent(int t, Bundle b) {}
             @Override public void onPartialResults(Bundle b) {
+                if (mia != gen) return;
                 String t = primero(b);
-                if (t != null && !t.isEmpty()) { oido = t; poner("Oyendo…"); }
+                if (t != null && !t.isEmpty()) {
+                    capParcial = t;
+                    capUltimoHabla = System.currentTimeMillis();
+                    oido = textoActual();
+                    poner("Oyendo…");
+                    if (LISTO.matcher(oido).find() && !capFinalizar) {
+                        capFinalizar = true;
+                        try { sr.stopListening(); } catch (Exception ignored) { }
+                    }
+                }
             }
             @Override public void onResults(Bundle b) {
                 if (mia != gen) return;
                 String t = primero(b);
-                destruirSr();
-                if (t == null || t.trim().isEmpty()) hablarYTerminar("No te escuché.");
-                else enviar(t.trim());
+                if (t != null && !t.trim().isEmpty()) {
+                    if (capAcum.length() > 0) capAcum.append(" ");
+                    capAcum.append(t.trim());
+                    capUltimoHabla = System.currentTimeMillis();
+                }
+                capParcial = "";
+                oido = textoActual();
+                poner("Oyendo…");
+                terminoSesion();
             }
             @Override public void onError(int e) {
                 if (mia != gen) return;
-                destruirSr();
                 if ((e == 12 || e == 13) && !reintentoUS) {   // idioma no disponible
                     reintentoUS = true;
-                    capturar("es-US");
-                } else if (e == 7 || e == 6) {
-                    hablarYTerminar("No te escuché.");
+                    capIdioma = "es-US";
+                    h.post(CerebroService.this::lanzarSesion);
+                } else if (e == 7 || e == 6 || e == 8 || e == 1 || e == 2 || e == 5) {
+                    // sin voz / ocupado / red / cliente: se cuenta como fin de sesión
+                    capParcial = "";
+                    terminoSesion();
                 } else if (e == 9) {
-                    hablarYTerminar("Me falta el permiso del micrófono.");
+                    cerrarConMensaje("Me falta el permiso del micrófono.");
                 } else {
-                    hablarYTerminar("No pude escucharte. Error " + e + ".");
+                    cerrarConMensaje("No pude escucharte. Error " + e + ".");
                 }
             }
         });
         Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, idioma)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, capIdioma)
                 .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-                // Habla con pausas largas: espera más silencio antes de dar por terminada la orden.
-                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L)
-                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2500L);
+                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L)
+                .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 6000L);
         sr.startListening(i);
-        // Si nadie habla, no quedarse colgado.
-        h.postDelayed(() -> {
-            if (mia == gen && sr != null) { destruirSr(); hablarYTerminar("No te escuché."); }
-        }, 25000);
+    }
+
+    /** Terminó una sesión del reconocedor: ¿enviar o seguir escuchando? */
+    private void terminoSesion() {
+        if (capIdioma == null) return;
+        String t = textoActual();
+        boolean listo = LISTO.matcher(t).find();
+        long silencio = prefs.silencio() * 1000L;
+        boolean paso = System.currentTimeMillis() - capUltimoHabla >= silencio;
+        if (listo || capFinalizar || paso) {
+            cerrarCaptura();
+        } else {
+            h.postDelayed(() -> { if (capIdioma != null && !capFinalizar) lanzarSesion(); }, 250);
+        }
+    }
+
+    private void cerrarCaptura() {
+        if (capIdioma == null) return;
+        String t = LISTO.matcher(textoActual()).replaceFirst("").trim();
+        capIdioma = null;
+        capFinalizar = false;
+        h.removeCallbacks(vigilante);
+        destruirSr();
+        if (t.isEmpty()) hablarYTerminar("No te escuché.");
+        else enviar(t);
+    }
+
+    private void cerrarConMensaje(String msg) {
+        capIdioma = null;
+        h.removeCallbacks(vigilante);
+        destruirSr();
+        hablarYTerminar(msg);
     }
 
     private static String primero(Bundle b) {
@@ -371,6 +506,8 @@ public class CerebroService extends Service {
         }
     }
 
+    // --- Envío, tareas y avisos ---------------------------------------------
+
     private void enviar(String texto) {
         oido = texto;
         respuesta = "";
@@ -379,20 +516,22 @@ public class CerebroService extends Service {
         final boolean n = nueva;
         nueva = false;
         new Thread(() -> {
-            String r;
             try {
-                r = Net.ask(this, texto, n);
+                final Net.Respuesta r = Net.ask(this, texto, n);
+                prefs.guardarUltimo(texto, r.texto);
+                h.post(() -> {
+                    respuesta = r.texto;
+                    poner("Respuesta");
+                    if (r.tarea != null) seguir(r.tarea);
+                    vozRemota = r.vozRemota;
+                    decir(r.texto, "respuesta", true, r.audioUrl);
+                });
             } catch (Throwable e) {
                 if (n) nueva = true;
-                r = e.getMessage() == null ? "Falló la conexión con el PC." : e.getMessage();
-                final String msg = r;
+                final String msg = e.getMessage() == null ? "Falló la conexión con el PC." : e.getMessage();
                 prefs.guardarUltimo(texto, msg);
                 h.post(() -> { respuesta = msg; poner("Sin conexión"); decir(msg, "aviso", true); });
-                return;
             }
-            final String ok = r;
-            prefs.guardarUltimo(texto, ok);
-            h.post(() -> { respuesta = ok; poner("Respuesta"); decir(ok, "respuesta", true); });
         }, "cerebro-red").start();
     }
 
@@ -404,6 +543,78 @@ public class CerebroService extends Service {
 
     private void terminar() {
         ocupado = false;
+        if (!anuncios.isEmpty()) { h.postDelayed(this::siguienteAnuncio, 400); return; }
         h.postDelayed(() -> { if (!ocupado) reanudar(); }, 500);
+    }
+
+    // Tareas que sigo: id -> ya la vi activa. Se consulta el PC cada ~3 s mientras haya alguna
+    // o la pantalla esté abierta.
+    private final java.util.Map<String, Boolean> seguidas = new java.util.LinkedHashMap<>();
+    private final java.util.ArrayDeque<String> anuncios = new java.util.ArrayDeque<>();
+    private boolean sondeando;
+
+    private void seguir(String id) {
+        if (!seguidas.containsKey(id)) seguidas.put(id, false);
+        sondear(0);
+    }
+
+    private void sondear(long demora) {
+        h.removeCallbacks(sondeo);
+        h.postDelayed(sondeo, demora);
+    }
+
+    private final Runnable sondeo = new Runnable() {
+        @Override public void run() {
+            if (!vivo) return;
+            if (sondeando) { h.postDelayed(this, 3000); return; }
+            if (seguidas.isEmpty() && ui == null) return;
+            sondeando = true;
+            new Thread(() -> {
+                try {
+                    final java.util.List<Net.Tarea> ts = Net.tareas(CerebroService.this);
+                    h.post(() -> { sondeando = false; procesar(ts); });
+                } catch (Throwable e) {
+                    h.post(() -> sondeando = false);
+                }
+                h.post(() -> { if (vivo && (!seguidas.isEmpty() || ui != null)) h.postDelayed(sondeo, 3000); });
+            }, "cerebro-sondeo").start();
+        }
+    };
+
+    private void procesar(java.util.List<Net.Tarea> ts) {
+        StringBuilder sb = new StringBuilder();
+        int desde = Math.max(0, ts.size() - 6);
+        for (int k = 0; k < ts.size(); k++) {
+            Net.Tarea t = ts.get(k);
+            if (k >= desde) {
+                sb.append("Tarea ").append(t.id).append(" · ").append(t.estado).append(" — ")
+                        .append(t.texto.length() > 60 ? t.texto.substring(0, 60) + "…" : t.texto).append("\n");
+            }
+            if (!seguidas.containsKey(t.id)) continue;
+            boolean activa = t.estado.equals("en cola") || t.estado.equals("trabajando");
+            if (activa) { seguidas.put(t.id, true); continue; }
+            boolean vista = seguidas.remove(t.id);
+            if (!vista || t.estado.equals("cancelada")) continue;   // nada nuevo que avisar
+            String voz;
+            if (t.estado.equals("lista")) voz = "Tarea " + t.id + " lista: " + t.respuesta;
+            else if (t.estado.equals("falló")) voz = "Tarea " + t.id + " falló: " + t.respuesta;
+            else voz = "Tarea " + t.id + ": " + t.respuesta;   // espera tu respuesta (termina en ?)
+            anuncios.add(voz);
+        }
+        tareasTexto = sb.toString().trim();
+        Ui u = ui;
+        if (u != null) u.cambio();
+        if (!ocupado && !anuncios.isEmpty()) siguienteAnuncio();
+    }
+
+    private void siguienteAnuncio() {
+        if (ocupado || anuncios.isEmpty()) return;
+        String voz = anuncios.poll();
+        ocupado = true;
+        pararKeyword();
+        beep();
+        respuesta = voz;
+        poner("Aviso de tarea");
+        decir(voz, "respuesta", false);
     }
 }

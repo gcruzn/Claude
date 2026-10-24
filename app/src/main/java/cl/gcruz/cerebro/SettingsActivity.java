@@ -8,19 +8,34 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
 import android.text.InputType;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-/** Dirección del PC, contraseña y exención de batería. Nada de esto vive en el código. */
+import java.util.ArrayList;
+import java.util.List;
+
+/** Dirección del PC, contraseña, tiempos de escucha, voz y exención de batería. */
 public class SettingsActivity extends Activity {
     private Prefs prefs;
     private EditText url, clave;
-    private TextView bateria;
+    private TextView bateria, silencioTxt, velTxt, tonoTxt;
+    private SeekBar silencio, vel, tono;
+    private Spinner voces;
+    private TextToSpeech tts;
+    private boolean ttsListo;
+    private final List<Voice> lista = new ArrayList<>();
 
     private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
 
@@ -44,6 +59,21 @@ public class SettingsActivity extends Activity {
         g.setCornerRadius(dp(18));
         x.setBackground(g);
         return x;
+    }
+
+    private interface Cambio { void al(int valor); }
+
+    private SeekBar barra(int max, int valor, Cambio c) {
+        SeekBar s = new SeekBar(this);
+        s.setMax(max);
+        s.setProgress(valor);
+        s.setPadding(dp(8), dp(8), dp(8), dp(8));
+        s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar b, int p, boolean u) { c.al(p); }
+            @Override public void onStartTrackingTouch(SeekBar b) {}
+            @Override public void onStopTrackingTouch(SeekBar b) { guardarVoz(); }
+        });
+        return s;
     }
 
     @Override
@@ -83,6 +113,34 @@ public class SettingsActivity extends Activity {
         lp.setMargins(0, dp(18), 0, 0);
         col.addView(guardar, lp);
 
+        silencioTxt = etiqueta("");
+        col.addView(silencioTxt);
+        silencio = barra(9, prefs.silencio() - 3, p -> {
+            prefs.setSilencio(p + 3);
+            silencioTxt.setText("Espero " + (p + 3) + " segundos de silencio antes de enviar tu orden");
+        });
+        silencioTxt.setText("Espero " + prefs.silencio() + " segundos de silencio antes de enviar tu orden");
+        col.addView(silencio);
+
+        col.addView(etiqueta("Voz de lectura"));
+        voces = new Spinner(this);
+        col.addView(voces);
+        velTxt = etiqueta("");
+        col.addView(velTxt);
+        vel = barra(100, prefs.velocidad() - 50, p -> velTxt.setText("Velocidad: " + (p + 50) + "%"));
+        velTxt.setText("Velocidad: " + prefs.velocidad() + "%");
+        col.addView(vel);
+        tonoTxt = etiqueta("");
+        col.addView(tonoTxt);
+        tono = barra(100, prefs.tono() - 50, p -> tonoTxt.setText("Tono: " + (p + 50) + "%"));
+        tonoTxt.setText("Tono: " + prefs.tono() + "%");
+        col.addView(tono);
+        Button probar = boton("Probar la voz", 0xFF406AB4);
+        probar.setOnClickListener(v -> probar());
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(-1, dp(72));
+        lp2.setMargins(0, dp(10), 0, 0);
+        col.addView(probar, lp2);
+
         bateria = etiqueta("");
         col.addView(bateria);
         Button bat = boton("Permitir en segundo plano", 0xFF73C96A);
@@ -90,6 +148,63 @@ public class SettingsActivity extends Activity {
         col.addView(bat, new LinearLayout.LayoutParams(-1, dp(72)));
 
         setContentView(sv);
+
+        tts = new TextToSpeech(this, st -> {
+            if (st != TextToSpeech.SUCCESS) return;
+            ttsListo = true;
+            runOnUiThread(this::llenarVoces);
+        });
+    }
+
+    private void llenarVoces() {
+        lista.clear();
+        lista.addAll(Voces.espanolas(tts));
+        List<String> nombres = new ArrayList<>();
+        int sel = 0;
+        for (int i = 0; i < lista.size(); i++) {
+            nombres.add(Voces.etiqueta(lista.get(i)));
+            if (lista.get(i).getName().equals(prefs.voz())) sel = i;
+        }
+        if (nombres.isEmpty()) nombres.add("No hay voces en español instaladas");
+        ArrayAdapter<String> ad = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, nombres) {
+            @Override public View getView(int pos, View v, android.view.ViewGroup g) {
+                TextView t = (TextView) super.getView(pos, v, g);
+                t.setTextSize(18);
+                return t;
+            }
+            @Override public View getDropDownView(int pos, View v, android.view.ViewGroup g) {
+                TextView t = (TextView) super.getDropDownView(pos, v, g);
+                t.setTextSize(18);
+                t.setPadding(dp(12), dp(14), dp(12), dp(14));
+                return t;
+            }
+        };
+        voces.setAdapter(ad);
+        voces.setSelection(sel);
+        voces.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> a, View v, int pos, long id) { guardarVoz(); }
+            @Override public void onNothingSelected(AdapterView<?> a) {}
+        });
+    }
+
+    private void guardarVoz() {
+        prefs.setVelocidadTono(vel.getProgress() + 50, tono.getProgress() + 50);
+        int pos = voces.getSelectedItemPosition();
+        if (pos >= 0 && pos < lista.size()) prefs.setVoz(lista.get(pos).getName());
+    }
+
+    private void probar() {
+        if (!ttsListo) return;
+        guardarVoz();
+        Voces.aplicar(tts, prefs);
+        tts.speak("Hola Gonzalo. Soy tu cerebro. Ya, lo reviso y te aviso apenas termine.",
+                TextToSpeech.QUEUE_FLUSH, null, "prueba");
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (tts != null) { tts.stop(); tts.shutdown(); }
+        super.onDestroy();
     }
 
     @Override

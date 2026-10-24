@@ -29,11 +29,23 @@ final class Prefs {
 
     void setToken(String t) { sp.edit().putString("token", t).apply(); }
     void clearToken() { sp.edit().remove("token").apply(); }
+    void setListen(boolean on) { sp.edit().putBoolean("listen", on).apply(); }
+
     String ultimoOido() { return sp.getString("oido", ""); }
     String ultimaRespuesta() { return sp.getString("respuesta", ""); }
     void guardarUltimo(String oido, String respuesta) {
         sp.edit().putString("oido", oido).putString("respuesta", respuesta).apply();
     }
 
-    void setListen(boolean on) { sp.edit().putBoolean("listen", on).apply(); }
+    /** Segundos de silencio total para dar por terminada la orden (3 a 12). */
+    int silencio() { return Math.max(3, Math.min(12, sp.getInt("silencio", 6))); }
+    void setSilencio(int s) { sp.edit().putInt("silencio", s).apply(); }
+
+    /** Voz de TextToSpeech elegida (nombre), o "" para la mejor disponible. */
+    String voz() { return sp.getString("voz", ""); }
+    void setVoz(String v) { sp.edit().putString("voz", v).apply(); }
+    /** Velocidad y tono en porcentaje (50 a 150). */
+    int velocidad() { return sp.getInt("velocidad", 100); }
+    int tono() { return sp.getInt("tono", 100); }
+    void setVelocidadTono(int v, int t) { sp.edit().putInt("velocidad", v).putInt("tono", t).apply(); }
 }

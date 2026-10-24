@@ -27,7 +27,7 @@ public class MainActivity extends Activity {
     private static final int PERMISOS = 7;
     private final Handler h = new Handler(Looper.getMainLooper());
     private Prefs prefs;
-    private TextView estado, oido, respuesta;
+    private TextView estado, oido, respuesta, tareas;
     private Switch escucha;
     private boolean armando;
 
@@ -86,12 +86,16 @@ public class MainActivity extends Activity {
         hablar.setOnClickListener(v -> hablar());
         col.addView(hablar);
 
-        col.addView(texto("Lo que entendí", 18, 0xFF969798, false));
+        col.addView(texto("Lo que entendí (en vivo)", 18, 0xFF969798, false));
         oido = texto("", 26, 0xFF454A51, false);
         col.addView(oido);
         col.addView(texto("Respuesta", 18, 0xFF969798, false));
         respuesta = texto("", 30, 0xFF454A51, true);
         col.addView(respuesta);
+
+        col.addView(texto("Tareas", 18, 0xFF969798, false));
+        tareas = texto("", 22, 0xFF454A51, false);
+        col.addView(tareas);
 
         escucha = new Switch(this);
         escucha.setText("Escuchar «oye cerebro»");
@@ -130,6 +134,7 @@ public class MainActivity extends Activity {
             estado.setText(CerebroService.estado);
             oido.setText(CerebroService.oido);
             respuesta.setText(CerebroService.respuesta);
+            tareas.setText(CerebroService.tareasTexto.isEmpty() ? "Sin tareas" : CerebroService.tareasTexto);
             armando = true;
             escucha.setChecked(prefs.listen());
             armando = false;
@@ -141,6 +146,7 @@ public class MainActivity extends Activity {
         super.onResume();
         CerebroService.ui = this::refrescar;
         refrescar();
+        if (CerebroService.vivo) startService(new Intent(this, CerebroService.class).setAction(CerebroService.ACTION_REFRESH));
         if (permisosFaltan().isEmpty() && prefs.listen() && !CerebroService.vivo
                 && !prefs.url().isEmpty()) {
             arrancar();
