@@ -332,8 +332,11 @@ public class Player {
             Pattern.Touch part = td < a ? repress(t, sa, se) : sub(t, sa, se);
             try {
                 b.addStroke(new StrokeDescription(timedPath(part), sa - a, Math.max(1, se - sa)));
+                // Todo dedo que no sea el primero (el joystick) cuenta como «otro dedo abajo»: 24-oct,
+                // el ataque mantenido (> SHORT_TOUCH_MS) no contaba, stopByUserTouch cortaba con dos
+                // dedos inyectados abajo y Android los dejó trabados hasta reiniciar.
+                if (n > 0 || tu - td <= SHORT_TOUCH_MS) shorts.add(new long[]{sa - a, se - a});
                 n++;
-                if (tu - td <= SHORT_TOUCH_MS) shorts.add(new long[]{sa - a, se - a});
             } catch (IllegalArgumentException ignored) {
             }
         }
